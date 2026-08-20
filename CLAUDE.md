@@ -6,8 +6,8 @@ BUBAS is an orchestration language for subject matter experts, embedded in Java 
 See [`README.md`](README.md) for the pitch and [`SPEC.md`](SPEC.md) for the language definition
 and API contract.
 
-**The repository currently contains no code.** The specification is settled; implementation has
-not begun.
+**Phase 1 in progress.** `bubas-api` and `bubas-lexer` exist and are green; the analyser, runtime
+and support modules have not been started.
 
 ## The specification is the contract
 
@@ -25,24 +25,69 @@ mistaken for oversights:
 - **There is no constant folding, anywhere.** `DECIMAL` division depends on a `MathContext` that
   can change at runtime, so folding it is unsound. Folding was dropped everywhere rather than
   maintaining a per-operator carve-out.
-- **A function may read variables but never write them.** Only a statement handler may modify the
-  store, and only as its pattern's postconditions promise. Loosening this destroys definite
-  assignment.
+- **A function cannot touch the variable store at all** — not even to read. Arguments in, value
+  out. Only a statement handler reaches variables, and only as its pattern's pre- and
+  postconditions declare. A by-name read would be a use the definite-assignment analysis never
+  sees, of a type nothing checked, possibly before assignment. Ambient configuration that many
+  functions share is a service, not a global.
 - **There is no NULL in the language.** `null` is a Java value that opaque slots may hold. Adding
   a null literal or a null test reopens a design that was deliberately closed.
 - **`+` coerces only when the left operand is a STRING.** The asymmetry is intentional; `42 + "x"`
   is an error and `"" + 42 + "x"` is not. The operator `+` is assimetrical in nature when applied 
- to strings, `"a" + "b"` is not the same as `"b" + "b"`.
+ to strings, `"a" + "b"` is not the same as `"b" + "a"`.
 - **Patterns match whole logical lines.** Not prefixes, not longest-match. Two patterns matching
   one line is an error, not a resolution problem.
+- **One class is one function or one command, and nothing names a method in a string.** A lambda
+  is anonymous, so generated code could only reach it by string key through a registry that would
+  have to be rebuilt first; a method name in a string literal rots silently under IDE rename. The
+  class reference is the only reference that refactoring tools maintain. This is also what allows
+  signatures to be derived instead of declared twice.
+- **Implementation classes are constructed by the runtime with no arguments.** They cannot capture
+  embedder state, which makes `ctx.service(...)` the only way to reach a dependency. Adding a
+  constructor-injection convenience undoes that.
+- **`VariableArg` omits `declare()` and `isInitialized()` on purpose.** The runtime creates the
+  slot, because a variable-creating placeholder must carry a type constraint and so name, type and
+  finality are all fixed statically — declaring is the framework's job, and only the value needs
+  the handler. Initialization is the analyser's job: a handler may read exactly where the pattern
+  declared an `initialized` precondition, and where it writes, prior state is irrelevant.
+  `type()` and `isFinal()` look like the same kind of member but are not: a pattern can leave both
+  open (`/NUMBER`, or no mutability prefix), and the two cases cannot be split into separate
+  patterns because their token shapes are identical and overlap analysis rejects the pair. Adding
+  the missing two back re-implements checks the analyser already made.
+- **Trivia has exactly one owner, and lexing is lossless.** Everything between two tokens belongs
+  to the earlier token; everything before a line's first token belongs to the line; a terminator
+  belongs to the line it ends. Leading-plus-trailing trivia gives every gap two plausible owners
+  and a tie-break rule nobody remembers. A blank or comment-only line is a zero-token logical line
+  owning its own trivia, which is why there is no file-level trivia slot and why the parser must
+  skip lines with no tokens.
+- **Extension registration is opt-in, discovery is not.** `ServiceLoader` finds whatever is on
+  the classpath; the builder decides what gets registered. Registering automatically would let an
+  unrelated jar reserve a word an existing script uses as a variable, breaking it with no change
+  to the script or the embedding code.
 
-## Assumptions to confirm before writing code
+## Build and layout
 
-These are not yet decided. Ask rather than guess:
+Maven, Java 21. Every artefact ships a `module-info.java` and a `META-INF/services` entry, so
+extension discovery works for embedders on the module path and on the classpath alike.
 
-- build tool (Maven assumed) and Java version (21+ assumed, for records and sealed types)
-- module layout: single artefact, or core / stdlib / codegen split
-- test framework and whether the conformance suite is a separate module
+| Module | Contents | Depends on |
+|--------|----------|-----------|
+| `bubas-api` | `BubasType`, `Value`, `Context` interfaces, `VariableArg`, `ExpressionArg`, `LiteralArg`, `BubasArray`, `BubasException`, the extension SPI | — |
+| `bubas-lexer` | Tokens, logical-line assembly, continuation and comment handling | api |
+| `bubas-analyser` | Parser, pattern matcher and overlap analysis, type checker, definite assignment | api, lexer |
+| `bubas-runtime` | `BubasLanguage`, `BubasProgram`, `Interpreter`, dispatcher, variable store | api, analyser |
+| `bubas-support` | Mandatory prelude and the optional packages | api |
+
+`bubas-codegen` joins in phase 3. `bubas-support` depends only on `bubas-api`, which is the point
+of splitting the API out: a third party writing a function library must not have to depend on the
+interpreter.
+
+Tests are JUnit 5 with AssertJ, and run on the classpath rather than the module path
+(`useModulePath=false` in surefire) because they exercise package-internal behaviour. The
+`-parameters` compiler flag is on for every module: BUBAS parameter names are derived from Java
+parameter names.
+
+Still undecided: whether the interpreter/codegen conformance suite is its own module.
 
 ## Conventions
 

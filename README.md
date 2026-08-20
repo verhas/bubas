@@ -55,10 +55,7 @@ embedder supplies, named for the domain.
 ```java
 BubasLanguage lang = BubasLanguage.builder()
     .defineOpaqueType("Order", Order.class)
-    .defineFunction("LOAD_ORDER")
-        .parameter("orderId", BubasType.INTEGER)
-        .returns(BubasType.opaque("Order"))
-        .as(ctx -> orderService.load(ctx.argument("orderId").asLong()))
+    .defineFunction("LOAD_ORDER", LoadOrder.class)
     .registerService(OrderService.class, orderService)
     .seal();
 
@@ -71,9 +68,47 @@ boolean approved = prog.newInterpreter()
     .asBoolean();
 ```
 
+```java
+public final class LoadOrder {
+    public Order call(Context ctx, long orderId) {
+        return ctx.service(OrderService.class).load(orderId);
+    }
+}
+```
+
+The signature is read off the Java method: `LOAD_ORDER(orderId INTEGER) -> Order`. Nothing is
+declared twice, and nothing names a method in a string — a class reference is what an IDE renames
+and the compiler checks.
+
 Three objects, three lifetimes. A **Language** is sealed once and shared by everything. A
 **Program** is compiled once and reused. An **Interpreter** is cheap, runs once, and carries
 whatever varies per run.
+
+One class is one function or one command. That is what lets the signature be derived rather than
+declared, and it means compiled output can call the implementation directly instead of dispatching
+by string key through a registry that would have to be rebuilt first. The runtime constructs the
+class itself, with no arguments, so it cannot capture the embedder's objects — every dependency
+arrives through `ctx.service(...)`, which makes the service registry the only route from a shared,
+sealed language to per-run state.
+
+Arrays cross the boundary as native Java arrays — `long[]`, `BigDecimal[]`, `Order[]` — passed as
+the interpreter's own storage, so `Arrays.sort` works and an in-place reorder is visible to the
+script.
+
+A function or command can also ship as a self-describing, annotated class discovered by
+`ServiceLoader`, which is how the optional packages and third-party libraries are delivered.
+Discovery finds whatever is on the classpath; **registration** is opt-in, because a registered
+extension contributes reserved words and an unrelated jar should not be able to break a working
+script by appearing.
+
+```java
+BubasLanguage.builder()
+    .extensions()
+        .classloader(pluginClassLoader)
+        .filter(e -> e.getClass().getPackageName().startsWith("com.acme."))
+        .register()
+    .seal();
+```
 
 ## Documentation
 

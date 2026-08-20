@@ -192,6 +192,28 @@ Rules:
 - a trailing comment on an intermediate physical line is stripped before joining
 - a string literal never spans a line break
 - when a bracket is never closed, the diagnostic names the line where the bracket **opened**
+- a lone `_` at the end of a line is a continuation marker, never a reference to a variable
+  actually named `_`
+- a lexical error is the one diagnostic that names a **physical** line, since that is where the
+  author must look; every later stage reports logical lines
+
+A line ending with `NOT`, `TO`, `THEN` or any other keyword that cannot legally end a statement
+does **not** continue. Only a binary operator, a comma, an open bracket or an explicit `_` does.
+
+This is deliberate, and the reason is worth stating because the alternative looks like an
+improvement. The lexer could be taught which keywords may end a statement, and technically that
+would work — but it would be the grammar's syntactic knowledge seeping down into the lexical
+layer. Layers that leak into one another produce rules a reader cannot predict from either layer
+alone, and the usability cost lands on exactly the audience this language exists for. Requiring an
+explicit `_` keeps each layer's rule statable on its own:
+
+```basic
+IF NOT _
+   ORDER_WAS_FOUND(order) THEN
+
+FOR i = 0 TO _
+    LENGTH(items) - 1
+```
 
 ### 4.3 Keywords
 
@@ -199,10 +221,18 @@ Keywords are case-insensitive; `IF`, `if` and `If` are the same word. The core k
 listed in [§15](#15-reserved-words). Registered command keywords — the literal words of a
 statement pattern — are keywords too, and are equally case-insensitive.
 
+The lexer does not classify them, and cannot. The reserved-word set is not fixed until `seal()`,
+and it includes every literal token of every registered pattern, every function name and every
+opaque type name. So the lexer emits every word-shaped token alike and the analyser classifies
+against its registries — the same layering rule as the `NOT` case above. The sole exception is
+`AND`, `OR` and `MOD`, which the continuation rule must recognise; those are core and can never
+be extended, so knowing them costs the lexer no coupling.
+
 ### 4.4 Names
 
 Variable names, function names and opaque type names start with a letter or underscore and
-continue with letters, digits and underscores.
+continue with letters, digits and underscores. "Letter" means any Unicode letter, not only ASCII:
+the audience is subject matter experts, whose domain vocabulary is not necessarily English.
 
 Names are **unique case-insensitively** and **written exactly as declared or registered**. A
 declaration reserves the name in every casing; a later reference must match it character for
@@ -228,6 +258,34 @@ TRUE      FALSE                                  ' BOOLEAN
 ```
 
 String escapes: `\n`, `\t`, `\r`, `\\`, `\"`.
+
+A leading `-` is not part of a literal — `-10` is the unary operator applied to `10`, so `a-10`
+and `a - 10` tokenize identically. An integer literal that does not fit in 64 bits is rejected
+where it is written.
+
+---
+
+### 4.6 Lossless lexing
+
+Every character of the source lands either in a token or in a piece of **trivia** — whitespace, a
+comment, a continuation underscore, or a line terminator. Concatenating a logical line's trivia,
+then each token's text and trailing trivia in order, reproduces the source exactly. Tooling that
+needs comments, indentation and line structure — a language server above all — reads them from
+the same scan the compiler used, rather than from a second scanner that could disagree with it.
+
+Trivia has exactly one owner:
+
+- everything between two tokens belongs to the **earlier** token
+- everything before the first token of a line belongs to the **line**
+- a line terminator belongs to the line it ends, so a logical line is self-contained
+
+With *n* tokens there are *n+1* gaps and *n+1* slots, so no run of text is claimed twice and none
+is left unclaimed. Attaching both leading and trailing trivia to tokens, as some compiler
+frameworks do, gives every gap two plausible owners and needs a tie-break rule nobody remembers.
+
+A blank or comment-only line is a logical line with **zero tokens** that owns all of its trivia.
+That is why nothing needs a file-level trivia slot: trailing blank lines and a final comment block
+are simply more zero-token lines. The parser skips them.
 
 ---
 
@@ -600,7 +658,7 @@ when the zone beyond it is present.
 ```
 {expression:amount}
 {var:total}
-{new > var:x}
+{new > var/T:x}
 {var:total > initialized}
 {mutable:initialized > var:total > initialized}
 {initialized > var/Order:o}
@@ -610,7 +668,7 @@ when the zone beyond it is present.
 ```
 
 An unnamed placeholder takes its **kind** as its name: `{expression}` is named `expression`,
-`{new > var}` is named `var`. Placeholder names must be unique within a pattern, which is why
+`{new > var/T}` is named `var`. Placeholder names must be unique within a pattern, which is why
 at most one placeholder of each kind may be left unnamed. State keywords may not be used as
 placeholder names, which is what makes `{var:total}` and `{var:initialized}` distinguishable.
 
@@ -647,6 +705,9 @@ A constraint follows the kind after `/`.
 | `/e` where `e` is an `{expression:e}` hole | that expression's static type |
 | `/a[]` where `a` is array-typed | that array's element type |
 
+References resolve within the pattern regardless of position, so a placeholder may refer to one
+declared later.
+
 A reference means **assignment-compatible with**, so `DECLARE d DECIMAL = 5` is legal. Write
 `/=T` to demand exactly the same type. An unresolvable name is a registration error.
 
@@ -676,6 +737,21 @@ which a single prefix slot cannot express:
 ADD {literal/NUMBER:amount} TO {mutable:initialized > var:total > initialized}
 ```
 
+A placeholder with a `new` prefix **must carry a type constraint** — a concrete type, or a
+reference to a `{type:T}` placeholder in the same pattern. Without one the analyser could not know
+the type of the variable being created, and every later use of it would be uncheckable.
+Registration rejects such a pattern.
+
+```
+FETCH {type:T} INTO {new > var/T:out > initialized}      ' FETCH Order INTO result
+OPEN LEDGER {new > var/Ledger:handle > final}            ' type fixed by the pattern
+FETCH INTO {new > var:out > initialized}                 ' registration error: no type
+```
+
+Because the type and the finality are settled by the pattern, the runtime creates the slot before
+invoking the handler; the handler only supplies the value. See
+[§10.8](#108-values-and-arguments).
+
 Rules: `new` is a prefix only; a `final` postfix implies a `new` prefix; `final` cannot be
 combined with a `declared` or `initialized` prefix; the postcondition of a custom statement is
 **verified when its handler returns**, and a handler that fails to deliver what its pattern
@@ -687,53 +763,172 @@ The built-ins are ordinary patterns, and expand to core AST nodes rather than ha
 which is what allows them to be compiled to standalone Java.
 
 ```
-DECLARE {new > var:name > declared} {type:T}
-DECLARE {new > var:name > initialized} {type:T} = {expression/T:init}
-DECLARE {new > var:name > final} {type:T} FINAL = {expression/T:init}
-DECLARE {new > var:name > initialized}[{expression/INTEGER:size}] {type:T}
+DECLARE {new > var/T:name > declared} {type:T}
+DECLARE {new > var/T:name > initialized} {type:T} = {expression/T:init}
+DECLARE {new > var/T:name > final} {type:T} FINAL = {expression/T:init}
+DECLARE {new > var/ARRAY/T:name > initialized}[{expression/INTEGER:size}] {type:T}
 
 LET {mutable:declared > var:name > initialized} = {expression/name:value}
 LET {initialized > var/ARRAY:a}[{expression/INTEGER:index}] = {expression/a[]:value}
 ```
 
-Note how `{expression/name:value}` and `{expression/a[]:value}` express, for the first time, that
-an assignment's right-hand side must match the target's declared type or element type.
+Two things to note. `{expression/name:value}` and `{expression/a[]:value}` express, for the first
+time, that an assignment's right-hand side must match the target's declared type or element type.
+And each `DECLARE` variant constrains its `new` placeholder by referring to the `{type:T}` hole
+that appears later in the same pattern — type references resolve within a pattern regardless of
+order, so a forward reference is fine.
 
 ### 9.7 Custom statements
 
+A command is a class, exactly like a function — see [§10.1](#101-one-class-one-thing). Its single
+public method takes the context followed by one parameter per placeholder, in pattern order.
+
 ```java
-builder.defineStatement("VALIDATE {initialized > var/Order:item} AGAINST {expression:rules}")
-       .as(ctx -> {
-           Order order = ctx.variable("item").get().as(Order.class);
-           Value  rs   = ctx.expression("rules").evaluate();
-           if (!validate(order, rs.asString())) {
-               ctx.error("validation failed for " + ctx.variable("item").name());
-           }
-       });
+builder.defineStatement("VALIDATE {initialized > var/Order:item} AGAINST {expression:rules}",
+                        Validate.class)
+```
+
+```java
+public final class Validate {
+    public void call(StatementContext ctx, VariableArg item, ExpressionArg rules) {
+        Order order = item.get().as(Order.class);
+        if (!ctx.service(RuleEngine.class).check(order, rules.evaluate().asString())) {
+            ctx.error("validation failed for " + item.name());
+        }
+    }
+}
 ```
 
 ```basic
 VALIDATE order AGAINST rules
 ```
 
-Handler arguments are **lazy**: an expression is evaluated when, and as often as, the handler
-asks. That is what lets a custom statement express control flow rather than only side effects:
+Placeholder kinds map to parameter types:
+
+| Kind | Parameter type |
+|------|----------------|
+| `var` | `VariableArg` |
+| `expression` | `ExpressionArg` |
+| `literal` | its Java value directly — `long`, `BigDecimal`, `String`, `boolean` — or `Value` when unconstrained |
+| `type` | `BubasType` |
+
+Expression placeholders are **lazy**: evaluated when, and as often as, the handler asks. That is
+what lets a custom statement express control flow rather than only side effects. Note that the
+unnamed `{expression}` below is named `expression`, and the parameter matches:
 
 ```java
-builder.defineStatement("EXECUTE {expression} TIMES {expression/INTEGER:n}")
-       .as(ctx -> {
-           long times = ctx.expression("n").evaluate().asLong();
-           for (long i = 0; i < times; i++) {
-               ctx.expression("expression").evaluate();
-           }
-       });
+builder.defineStatement("EXECUTE {expression} TIMES {expression/INTEGER:n}",
+                        ExecuteTimes.class)
+```
+
+```java
+public final class ExecuteTimes {
+    public void call(StatementContext ctx, ExpressionArg expression, ExpressionArg n) {
+        long times = n.evaluate().asLong();
+        for (long i = 0; i < times; i++) {
+            expression.evaluate();
+        }
+    }
+}
 ```
 
 ---
 
 ## 10. Java Integration
 
-### 10.1 Building a language
+### 10.1 One class, one thing
+
+Every function and every command is implemented by its own class. The runtime instantiates it
+once per sealed language, through a public no-arg constructor or a public static `provider()`
+method — deliberately the same contract `ServiceLoader` uses, so one class works through either
+registration route.
+
+The implementation is **the single public method the class declares**. Its name is irrelevant;
+helpers are private. Declaring none, or more than one, fails at `seal()` naming the class, so a
+stray public helper is a reported error rather than a silent substitution. Overrides of `Object`
+methods are ignored.
+
+Nothing anywhere names a method in a string. A class reference is what an IDE renames and the
+compiler checks; a method name in a string literal is neither, and would rot silently under
+refactoring.
+
+To keep related implementations in one file, nest them:
+
+```java
+public final class OrderVocabulary {
+    public static final class LoadOrder  { ... }
+    public static final class OrderTotal { ... }
+}
+```
+
+Because a `BubasLanguage` is shared across threads, an implementation class must be thread-safe;
+in practice it should be stateless. It is constructed with no arguments, so it cannot capture the
+embedder's objects the way a lambda could. Every dependency arrives through `ctx.service(...)`,
+which makes the service registry the only path from a shared, sealed language to per-run state —
+enforced by construction rather than by convention.
+
+### 10.2 Signatures are derived from Java
+
+A BUBAS signature is read off the Java method. The first parameter is always the context; the
+rest are the BUBAS parameters, in order.
+
+```java
+public final class LoadOrder {
+    public Order call(Context ctx, long orderId) {
+        return ctx.service(OrderService.class).load(orderId);
+    }
+}
+```
+
+Registered as `LOAD_ORDER`, that declares `LOAD_ORDER(orderId INTEGER) -> Order`. There is one
+signature per name and no overloading. Arguments are evaluated **eagerly**, in order, before the
+implementation runs, and each must be assignable to its parameter type.
+
+| BUBAS type | Java type |
+|------------|-----------|
+| `INTEGER` | `long` |
+| `DECIMAL` | `java.math.BigDecimal` |
+| `STRING` | `java.lang.String` |
+| `BOOLEAN` | `boolean` |
+| opaque `T` | the Java class registered for `T` |
+| array of `INTEGER` | `long[]` |
+| array of `DECIMAL` | `BigDecimal[]` |
+| array of `STRING` | `String[]` |
+| array of `BOOLEAN` | `boolean[]` |
+| array of opaque `T` | `T[]` |
+| any array | `BubasArray` |
+| `VOID` (return position only) | `void` |
+
+Three consequences follow.
+
+**The opaque mapping is one-to-one.** Because a Java class identifies a BUBAS type, registering
+two type names against the same class is a `seal()` error, where previously it was merely odd.
+
+**An array is passed as the interpreter's backing store**, not a copy — no wrapper, no boxing, and
+`Arrays.sort` and `Arrays.stream` work on it directly. Writes are visible to the script
+immediately, which is what makes `SORT_ITEMS(items)` mean what it looks like. That does not
+conflict with functions being unable to write variables: an element write cannot change a
+binding, cannot violate finality since arrays are never final, and cannot change a type since the
+element type is fixed at declaration. An implementation must not retain the reference after the
+call returns.
+
+**`BubasArray` exists only for the element-agnostic case.** `LENGTH` is its sole use in the
+prelude:
+
+```java
+public interface BubasArray {
+    int       size();
+    BubasType elementType();
+    Object    raw();            // the backing long[], String[], Order[], ...
+}
+```
+
+Parameter names come from the Java parameter names when the class is compiled with `-parameters`,
+and `@Param("orderId")` overrides them. Names are documentation only, since BUBAS calls are
+positional, so a class compiled without the flag degrades to `arg0` rather than failing and
+`seal()` reports it as a diagnostic.
+
+### 10.3 Building a language
 
 ```java
 BubasLanguage lang = BubasLanguage.builder()
@@ -744,28 +939,24 @@ BubasLanguage lang = BubasLanguage.builder()
     .registerService(DataSource.class, "read",  readOnlyDs)
     .registerService(DataSource.class, "write", primaryDs)
 
-    .defineFunction("LOAD_ORDER")
-        .parameter("orderId", BubasType.INTEGER)
-        .returns(BubasType.opaque("Order"))
-        .as(ctx -> orderService.load(ctx.argument("orderId").asLong()))
+    .defineFunction("LOAD_ORDER", LoadOrder.class)
+    .defineFunction("LOG_EVENT",  LogEvent.class)
 
-    .defineFunction("LOG_EVENT")
-        .parameter("level",   BubasType.STRING)
-        .parameter("message", BubasType.STRING)
-        .returns(BubasType.VOID)
-        .as(ctx -> {
-            ctx.log(ctx.argument("level").asString(),
-                    ctx.argument("message").asString());
-            return null;
-        })
+    .defineStatement("VALIDATE {initialized > var/Order:item} AGAINST {expression:rules}",
+                     Validate.class)
 
-    .defineStatement("VALIDATE {initialized > var/Order:item} AGAINST {expression:rules}")
-        .as(ctx -> { ... })
+    .extensions()
+        .classloader(pluginClassLoader)
+        .filter(e -> e.getClass().getPackageName().startsWith("com.acme."))
+        .register()
 
     .seal();
 ```
 
-### 10.2 Compiling and running
+Every definition is one call returning the builder. There is no nested builder and no terminal
+method, because the class carries everything a nested builder used to declare.
+
+### 10.4 Compiling and running
 
 ```java
 BubasProgram prog = lang.compile(source);
@@ -784,56 +975,106 @@ for (long id : orderIds) {
 
 `run()` may be called once per `Interpreter`; a second call throws.
 
-### 10.3 Types
+### 10.5 Extensions and discovery
+
+A function or command may instead be self-describing and discoverable by `ServiceLoader`. This is
+how the optional prelude packages and third-party libraries are delivered.
+
+```
+BubasExtension                                    marker interface
+  ├── BubasFunction extends BubasExtension
+  └── BubasCommand  extends BubasExtension
+
+AbstractBubasFunction implements BubasFunction    annotation harvesting
+AbstractBubasCommand  implements BubasCommand     annotation harvesting
+```
+
+A concrete extension extends one of the abstract classes and carries an annotation. The abstract
+base reads that annotation from the concrete class and supplies the function name or the
+statement pattern; the registrar switches on `instanceof` and routes each to the matching
+registration. Everything else — the implementing method, the derived signature, instantiation —
+works exactly as in [§10.1](#101-one-class-one-thing) and [§10.2](#102-signatures-are-derived-from-java).
+
+```java
+@BubasFunction("LOAD_ORDER")
+public class LoadOrder extends AbstractBubasFunction {
+
+    public Order call(Context ctx, long orderId) {
+        return ctx.service(OrderService.class).load(orderId);
+    }
+
+    private static String cacheKey(long id) { ... }
+}
+
+@BubasCommand("VALIDATE {initialized > var/Order:item} AGAINST {expression:rules}")
+public class Validate extends AbstractBubasCommand {
+
+    public void call(StatementContext ctx, VariableArg item, ExpressionArg rules) { ... }
+}
+```
+
+The only difference between the two routes is where the name or pattern comes from: the builder
+call supplies it for a plain class, the annotation supplies it for a discoverable one.
+
+#### Registration
+
+`ServiceLoader` matches the exact service type requested, so providers must be declared for the
+marker rather than for a subtype:
+
+```java
+module bubas.support {
+    requires bubas.api;
+    provides org.bubas.api.BubasExtension with LoadOrder, Validate;
+}
+```
+
+Declaring `provides BubasFunction with LoadOrder` would not be found by
+`ServiceLoader.load(BubasExtension.class)`, and would make every new SPI subtype a breaking change
+for extension authors.
+
+Discovery is not filtered — `ServiceLoader` finds whatever the classpath holds. **Registration** is
+what the embedder controls, through the selector shown in [§10.3](#103-building-a-language). With
+no `classloader` the context class loader is used; with no `filter` everything discovered is
+registered.
+
+Registration is deliberately opt-in. A registered extension contributes reserved words, so
+automatic registration would let an unrelated jar appearing on the classpath reserve a word an
+existing script uses as a variable name, breaking it with no change to either the script or the
+embedding code.
+
+### 10.6 Types
 
 ```java
 BubasType.INTEGER
 BubasType.DECIMAL
 BubasType.STRING
 BubasType.BOOLEAN
-BubasType.VOID                    // function return type only
-BubasType.opaque("Order")         // a registered opaque type
+BubasType.VOID
+BubasType.opaque("Order")
 BubasType.arrayOf(BubasType.INTEGER)
-BubasType.ANY_ARRAY               // parameter position only
+BubasType.ANY_ARRAY
 ```
 
-`ANY_ARRAY` accepts an array of any element type. It is legal only as a parameter type — never
-for a variable, a return type or a constraint.
+`BubasType` is mostly an introspection type now that signatures are derived: it surfaces through
+`Value.type()`, `BubasArray.elementType()`, `ctx.type(name)` in a statement handler, and the
+Phase 4 vocabulary export. `ANY_ARRAY` is only ever a parameter type — never a variable type, a
+return type or a constraint.
 
-### 10.4 Functions
+### 10.7 Contexts
 
-```java
-FunctionSignature {
-    String name;                  // reserved case-insensitively, written as registered
-    BubasType returnType;         // VOID for a procedure
-    List<Parameter> parameters;   // named; Context is not among them
-}
-```
-
-One signature per name; there is no overloading. Arguments are evaluated **eagerly**, in order,
-before the implementation runs, and each must be assignable to its parameter type. A signature
-is used by the parser to recognise calls, by the analyser to check them, by the code generator
-to emit type-safe Java, and by the LLM prompt exporter to describe the available vocabulary.
-
-### 10.5 Contexts
-
-Functions and statement handlers receive different contexts, because they have different powers.
-A function may **read** variables but never write them; only a statement handler may modify the
-store, and only as its pattern's postconditions promise.
+**A function cannot touch the variable store at all.** Its arguments arrive as typed method
+parameters and it returns a value; that is the whole interface. Only a statement handler may read
+or modify variables, and only as its pattern's preconditions and postconditions declare — which is
+why it gets a richer context.
 
 ```java
-public interface Context {                          // common
+public interface Context {
     <T> T service(Class<T> type);
     <T> T service(Class<T> type, String qualifier);
     MathContext mathContext();
     void log(String level, String message);
     void debug(String message);
     void error(String message);                     // throws BubasException
-}
-
-public interface FunctionContext extends Context {
-    Value argument(String name);
-    Value variable(String name);                    // read-only
 }
 
 public interface StatementContext extends Context {
@@ -844,15 +1085,44 @@ public interface StatementContext extends Context {
 }
 ```
 
-Service lookup walks the interpreter first, then the language, so a run-scoped service overrides
-a singleton of the same key. The key is the class plus an optional qualifier, defaulting to the
+A function reading a global by name would be a use the definite-assignment analysis never
+observes, on a value whose type nothing checked, possibly before it was ever assigned. There is no
+accessor for it.
+
+Service lookup walks the interpreter first, then the language, so a run-scoped service overrides a
+singleton of the same key. The key is the class plus an optional qualifier, defaulting to the
 empty string.
 
 Services are invisible to BUBAS. No syntax refers to them and no script can observe one; they
-exist only so that shared function definitions in a sealed language can reach per-run state such
-as a transaction, a tenant or a correlation id.
+exist so that shared implementations in a sealed language can reach per-run state such as a
+transaction, a tenant or a correlation id.
 
-### 10.6 Values and arguments
+#### Ambient configuration
+
+State that many functions share — a format pattern, the digit count for loan arithmetic, a
+mandator id — is a service, not a variable. A function or command sets it, and everything else
+reads it from there:
+
+```basic
+PROGRAM Loans
+    SET_LOAN_DIGITS 4
+    LET rate = LOAN_INTEREST(principal)
+END.
+```
+
+```java
+public final class SetLoanDigits {
+    public void call(Context ctx, long digits) {
+        ctx.service(LoanConfig.class).setDigits((int) digits);
+    }
+}
+```
+
+`LoanConfig` is registered per interpreter, so the setting is scoped to the run and cannot leak
+between concurrent orchestrations. This is the layering principle applied: state shared across
+implementations belongs in Java, not threaded through every call site in the script.
+
+### 10.8 Values and arguments
 
 ```java
 public interface Value {
@@ -870,9 +1140,9 @@ public interface ExpressionArg {
 }
 
 public interface VariableArg {
-    String    name();
-    BubasType type();
-    boolean   isFinal();
+    String    name();                      // the script variable's name, for diagnostics
+    BubasType type();                      // resolved: /NUMBER may be INTEGER or DECIMAL
+    boolean   isFinal();                   // resolved: open when no mutability prefix is given
     Value     get();
     void      set(Value value);
     void      set(Object javaValue);
@@ -885,6 +1155,30 @@ public interface LiteralArg {
 
 `as(Class)` is checked against the registered opaque type rather than blind-casting, so a
 mismatch produces a BUBAS diagnostic instead of a `ClassCastException`.
+
+`VariableArg` is deliberately small, because the pattern has already decided almost everything.
+
+**There is no `declare()`.** A placeholder that creates a variable must carry a type constraint,
+so the runtime creates the slot itself before invoking the handler. Declaring is the framework's
+job; only the value needs the handler.
+
+**`type()` and `isFinal()` survive because a pattern may leave them open.** A `/NUMBER` constraint
+admits `INTEGER` or `DECIMAL`; an omitted mutability prefix admits a final variable and a mutable
+one alike. Neither can be resolved by splitting the pattern in two, because
+`X {final > var:a}` and `X {mutable > var:a}` have identical token shapes and overlap analysis
+would reject the pair — so asking at runtime is the only option available.
+
+**There is no `isInitialized()`.** The analyser already governs it: a handler may read exactly
+where the pattern declared an `initialized` precondition, and where it writes, what was there
+before does not matter.
+
+| Postcondition | What the runtime does | What the handler must do |
+|---------------|----------------------|--------------------------|
+| `> declared` | creates the slot, uninitialized | nothing |
+| `> initialized` | creates the slot | `set(...)` |
+| `> final` | creates the slot, sealing after the first write | `set(...)` exactly once |
+
+Whether the handler did its part is verified when it returns.
 
 ---
 
@@ -939,15 +1233,30 @@ BubasRegex.installInto(builder);
 
 ## 13. Code Generation
 
-A `BubasProgram` can be compiled to Java source. The generated code links against the BUBAS
-runtime rather than standing alone:
+A `BubasProgram` can be compiled to Java source. Because every function and statement
+implementation is a named static method rather than a lambda, generated code calls them
+directly:
 
-- a custom statement compiles to a callback into the statement registry
-- `DECIMAL` division reads the interpreter's `MathContext` at each site
-- overflow, bounds and postcondition checks are emitted inline
+```java
+// generated
+private final LoadOrder fn_loadOrder = new LoadOrder();
+private final Validate  cmd_validate = new Validate();
+...
+Order order = fn_loadOrder.call(ctx, orderId);
+cmd_validate.call(ctx, v_order, rulesThunk);
+```
 
-Compilation therefore buys the removal of AST-walking overhead, not standalone deployment. The
-generated code and the interpreter are two implementations of one semantics, so **a conformance
+The output needs the implementation classes and the BUBAS runtime on the classpath, and nothing
+else — the registration code does not have to run first. Had implementations been lambdas, every
+call would have dispatched through the registry by string key, and the compiled program would
+have been unable to run without first re-executing the whole builder.
+
+The runtime is still required, for `DECIMAL` division reading the interpreter's `MathContext` at
+each site, for overflow, division-by-zero and bounds checks emitted inline, for postcondition
+verification after a custom statement, and for the expression thunks that lazy statement
+placeholders need.
+
+The generated code and the interpreter are two implementations of one semantics, so **a conformance
 suite is mandatory**: every test program must run through both backends and produce identical
 results and identical errors. Divergence between the two is the characteristic bug of this
 design, and only the suite will catch it.
@@ -960,30 +1269,36 @@ design, and only the suite will catch it.
 BubasLanguage lang = BubasLanguage.builder()
     .defineOpaqueType("Order", Order.class)
 
-    .defineFunction("LOAD_ORDER")
-        .parameter("orderId", BubasType.INTEGER)
-        .returns(BubasType.opaque("Order"))
-        .as(ctx -> ctx.service(OrderService.class)
-                      .load(ctx.argument("orderId").asLong()))
-
-    .defineFunction("ORDER_WAS_FOUND")
-        .parameter("order", BubasType.opaque("Order"))
-        .returns(BubasType.BOOLEAN)
-        .as(ctx -> ctx.argument("order").as(Order.class) != null)
-
-    .defineFunction("ORDER_TOTAL")
-        .parameter("order", BubasType.opaque("Order"))
-        .returns(BubasType.DECIMAL)
-        .as(ctx -> ctx.argument("order").as(Order.class).total())
-
-    .defineFunction("LOG_EVENT")
-        .parameter("level",   BubasType.STRING)
-        .parameter("message", BubasType.STRING)
-        .returns(BubasType.VOID)
-        .as(ctx -> { log(ctx); return null; })
+    .defineFunction("LOAD_ORDER",      OrderVocabulary.LoadOrder.class)
+    .defineFunction("ORDER_WAS_FOUND", OrderVocabulary.OrderWasFound.class)
+    .defineFunction("ORDER_TOTAL",     OrderVocabulary.OrderTotal.class)
+    .defineFunction("LOG_EVENT",       LogEvent.class)
 
     .registerService(OrderService.class, orderService)
     .seal();
+```
+
+```java
+public final class OrderVocabulary {
+
+    public static final class LoadOrder {
+        public Order call(Context ctx, long orderId) {
+            return ctx.service(OrderService.class).load(orderId);
+        }
+    }
+
+    public static final class OrderWasFound {
+        public boolean call(Context ctx, Order order) {
+            return order != null;
+        }
+    }
+
+    public static final class OrderTotal {
+        public BigDecimal call(Context ctx, Order order) {
+            return order.total();
+        }
+    }
+}
 ```
 
 ```basic
