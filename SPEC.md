@@ -269,13 +269,25 @@ TRUE      FALSE                                  ' BOOLEAN
 
 String escapes: `\n`, `\t`, `\r`, `\\`, `\"`.
 
+### 4.6 Punctuation
+
+Any character that is not whitespace, a name character, a digit, a quote or an apostrophe is a
+single-character punctuation token. The lexer does not decide whether it belongs where it was
+written — the parser does, and can say so far more precisely than "unexpected character" ever
+could.
+
+That generosity is what lets a statement pattern be lexed by this same lexer, braces and all,
+rather than preprocessed into something a stricter lexer would accept. Brace pairs are balanced
+like the others, so an unclosed `{` in a pattern is reported by the lexer rather than by
+hand-written scanning.
+
 A leading `-` is not part of a literal — `-10` is the unary operator applied to `10`, so `a-10`
 and `a - 10` tokenize identically. An integer literal that does not fit in 64 bits is rejected
 where it is written.
 
 ---
 
-### 4.6 Lossless lexing
+### 4.7 Lossless lexing
 
 Every character of the source lands either in a token or in a piece of **trivia** — whitespace, a
 comment, a continuation underscore, or a line terminator. Concatenating a logical line's trivia,
@@ -764,13 +776,13 @@ A constraint follows the kind after `/`.
 
 **Type references.** A constraint may instead name another placeholder in the same pattern:
 
-| Written | Means |
-|---------|-------|
-| `/T` where `T` is a `{type:T}` hole | the type actually written at that position |
+| Written | Means                                                                   |
+|---------|-------------------------------------------------------------------------|
+| `/T` where `T` is a `{type:T}` hole | the type actually written at that position                             |
 | `/x` where `x` is a `{var:x}` hole | the static type of that reference — the element type when it is indexed |
-| `/x` where `x` is an `{identifier:x}` hole | that variable's declared type |
-| `/e` where `e` is an `{expression:e}` hole | that expression's static type |
-| `/a[]` where `a` is array-typed | that array's element type |
+| `/x` where `x` is an `{identifier:x}` hole | that variable's declared type                                           |
+| `/e` where `e` is an `{expression:e}` hole | that expression's static type                                           |
+| `/a[]` where `a` is array-typed | that array's element type                                               |
 
 References resolve within the pattern regardless of position, so a placeholder may refer to one
 declared later.

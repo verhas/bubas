@@ -1,23 +1,22 @@
 package javax0.bubas.analyser.pattern;
 
 import javax0.bubas.api.BubasDefinitionException;
+import javax0.bubas.api.BubasException;
 import javax0.bubas.lexer.Lexer;
+import javax0.bubas.lexer.LogicalLine;
+import javax0.bubas.lexer.Token;
 import javax0.bubas.lexer.TokenType;
 
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Turns a pattern string into a {@link StatementPattern}.
  * <p>
- * The literal text between placeholders is lexed with the same {@link Lexer} that reads source, so
- * a pattern literal can only ever be a token a source line could contain, and the two can be
- * compared directly. To make that work the placeholders are first replaced by marker names, which
- * also means the pattern's brackets are checked for balance by the lexer for free.
+ * A pattern is lexed by the same {@link Lexer} that reads source, exactly as written. That is
+ * possible because the lexer accepts any punctuation character, so braces are ordinary tokens and
+ * a placeholder body arrives already split into tokens. Nothing is rewritten or preprocessed, so a
+ * pattern containing any particular word cannot be mistaken for something else, and bracket
+ * balance inside a pattern is checked by the lexer for free.
  * <p>
  * Everything checked here is syntactic. Whether {@code /Order} names a registered opaque type or a
  * placeholder in the same pattern cannot be known until the language is sealed, so constraints are
@@ -25,71 +24,25 @@ import java.util.Set;
  */
 public final class PatternParser {
 
-    private static final String MARKER_PREFIX = "__bubas_ph_";
-    private static final String MARKER_SUFFIX = "__";
-
     private final String source;
-    private final List<String> bodies = new ArrayList<>();
+    private final List<Token> tokens;
+    private int at;
 
     private PatternParser(String source) {
         this.source = source;
+        this.tokens = lex();
+        this.at = 0;
     }
 
     public static StatementPattern parse(String pattern) {
         return new PatternParser(pattern).run();
     }
 
-    private StatementPattern run() {
-        final var elements = new ArrayList<PatternElement>();
-        final var placeholders = new ArrayList<Placeholder>();
-        for (final var token : lex(rewrite())) {
-            final int index = markerIndex(token.type(), token.text());
-            if (index < 0) {
-                elements.add(new Literal(token.type(), token.text()));
-            } else {
-                final var placeholder = placeholder(bodies.get(index));
-                placeholders.add(placeholder);
-                elements.add(placeholder);
-            }
-        }
-        validate(elements, placeholders);
-        return new StatementPattern(source, List.copyOf(elements));
-    }
-
-    /** Replaces every {@code {...}} with a marker name, collecting the bodies in order. */
-    private String rewrite() {
-        final var rewritten = new StringBuilder();
-        int i = 0;
-        while (i < source.length()) {
-            final char c = source.charAt(i);
-            if (c == '}') {
-                throw error("'}' without a matching '{'");
-            }
-            if (c != '{') {
-                rewritten.append(c);
-                i++;
-                continue;
-            }
-            final int close = source.indexOf('}', i + 1);
-            if (close < 0) {
-                throw error("'{' is never closed");
-            }
-            final String body = source.substring(i + 1, close);
-            if (body.indexOf('{') >= 0) {
-                throw error("a placeholder may not contain '{'");
-            }
-            rewritten.append(MARKER_PREFIX).append(bodies.size()).append(MARKER_SUFFIX);
-            bodies.add(body);
-            i = close + 1;
-        }
-        return rewritten.toString();
-    }
-
-    private List<javax0.bubas.lexer.Token> lex(String rewritten) {
-        final List<javax0.bubas.lexer.LogicalLine> lines;
+    private List<Token> lex() {
+        final List<LogicalLine> lines;
         try {
-            lines = Lexer.lex(rewritten).stream().filter(l -> l.hasTokens()).toList();
-        } catch (RuntimeException e) {
+            lines = Lexer.lex(source).stream().filter(LogicalLine::hasTokens).toList();
+        } catch (BubasException e) {
             throw error(e.getMessage(), e);
         }
         if (lines.isEmpty()) {
@@ -101,141 +54,224 @@ public final class PatternParser {
         return lines.getFirst().tokens();
     }
 
-    private int markerIndex(TokenType type, String text) {
-        if (type != TokenType.WORD || !text.startsWith(MARKER_PREFIX) || !text.endsWith(MARKER_SUFFIX)) {
-            return -1;
+    private StatementPattern run() {
+        final var elements = new ArrayList<PatternElement>();
+        final var placeholders = new ArrayList<Placeholder>();
+        while (at < tokens.size()) {
+            if (tokens.get(at).is("{")) {
+                at++;
+                final var placeholder = placeholder(body());
+                placeholders.add(placeholder);
+                elements.add(placeholder);
+            } else {
+                elements.add(new Literal(tokens.get(at).type(), tokens.get(at).text()));
+                at++;
+            }
         }
-        final String digits = text.substring(MARKER_PREFIX.length(),
-                text.length() - MARKER_SUFFIX.length());
-        return digits.chars().allMatch(Character::isDigit) ? Integer.parseInt(digits) : -1;
+        validate(elements, placeholders);
+        return new StatementPattern(source, List.copyOf(elements));
+    }
+
+    /**
+     * The tokens of one placeholder, consuming the closing brace.
+     */
+    private List<Token> body() {
+        final int start = at;
+        while (!tokens.get(at).is("}")) {
+            if (tokens.get(at).is("{")) {
+                throw error("a placeholder may not contain '{'");
+            }
+            at++;
+        }
+        final var body = tokens.subList(start, at);
+        at++;
+        return body;
     }
 
     // ---------------------------------------------------------------- placeholder body
 
     /**
-     * Splits {@code prefixes > kind[/constraint][:name] > postfixes} on {@code >}. Which part is
-     * which is decided by finding the one that names a kind, so a placeholder with only prefixes
-     * and one with only postfixes are told apart without a positional rule.
+     * Splits {@code prefixes > kind[/constraint][:name] > postfixes} on {@code >}. Which zone is
+     * which is decided by finding the one that names a kind, so a placeholder carrying only
+     * preconditions and one carrying only postconditions are told apart without a positional rule.
      */
-    private Placeholder placeholder(String body) {
-        final var zones = split(body, '>');
+    private Placeholder placeholder(List<Token> body) {
+        if (body.isEmpty()) {
+            throw error("an empty placeholder");
+        }
+        final var zones = zones(body);
+        final int core = getCore(body, zones);
+        if (zones.size() > 3) {
+            throw error("'" + text(body) + "' has too many '>' zones, maximum 3 allowed");
+        }
+        if (core > 1 || zones.size() - core > 2) {
+            throw error("'" + text(body) + "' core name is displaced. It can be in the first, or the second part.");
+        }
+        return core(zones.get(core),
+                preconditions(body, core == 1 ? zones.getFirst() : List.of()),
+                postconditions(body, core < zones.size() - 1 ? zones.getLast() : List.of()));
+    }
+
+    /**
+     * Get the index of the element in the zones that is the core one, namely the {@code expression}, {@code var}, and
+     * so on.
+     *
+     * @param body  the list of tokens
+     * @param zones the list of zones, that is the lis of list of tokens separated by the '{@code >}' characters.
+     * @return the index of the zone list that is the core one, namely the {@code expression}, {@code var}, and so on.
+     */
+    private int getCore(List<Token> body, List<List<Token>> zones) {
         int core = -1;
         for (int i = 0; i < zones.size(); i++) {
-            if (Kind.of(kindWordOf(zones.get(i))).isPresent()) {
+            if (!zones.get(i).isEmpty() && Kind.of(zones.get(i).getFirst().text()).isPresent()) {
                 if (core >= 0) {
-                    throw error("'" + body + "' names more than one kind");
+                    throw error("'" + text(body) + "' names more than one kind");
                 }
                 core = i;
             }
         }
         if (core < 0) {
-            throw error("'" + body
+            throw error("'" + text(body)
                     + "' names no kind; expected one of var, identifier, expression, literal, type");
         }
-        if (zones.size() > 3 || core > 1 || zones.size() - core > 2) {
-            throw error("'" + body + "' has too many '>' zones");
-        }
-        final var preconditions = preconditions(body, core > 0 ? zones.getFirst() : "");
-        final var postconditions = postconditions(body, core < zones.size() - 1 ? zones.getLast() : "");
-        return core(body, zones.get(core), preconditions, postconditions);
+        return core;
     }
 
-    /** The first colon-segment of a zone, which is where a kind word would sit. */
-    private static String kindWordOf(String zone) {
-        final var head = split(zone, ':').getFirst();
-        final int slash = head.indexOf('/');
-        return slash < 0 ? head : head.substring(0, slash);
+    private List<List<Token>> zones(List<Token> body) {
+        final var zones = new ArrayList<List<Token>>();
+        int start = 0;
+        for (int i = 0; i <= body.size(); i++) {
+            if (i == body.size() || body.get(i).is(">")) {
+                zones.add(body.subList(start, i));
+                start = i + 1;
+            }
+        }
+        return zones;
     }
 
-    private Placeholder core(String body, String zone,
-                             Set<Precondition> pre, Set<Postcondition> post) {
-        final var segments = split(zone, ':');
-        if (segments.size() > 2) {
-            throw error("'" + body + "' has more than one name");
+    private Placeholder core(List<Token> zone, Set<Precondition> pre, Set<Postcondition> post) {
+        final var kind = Kind.of(zone.getFirst().text()).orElseThrow();
+        int i = 1;
+        Constraint constraint = null;
+        if (i < zone.size() && zone.get(i).is("/")) {
+            i++;
+            final int from = i;
+            while (i < zone.size() && !zone.get(i).is(":")) {
+                i++;
+            }
+            constraint = constraint(zone.subList(from, i));
         }
-        final String head = segments.getFirst();
-        final int slash = head.indexOf('/');
-        final var kind = Kind.of(slash < 0 ? head : head.substring(0, slash)).orElseThrow();
-        final var constraint = slash < 0 ? null : constraint(body, head.substring(slash + 1));
-        final String name = segments.size() == 2 ? segments.get(1) : kind.spelling();
-        checkName(body, name);
+        String name = kind.spelling();
+        if (i < zone.size()) {
+            if (!zone.get(i).is(":")) {
+                throw error("'" + text(zone) + "' is not a placeholder");
+            }
+            i++;
+            if (i == zone.size()) {
+                throw error("'" + text(zone) + "' has an empty name");
+            }
+            if (zone.get(i).type() != TokenType.WORD) {
+                throw error("'" + zone.get(i).text() + "' is not a valid placeholder name");
+            }
+            name = zone.get(i).text();
+            i++;
+            if (i < zone.size()) {
+                throw error("'" + text(zone) + "' has more than one name");
+            }
+        }
+        checkName(name);
         return new Placeholder(kind, name, constraint, pre, post);
     }
 
-    private void checkName(String body, String name) {
-        if (name.isEmpty()) {
-            throw error("'" + body + "' has an empty name");
-        }
+    private void checkName(String name) {
         if (Precondition.of(name).isPresent() || Postcondition.of(name).isPresent()) {
             throw error("'" + name + "' is a state word and cannot be a placeholder name");
         }
-        if (!Character.isLetter(name.charAt(0)) && name.charAt(0) != '_') {
-            throw error("'" + name + "' is not a valid placeholder name");
-        }
     }
 
-    private Constraint constraint(String body, String text) {
-        if (text.isEmpty()) {
-            throw error("'" + body + "' has an empty constraint");
+    private Constraint constraint(List<Token> zone) {
+        if (zone.isEmpty()) {
+            throw error("an empty constraint");
         }
-        final int slash = text.indexOf('/');
-        final String head = slash < 0 ? text : text.substring(0, slash);
-        if (head.equalsIgnoreCase("ARRAY")) {
-            return new Constraint.ArrayOf(slash < 0 ? null : constraint(body, text.substring(slash + 1)));
+        final var head = zone.getFirst();
+        if ( head.is("ARRAY")) {
+            if (zone.size() == 1) {
+                return new Constraint.ArrayOf(null);
+            }
+            if (!zone.get(1).is("/")) {
+                throw error("'" + text(zone) + "' is not a valid constraint");
+            }
+            return new Constraint.ArrayOf(constraint(zone.subList(2, zone.size())));
         }
-        if (slash >= 0) {
-            throw error("'" + text + "' is not a valid constraint");
+        if (head.is("=")) {
+            if (zone.size() != 2 || zone.get(1).type() != TokenType.WORD) {
+                throw error("'" + text(zone) + "' is not a valid constraint");
+            }
+            return new Constraint.Named(zone.get(1).text(), true);
         }
-        if (text.endsWith("[]")) {
-            return new Constraint.ElementOf(text.substring(0, text.length() - 2));
+        if (head.type() != TokenType.WORD) {
+            throw error("'" + text(zone) + "' is not a valid constraint");
         }
-        return text.startsWith("=")
-                ? new Constraint.Named(text.substring(1), true)
-                : new Constraint.Named(text, false);
+        if (zone.size() == 1) {
+            return new Constraint.Named(head.text(), false);
+        }
+        if (zone.size() == 3 && zone.get(1).is("[") && zone.get(2).is("]")) {
+            return new Constraint.ElementOf(head.text());
+        }
+        throw error("'" + text(zone) + "' is not a valid constraint");
     }
 
-    private Set<Precondition> preconditions(String body, String zone) {
+    private Set<Precondition> preconditions(List<Token> body, List<Token> zone) {
         final var found = EnumSet.noneOf(Precondition.class);
-        for (final var word : words(zone)) {
+        for (final var word : conditionWords(zone)) {
             final var p = Precondition.of(word).orElseThrow(
                     () -> error("'" + word + "' is not a precondition"));
             found.stream().filter(other -> other.axis() == p.axis()).findFirst().ifPresent(other -> {
-                throw error("'" + body + "' gives two " + p.axis().name().toLowerCase(Locale.ROOT)
-                        + " preconditions: " + other.spelling() + " and " + p.spelling());
+                throw error("'" + text(body) + "' gives two "
+                        + p.axis().name().toLowerCase(Locale.ROOT) + " preconditions: "
+                        + other.spelling() + " and " + p.spelling());
             });
             found.add(p);
         }
         return Set.copyOf(found);
     }
 
-    private Set<Postcondition> postconditions(String body, String zone) {
+    private Set<Postcondition> postconditions(List<Token> body, List<Token> zone) {
         final var found = EnumSet.noneOf(Postcondition.class);
-        for (final var word : words(zone)) {
-            found.add(Postcondition.of(word).orElseThrow(
-                    () -> error("'" + word + "' is not a postcondition")));
+        for (final var word : conditionWords(zone)) {
+            final var pc = Postcondition.of(word).orElseThrow(() -> error("'" + word + "' is not a postcondition"));
+            if (found.contains(pc)) {
+                throw error("'" + text(body) + "' gives postconditions " + pc.spelling() + " more than once");
+            }
+            found.add(pc);
         }
         if (found.contains(Postcondition.FINAL) && found.size() > 1) {
-            throw error("'" + body + "' combines 'final' with another postcondition; "
+            throw error("'" + text(body) + "' combines 'final' with another postcondition; "
                     + "final already implies the variable is created and initialized");
         }
         return Set.copyOf(found);
     }
 
-    private static List<String> words(String zone) {
-        return zone.isBlank() ? List.of() : split(zone, ':');
-    }
-
-    /** Splits on a separator, trimming each part; spaces around ':' and '>' carry no meaning. */
-    private static List<String> split(String text, char separator) {
-        final var parts = new ArrayList<String>();
-        int start = 0;
-        for (int i = 0; i <= text.length(); i++) {
-            if (i == text.length() || text.charAt(i) == separator) {
-                parts.add(text.substring(start, i).trim());
-                start = i + 1;
+    /**
+     * A condition zone is {@code WORD (':' WORD)*}.
+     */
+    private List<String> conditionWords(List<Token> zone) {
+        final var words = new ArrayList<String>();
+        for (int i = 0; i < zone.size(); i++) {
+            final var token = zone.get(i);
+            if (i % 2 == 0) {
+                if (token.type() != TokenType.WORD) {
+                    throw error("'" + token.text() + "' is not a condition");
+                }
+                words.add(token.text());
+            } else if (!token.is(":")) {
+                throw error("conditions are separated by ':', not '" + token.text() + "'");
             }
         }
-        return parts;
+        if (!zone.isEmpty() && zone.size() % 2 == 0) {
+            throw error("'" + text(zone) + "' ends with a dangling ':'");
+        }
+        return words;
     }
 
     // ---------------------------------------------------------------- whole-pattern rules
@@ -292,10 +328,18 @@ public final class PatternParser {
         }
     }
 
-    /** A placeholder creates a variable when it says {@code new}, or implies it by making one final. */
+    /**
+     * A placeholder creates a variable when it says {@code new}, or implies it by making one final.
+     */
     private static boolean creates(Placeholder p) {
         return p.preconditions().contains(Precondition.NEW)
                 || p.postconditions().contains(Postcondition.FINAL);
+    }
+
+    // ---------------------------------------------------------------- token helpers
+
+    private static String text(List<Token> tokens) {
+        return tokens.stream().map(Token::text).reduce("", String::concat);
     }
 
     private BubasDefinitionException error(String message) {

@@ -303,7 +303,7 @@ class PatternParserTest {
 
         @Test
         void a_stray_closing_brace_is_rejected() {
-            assertThat(rejection("SHOW var:x}")).contains("without a matching");
+            assertThat(rejection("SHOW var:x}")).contains("unmatched '}'");
         }
 
         @Test

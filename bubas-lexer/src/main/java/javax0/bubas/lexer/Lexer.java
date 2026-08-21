@@ -19,6 +19,12 @@ import java.util.regex.Pattern;
  * exception: a lexical error names the physical line it occurred on, because that is where the
  * author has to look.
  * <p>
+ * Any character that is not whitespace, a name character, a digit, a quote or an apostrophe is a
+ * single-character {@link TokenType#PUNCT} token. The lexer does not judge whether it belongs
+ * where it was written; the parser does, and can say so far more precisely. That is also what lets
+ * a statement pattern be lexed with this same lexer, braces and all, rather than preprocessed into
+ * something the lexer would accept.
+ * <p>
  * The lexer does not know what a keyword is, and cannot: the reserved-word set is not fixed until
  * the language is sealed, and it includes every literal token of every registered pattern, every
  * function name and every opaque type name. Everything word-shaped is a {@link TokenType#WORD}
@@ -32,7 +38,9 @@ import java.util.regex.Pattern;
  */
 public final class Lexer {
 
-    /** Word-shaped binary operators. A line ending with one of these continues. */
+    /**
+     * Word-shaped binary operators. A line ending with one of these continues.
+     */
     private static final Set<String> WORD_OPERATORS = Set.of("AND", "OR", "MOD");
 
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
@@ -40,7 +48,9 @@ public final class Lexer {
     private record Bracket(char open, int line, int column) {
     }
 
-    /** A token under construction; its trailing trivia is not known until the next token appears. */
+    /**
+     * A token under construction; its trailing trivia is not known until the next token appears.
+     */
     private static final class Pending {
         private final TokenType type;
         private final String text;
@@ -69,9 +79,13 @@ public final class Lexer {
     private final List<Pending> pending = new ArrayList<>();
     private final List<Bracket> brackets = new ArrayList<>();
 
-    /** Trivia seen since the last token, awaiting an owner. */
+    /**
+     * Trivia seen since the last token, awaiting an owner.
+     */
     private final List<Trivia> gap = new ArrayList<>();
-    /** Trivia that precedes the first token of the current logical line. */
+    /**
+     * Trivia that precedes the first token of the current logical line.
+     */
     private final List<Trivia> lineTrivia = new ArrayList<>();
 
     private int firstPhysicalLine = -1;
@@ -171,7 +185,9 @@ public final class Lexer {
         };
     }
 
-    /** Hands the pending gap to its owner: the previous token, or the line when there is none. */
+    /**
+     * Hands the pending gap to its owner: the previous token, or the line when there is none.
+     */
     private void flushGap() {
         if (gap.isEmpty()) {
             return;
@@ -340,27 +356,34 @@ public final class Lexer {
         final char c = text.charAt(i);
         switch (c) {
             case '+', '-', '*', '/', '=', '<', '>' -> add(TokenType.OPERATOR, String.valueOf(c), ln, i, null);
-            case '(', '[' -> {
+            case '(', '[', '{' -> {
                 brackets.add(new Bracket(c, ln, i + 1));
                 add(TokenType.PUNCT, String.valueOf(c), ln, i, null);
             }
-            case ')', ']' -> {
+            case ')', ']', '}' -> {
                 closeBracket(c, ln);
                 add(TokenType.PUNCT, String.valueOf(c), ln, i, null);
             }
-            case ',', '.' -> add(TokenType.PUNCT, String.valueOf(c), ln, i, null);
-            default -> throw error(ln, "unexpected character '" + c + "'");
+            default -> add(TokenType.PUNCT, String.valueOf(c), ln, i, null);
         }
         return i + 1;
     }
 
+    private static char opening(char close) {
+        return switch (close) {
+            case ')' -> '(';
+            case ']' -> '[';
+            case '}' -> '{';
+            default -> throw new RuntimeException("INternal error, opening was called with " + close + " characetr");
+        };
+    }
+
     private void closeBracket(char close, int ln) {
-        final char expected = close == ')' ? '(' : '[';
         if (brackets.isEmpty()) {
             throw error(ln, "unmatched '" + close + "'");
         }
         final var open = brackets.removeLast();
-        if (open.open() != expected) {
+        if (open.open() != opening(close)) {
             throw error(ln, "'" + close + "' does not match '" + open.open()
                     + "' opened on line " + (open.line() + 1));
         }

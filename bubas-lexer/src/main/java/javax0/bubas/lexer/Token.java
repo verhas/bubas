@@ -26,6 +26,20 @@ import java.util.List;
 public record Token(TokenType type, String text, int line, int column, Object value,
                     List<Trivia> trailing) {
 
+    /**
+     * True when this token is spelled exactly {@code text}.
+     * <p>
+     * There is deliberately no token type to compare as well. No text is producible by two
+     * different types: {@code > / = + - * <} and the two-character comparisons are only ever
+     * {@link TokenType#OPERATOR}, every other symbol is only ever {@link TokenType#PUNCT}, a word
+     * is letters and digits, a number is digits, and a string literal's text keeps its quotes.
+     * Comparing the type could never change an outcome, and would silently stop matching if the
+     * lexer ever reclassified one of these symbols.
+     */
+    public boolean is(String text) {
+        return this.text.equalsIgnoreCase(text);
+    }
+
     public long asLong() {
         return (Long) value;
     }
