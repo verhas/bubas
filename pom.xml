@@ -15,6 +15,7 @@
     <modules>
         <module>bubas-api</module>
         <module>bubas-lexer</module>
+        <module>bubas-analyser</module>
     </modules>
 
     <properties>

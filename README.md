@@ -13,14 +13,14 @@ PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
     DECLARE total DECIMAL
     DECLARE taxRate DECIMAL FINAL = 0.07
 
-    LET order = LOAD_ORDER(orderId)
+    order = LOAD_ORDER(orderId)
 
     IF NOT ORDER_WAS_FOUND(order) THEN
         LOG_EVENT "ERROR", "no such order: " + orderId
         RETURN FALSE
     END IF
 
-    LET total = ORDER_TOTAL(order) * (1.0 + taxRate)
+    total = ORDER_TOTAL(order) * (1.0 + taxRate)
 
     IF total > limit THEN
         LOG_EVENT "INFO", "over limit: " + total
@@ -32,6 +32,10 @@ END.
 ```
 
 ## Why it looks like this
+
+**BUBAS is not BASIC.** The name is a nod, not a lineage. There is no `LET`, no line numbers, no
+`GOTO`, no user-defined subroutines — and no general-purpose language hiding under the syntax.
+What survives is the one thing BASIC got right: a reader who is not a hard-core programmer can follow it.
 
 **Typed, and strict about it.** Every type error, every variable read before it holds a value,
 every unreachable statement and every unused variable is reported before the script runs. A
@@ -61,7 +65,7 @@ BubasLanguage lang = BubasLanguage.builder()
 
 BubasProgram prog = lang.compile(source);
 
-boolean approved = prog.newInterpreter()
+boolean approved = Interpreter.of(prog)
     .argument("orderId", 42L)
     .argument("limit", new BigDecimal("1000.00"))
     .run()

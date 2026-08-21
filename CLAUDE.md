@@ -54,6 +54,16 @@ mistaken for oversights:
   open (`/NUMBER`, or no mutability prefix), and the two cases cannot be split into separate
   patterns because their token shapes are identical and overlap analysis rejects the pair. Adding
   the missing two back re-implements checks the analyser already made.
+- **A `var` reaches exactly one location, and there is no `get(index)` / `set(index, value)`.**
+  Given `MODIFY A[5]` the handler alters `A[5]` and has no way to reach `A[6]`. That is the
+  guarantee the script author reads off the line. An array-typed placeholder is the opposite and
+  deliberately unrestricted: `RESET A FROM 3 TO 7` hands over the backing store, and the handler
+  may write whatever it likes. The difference is visible in the source — `A[5]` names a slot, `A`
+  names the array.
+- **Assignment has no keyword, so a pattern need not begin with one.** `x = 5` is the built-in
+  assignment pattern; its only literal is `=`. Requiring a leading word would make the most
+  frequent statement in the language inexpressible. What a pattern must have is at least one
+  literal of any kind — one made only of placeholders reserves nothing and would match by shape.
 - **Trivia has exactly one owner, and lexing is lossless.** Everything between two tokens belongs
   to the earlier token; everything before a line's first token belongs to the line; a terminator
   belongs to the line it ends. Leading-plus-trailing trivia gives every gap two plausible owners
@@ -74,9 +84,20 @@ extension discovery works for embedders on the module path and on the classpath 
 |--------|----------|-----------|
 | `bubas-api` | `BubasType`, `Value`, `Context` interfaces, `VariableArg`, `ExpressionArg`, `LiteralArg`, `BubasArray`, `BubasException`, the extension SPI | — |
 | `bubas-lexer` | Tokens, logical-line assembly, continuation and comment handling | api |
-| `bubas-analyser` | Parser, pattern matcher and overlap analysis, type checker, definite assignment | api, lexer |
-| `bubas-runtime` | `BubasLanguage`, `BubasProgram`, `Interpreter`, dispatcher, variable store | api, analyser |
+| `bubas-analyser` | `BubasLanguage`, `BubasProgram`, pattern matcher and overlap analysis, parser, type checker, definite assignment | api, lexer |
+| `bubas-runtime` | `Interpreter`, dispatcher, variable store | api, analyser |
 | `bubas-support` | Mandatory prelude and the optional packages | api |
+
+The pattern matcher sits with the parser deliberately. They would be separable only at the cost of
+an interface module and runtime injection of its implementation, to solve a dependency that does
+not exist: every pattern, function and opaque type is registered and the language sealed before the
+first source line is matched, so the parser's vocabulary is complete and immutable by the time it
+runs — a plain field, not an injected service.
+
+`BubasLanguage` owns `compile()`, so it belongs with the analyser, not the runtime. Nothing is
+resolved by name at run time: the compiler bakes resolved implementations and classes into the AST,
+so the registries never outlive analysis. Execution is entered with `Interpreter.of(program)` —
+a factory method on `BubasProgram` would make the analyser depend on the runtime.
 
 `bubas-codegen` joins in phase 3. `bubas-support` depends only on `bubas-api`, which is the point
 of splitting the API out: a third party writing a function library must not have to depend on the
