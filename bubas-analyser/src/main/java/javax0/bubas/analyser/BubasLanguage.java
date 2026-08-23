@@ -8,7 +8,7 @@ import javax0.bubas.analyser.pattern.PatternParser;
 import javax0.bubas.analyser.pattern.StatementPattern;
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.analyser.statement.StatementParser;
-import javax0.bubas.analyser.type.TypeChecker;
+import javax0.bubas.analyser.core.Lowering;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.lexer.Lexer;
 
@@ -86,8 +86,7 @@ public final class BubasLanguage {
     public BubasProgram compile(String source) {
         final var program = StatementParser.parse(Lexer.lex(source), this);
         final var symbols = FlowAnalyser.check(program, this);
-        TypeChecker.check(program, this, symbols);
-        return new BubasProgram(this, program, symbols.declared());
+        return new BubasProgram(this, Lowering.lower(program, this, symbols));
     }
 
     public static final class Builder {

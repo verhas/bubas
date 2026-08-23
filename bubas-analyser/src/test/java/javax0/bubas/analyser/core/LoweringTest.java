@@ -1,4 +1,4 @@
-package javax0.bubas.analyser.type;
+package javax0.bubas.analyser.core;
 
 import javax0.bubas.analyser.BubasLanguage;
 import javax0.bubas.analyser.flow.FlowAnalyser;
@@ -19,7 +19,7 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-class TypeCheckerTest {
+class LoweringTest {
 
     public static final class Order {
     }
@@ -72,7 +72,7 @@ class TypeCheckerTest {
         final var source = "PROGRAM P\n" + body + "\nEND.";
         final var thrown = catchThrowableOfType(BubasException.class, () -> {
             final var program = StatementParser.parse(Lexer.lex(source), LANGUAGE);
-            TypeChecker.check(program, LANGUAGE, FlowAnalyser.check(program, LANGUAGE));
+            Lowering.lower(program, LANGUAGE, FlowAnalyser.check(program, LANGUAGE));
         });
         return thrown == null ? null : thrown.getMessage();
     }
@@ -238,7 +238,7 @@ class TypeCheckerTest {
             final var thrown = catchThrowableOfType(BubasException.class, () -> {
                 final var source = "PROGRAM P RETURNS BOOLEAN\nRETURN 1\nEND.";
                 final var program = StatementParser.parse(Lexer.lex(source), LANGUAGE);
-                TypeChecker.check(program, LANGUAGE, FlowAnalyser.check(program, LANGUAGE));
+                Lowering.lower(program, LANGUAGE, FlowAnalyser.check(program, LANGUAGE));
             });
             assertThat(thrown.getMessage())
                     .contains("declares RETURNS BOOLEAN, so it cannot return INTEGER");

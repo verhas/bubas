@@ -1,8 +1,6 @@
 package javax0.bubas.analyser;
 
-import javax0.bubas.analyser.statement.Program;
-import javax0.bubas.analyser.statement.Statement;
-import javax0.bubas.analyser.symbol.Variable;
+import javax0.bubas.analyser.core.CoreProgram;
 import javax0.bubas.api.BubasType;
 
 import java.util.List;
@@ -18,37 +16,36 @@ import java.util.List;
 public final class BubasProgram {
 
     private final BubasLanguage language;
-    private final Program program;
-    private final List<Variable> variables;
+    private final CoreProgram core;
 
-    BubasProgram(BubasLanguage language, Program program, List<Variable> variables) {
+    BubasProgram(BubasLanguage language, CoreProgram core) {
         this.language = language;
-        this.program = program;
-        this.variables = List.copyOf(variables);
+        this.core = core;
     }
 
     /** Documentation, and not otherwise significant. */
     public String name() {
-        return program.name().text();
+        return core.name();
     }
 
-    /** Supplied by the embedder before the run; FINAL and INITIALIZED on entry. */
-    public List<Program.Parameter> parameters() {
-        return program.parameters();
+    /** How many of the leading slots the embedder supplies. They are final and already assigned. */
+    public int parameterCount() {
+        return core.parameters();
     }
 
     /** {@code null} when the program declares no {@code RETURNS}. */
     public BubasType returns() {
-        return program.returns();
+        return core.returns();
     }
 
-    public List<Statement> body() {
-        return program.body();
+    /** Every variable, in slot order, parameters first. */
+    public List<CoreProgram.Slot> variables() {
+        return core.slots();
     }
 
-    /** Every variable the program declares, in declaration order, parameters first. */
-    public List<Variable> variables() {
-        return variables;
+    /** What a back end executes or emits. */
+    public CoreProgram core() {
+        return core;
     }
 
     /** The language this was compiled against, which carries the services a run needs. */

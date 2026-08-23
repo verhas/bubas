@@ -17,5 +17,5 @@ module bubas.analyser {
     exports javax0.bubas.analyser.symbol;
     exports javax0.bubas.analyser.statement;
     exports javax0.bubas.analyser.flow;
-    exports javax0.bubas.analyser.type;
+    exports javax0.bubas.analyser.core;
 }

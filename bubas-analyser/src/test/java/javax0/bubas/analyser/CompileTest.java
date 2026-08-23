@@ -1,6 +1,6 @@
 package javax0.bubas.analyser;
 
-import javax0.bubas.analyser.symbol.Variable;
+import javax0.bubas.analyser.core.CoreProgram;
 import javax0.bubas.support.Standard;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.api.BubasType;
@@ -100,22 +100,23 @@ class CompileTest {
             final var program = LANGUAGE.compile(APPROVE_ORDER);
             assertThat(program.name()).isEqualTo("ApproveOrder");
             assertThat(program.returns()).isEqualTo(BubasType.BOOLEAN);
-            assertThat(program.parameters()).extracting(p -> p.name().text())
-                    .containsExactly("orderId", "limit");
+            assertThat(program.parameterCount()).isEqualTo(2);
+            assertThat(program.variables().subList(0, program.parameterCount()))
+                    .extracting(CoreProgram.Slot::name).containsExactly("orderId", "limit");
         }
 
         @Test
         void every_variable_is_recorded_with_parameters_first() {
             assertThat(LANGUAGE.compile(APPROVE_ORDER).variables())
-                    .extracting(Variable::name)
+                    .extracting(CoreProgram.Slot::name)
                     .containsExactly("orderId", "limit", "purchase", "total", "taxRate");
         }
 
         @Test
         void a_parameter_and_a_FINAL_declaration_are_both_immutable() {
             assertThat(LANGUAGE.compile(APPROVE_ORDER).variables())
-                    .filteredOn(Variable::isFinal)
-                    .extracting(Variable::name)
+                    .filteredOn(CoreProgram.Slot::isFinal)
+                    .extracting(CoreProgram.Slot::name)
                     .containsExactly("orderId", "limit", "taxRate");
         }
 
@@ -123,7 +124,7 @@ class CompileTest {
         void the_program_is_reusable_and_carries_its_language() {
             final var program = LANGUAGE.compile(APPROVE_ORDER);
             assertThat(program.language()).isSameAs(LANGUAGE);
-            assertThat(program.body()).isNotEmpty();
+            assertThat(program.core().body()).isNotEmpty();
             assertThat(LANGUAGE.compile(APPROVE_ORDER).name()).isEqualTo(program.name());
         }
     }
