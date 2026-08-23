@@ -2,11 +2,15 @@ package javax0.bubas.analyser;
 
 import javax0.bubas.analyser.match.OverlapAnalysis;
 import javax0.bubas.analyser.match.Vocabulary;
+import javax0.bubas.analyser.flow.FlowAnalyser;
 import javax0.bubas.analyser.pattern.ConstraintResolver;
 import javax0.bubas.analyser.pattern.PatternParser;
 import javax0.bubas.analyser.pattern.StatementPattern;
 import javax0.bubas.api.BubasDefinitionException;
+import javax0.bubas.analyser.statement.StatementParser;
+import javax0.bubas.analyser.type.TypeChecker;
 import javax0.bubas.api.BubasType;
+import javax0.bubas.lexer.Lexer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -68,6 +72,22 @@ public final class BubasLanguage {
 
     public List<CommandDefinition> commands() {
         return commands;
+    }
+
+    /**
+     * Lexes, parses and checks one source.
+     * <p>
+     * The result is reusable across runs, which is the point of separating this from execution: a
+     * script compiled once can be run many times, each run getting nothing but a fresh variable
+     * store.
+     *
+     * @throws javax0.bubas.api.BubasException on the first problem found
+     */
+    public BubasProgram compile(String source) {
+        final var program = StatementParser.parse(Lexer.lex(source), this);
+        final var symbols = FlowAnalyser.check(program, this);
+        TypeChecker.check(program, this, symbols);
+        return new BubasProgram(this, program, symbols.declared());
     }
 
     public static final class Builder {
