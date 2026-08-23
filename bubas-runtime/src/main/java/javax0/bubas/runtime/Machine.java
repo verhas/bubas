@@ -4,14 +4,7 @@ import javax0.bubas.analyser.core.CoreArgument;
 import javax0.bubas.analyser.core.CoreExpression;
 import javax0.bubas.analyser.core.CoreProgram;
 import javax0.bubas.analyser.core.CoreStatement;
-import javax0.bubas.api.ArrayIndex;
-import javax0.bubas.api.BubasException;
-import javax0.bubas.api.BubasType;
-import javax0.bubas.api.ExpressionArg;
-import javax0.bubas.api.LiteralArg;
-import javax0.bubas.api.StatementContext;
-import javax0.bubas.api.Value;
-import javax0.bubas.api.VariableArg;
+import javax0.bubas.api.*;
 import javax0.bubas.lexer.LogicalLine;
 
 import java.lang.reflect.Array;
@@ -20,7 +13,6 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -48,9 +40,13 @@ final class Machine implements StatementContext {
     private final MathContext mathContext;
     private final BiConsumer<String, String> logger;
 
-    /** The statement being executed, so anything raised below can name a line. */
+    /**
+     * The statement being executed, so anything raised below can name a line.
+     */
     private LogicalLine current;
-    /** The arguments of the command being invoked, which its handler asks for by name. */
+    /**
+     * The arguments of the command being invoked, which its handler asks for by name.
+     */
     private Map<String, CoreArgument> arguments = Map.of();
 
     Machine(CoreProgram program, Object[] slots, Map<Class<?>, Map<String, Object>> services,
@@ -88,8 +84,7 @@ final class Machine implements StatementContext {
             case CoreStatement.Break leave -> throw new Signal.Broke(leave.loopId());
             case CoreStatement.Return result -> throw new Signal.Returned(
                     result.value() == null ? null : evaluate(result.value()));
-            case CoreStatement.Procedure procedure ->
-                    invoke(procedure.signature(), procedure.arguments());
+            case CoreStatement.Procedure procedure -> invoke(procedure.signature(), procedure.arguments());
             case CoreStatement.Invoke command -> command(command);
         }
     }
@@ -154,9 +149,12 @@ final class Machine implements StatementContext {
         arguments = command.arguments();
         try {
             final var implementation = command.definition().implementation();
-            final var parameters = new ArrayList<Object>();
-            for (final var placeholder : command.definition().pattern().placeholders()) {
-                parameters.add(parameter(command.arguments().get(placeholder.name())));
+            final var declared = implementation.method().getParameterTypes();
+            final var placeholders = command.definition().pattern().placeholders();
+            final var parameters = new ArrayList<>();
+            for (int i = 0; i < placeholders.size(); i++) {
+                parameters.add(parameter(command.arguments().get(placeholders.get(i).name()),
+                        declared[i + 1]));
             }
             call(implementation.instance(), implementation.method(), this, parameters);
         } finally {
@@ -164,12 +162,19 @@ final class Machine implements StatementContext {
         }
     }
 
-    private Object parameter(CoreArgument argument) {
+    /**
+     * A constrained literal arrives as the Java type its constraint fixes; an unconstrained one has
+     * no single type to arrive as, so it arrives as a {@link Value}. Which of the two is decided by
+     * what the handler declared, checked at seal.
+     */
+    private Object parameter(CoreArgument argument, Class<?> declared) {
         return switch (argument) {
             case CoreArgument.Slot slot -> new SlotArgument(slot);
             case CoreArgument.Lazy lazy -> new LazyArgument(lazy.expression());
             case CoreArgument.Type type -> type.type();
-            case CoreArgument.Constant constant -> constant.value();
+            case CoreArgument.Constant constant -> declared == Value.class
+                    ? new RuntimeValue(constant.type(), constant.value())
+                    : constant.value();
         };
     }
 
@@ -186,16 +191,14 @@ final class Machine implements StatementContext {
             case CoreExpression.Element element -> element(element);
             case CoreExpression.Widen widen -> BigDecimal.valueOf((Long) evaluate(widen.operand()));
             case CoreExpression.Text text -> text(evaluate(text.operand()));
-            case CoreExpression.Concat concat ->
-                    (String) evaluate(concat.left()) + evaluate(concat.right());
+            case CoreExpression.Concat concat -> (String) evaluate(concat.left()) + evaluate(concat.right());
             case CoreExpression.Arithmetic operation -> arithmetic(operation);
             case CoreExpression.Negate negate -> negate(negate);
             case CoreExpression.Compare compare -> compare(compare);
             case CoreExpression.Not not -> !(Boolean) evaluate(not.operand());
-            case CoreExpression.Logical logical ->
-                    logical.connective() == CoreExpression.Connective.AND
-                            ? truth(logical.left()) && truth(logical.right())
-                            : truth(logical.left()) || truth(logical.right());
+            case CoreExpression.Logical logical -> logical.connective() == CoreExpression.Connective.AND
+                    ? truth(logical.left()) && truth(logical.right())
+                    : truth(logical.left()) || truth(logical.right());
             case CoreExpression.Call call -> invoke(call.signature(), call.arguments());
         };
     }
@@ -205,7 +208,9 @@ final class Machine implements StatementContext {
                 bounds(slots[element.slot()], (Long) evaluate(element.index())));
     }
 
-    /** Plain digits, plain decimal notation keeping scale, and TRUE/FALSE as the literals read. */
+    /**
+     * Plain digits, plain decimal notation keeping scale, and TRUE/FALSE as the literals read.
+     */
     private static String text(Object value) {
         if (value instanceof BigDecimal decimal) {
             return decimal.toPlainString();
@@ -224,7 +229,9 @@ final class Machine implements StatementContext {
                 : decimal(operation.operator(), (BigDecimal) left, (BigDecimal) right);
     }
 
-    /** Overflow is an error, never a wraparound; division truncates and MOD takes the dividend's sign. */
+    /**
+     * Overflow is an error, never a wraparound; division truncates and MOD takes the dividend's sign.
+     */
     private Object integer(CoreExpression.Operator operator, long left, long right) {
         return switch (operator) {
             case ADD -> arithmetic(() -> Math.addExact(left, right));
@@ -291,7 +298,13 @@ final class Machine implements StatementContext {
 
     private Object invoke(javax0.bubas.analyser.FunctionSignature signature,
                           List<CoreExpression> given) {
-        final var parameters = given.stream().map(this::evaluate).toList();
+        final var parameters = new ArrayList<>();
+        for (int i = 0; i < given.size(); i++) {
+            final var value = evaluate(given.get(i));
+            parameters.add(signature.parameters().get(i).type() == BubasType.ANY_ARRAY
+                    ? new RuntimeArray(value, element(given.get(i).type()))
+                    : value);
+        }
         return call(signature.implementation().instance(), signature.implementation().method(),
                 this, parameters);
     }
@@ -311,10 +324,17 @@ final class Machine implements StatementContext {
             return method.invoke(instance, arguments);
         } catch (InvocationTargetException e) {
             throw wrap(e.getCause());
-        } catch (ReflectiveOperationException e) {
-            throw new BubasException(method.getName() + " could not be called", current.line(),
-                    current.source(), e);
+        } catch (ReflectiveOperationException | IllegalArgumentException e) {
+            // An argument mismatch is an IllegalArgumentException, which is neither a
+            // ReflectiveOperationException nor thrown by the handler — so without this it would
+            // reach the embedder as a raw Java exception naming no line.
+            throw new BubasException(method.getName() + " could not be called: " + e.getMessage(),
+                    current.line(), current.source(), e);
         }
+    }
+
+    private static BubasType element(BubasType arrayType) {
+        return arrayType instanceof BubasType.ArrayOf(var elementType) ? elementType : arrayType;
     }
 
     private BubasException wrap(Throwable cause) {
@@ -350,12 +370,18 @@ final class Machine implements StatementContext {
 
     @Override
     public ExpressionArg expression(String name) {
-        return (ExpressionArg) parameter(argument(name));
+        if (argument(name) instanceof CoreArgument.Lazy lazy) {
+            return new LazyArgument(lazy.expression());
+        }
+        throw new Mistake("'" + name + "' is not an expression placeholder");
     }
 
     @Override
     public VariableArg variable(String name) {
-        return (VariableArg) parameter(argument(name));
+        if (argument(name) instanceof CoreArgument.Slot slot) {
+            return new SlotArgument(slot);
+        }
+        throw new Mistake("'" + name + "' is not a variable placeholder");
     }
 
     @Override
@@ -473,7 +499,9 @@ final class Machine implements StatementContext {
         }
     }
 
-    /** At most one evaluation, because the index selects which location is read or written. */
+    /**
+     * At most one evaluation, because the index selects which location is read or written.
+     */
     private final class IndexArgument implements ArrayIndex {
         private final CoreExpression expression;
         private boolean evaluated;

@@ -16,6 +16,17 @@ public final class Standard {
     private Standard() {
     }
 
+    /** Name to implementation: the conversions and the length the specification depends on. */
+    public static final Map<String, Class<?>> FUNCTIONS = functions();
+
+    private static Map<String, Class<?>> functions() {
+        final var map = new LinkedHashMap<String, Class<?>>();
+        map.put(ToInteger.NAME, ToInteger.class);
+        map.put(ToDecimal.NAME, ToDecimal.class);
+        map.put(Length.NAME, Length.class);
+        return java.util.Collections.unmodifiableMap(map);
+    }
+
     /** Pattern to implementation, in the order an embedder would naturally read them. */
     public static final Map<String, Class<?>> STATEMENTS = statements();
 
