@@ -100,7 +100,7 @@ BUBAS separates definition, compilation and execution into three objects with di
         │  compile(source)
         ▼
    BubasProgram                   immutable · reusable · fully checked
-        │  newInterpreter()
+        │  Interpreter.of(program)
         ▼
    Interpreter                    cheap · single-use · single-threaded
         │  argument() / registerService() / mathContext()
@@ -115,6 +115,16 @@ Registration is expensive: pattern compilation, overlap analysis and the opaque-
 computed once, at `seal()`. Every `Interpreter` forked afterwards inherits that work. Compilation
 is expensive too, so a `BubasProgram` is reusable across runs. Only the `Interpreter` is per-run,
 and it is deliberately cheap.
+
+**Nothing is resolved by name at run time.** Because implementations are named classes, the
+compiler resolves every call while it analyses: an AST node carries the implementation instance,
+the target method, and the `Class` behind each opaque type it checks. The registries are therefore
+compile-time structures only. What survives into the run is data rather than lookup — the
+language-level services and the default `MathContext` — and it travels with the compiled program.
+
+This is why `BubasLanguage` and `BubasProgram` belong to the analyser and `Interpreter` to the
+runtime: the runtime depends on the analyser, never the reverse, and execution is entered through
+`Interpreter.of(program)` rather than a factory method on the program.
 
 ### Sealing
 
@@ -142,10 +152,11 @@ orchestration means one `Interpreter` per thread, all sharing one `BubasProgram`
 | Pattern matcher | Matches a logical line against the registered patterns |
 | Parser | Block structures, expressions, function calls → AST |
 | Symbol table | Variable declarations, types and states |
-| Analyser | Type checking, definite assignment, reachability, use checking |
+| Analyser | Definite assignment, reachability, use checking |
+| Lowering | Types every expression and emits the core tree every back end consumes |
 | Interpreter | Executes the AST |
 | Function dispatcher | Evaluates arguments, invokes Java implementations |
-| Code generator | Compiles the AST to Java source (Phase 3) |
+| Code generator | Emits target-language source from the core tree (Phase 3) |
 
 ---
 
@@ -172,14 +183,14 @@ The lexer joins physical lines into **logical lines**. Everywhere else in this s
 - it ends with an underscore `_`
 
 ```basic
-LET total = subtotal +
+total = subtotal +
             tax +
             shipping
 
-LET x = COMPUTE(alpha,
+x = COMPUTE(alpha,
                 beta)
 
-LET first = names[index +
+first = names[index +
                   offset]
 
 VALIDATE order _
@@ -209,7 +220,7 @@ explicit `_` keeps each layer's rule statable on its own:
 
 ```basic
 IF NOT _
-   ORDER_WAS_FOUND(order) THEN
+   ORDER_WAS_FOUND(purchase) THEN
 
 FOR i = 0 TO _
     LENGTH(items) - 1
@@ -241,8 +252,8 @@ character. This rules out lookalike pairs and capitalisation typos in one rule.
 ```basic
 DECLARE userId INTEGER
 DECLARE UserID STRING    ' error: collides with userId
-LET UserId = 5           ' error: declared as 'userId'
-LET userId = 5           ' correct
+UserId = 5           ' error: declared as 'userId'
+userId = 5           ' correct
 ```
 
 All names share one namespace with all keywords. A variable may not be named after a core
@@ -259,13 +270,25 @@ TRUE      FALSE                                  ' BOOLEAN
 
 String escapes: `\n`, `\t`, `\r`, `\\`, `\"`.
 
+### 4.6 Punctuation
+
+Any character that is not whitespace, a name character, a digit, a quote or an apostrophe is a
+single-character punctuation token. The lexer does not decide whether it belongs where it was
+written — the parser does, and can say so far more precisely than "unexpected character" ever
+could.
+
+That generosity is what lets a statement pattern be lexed by this same lexer, braces and all,
+rather than preprocessed into something a stricter lexer would accept. Brace pairs are balanced
+like the others, so an unclosed `{` in a pattern is reported by the lexer rather than by
+hand-written scanning.
+
 A leading `-` is not part of a literal — `-10` is the unary operator applied to `10`, so `a-10`
 and `a - 10` tokenize identically. An integer literal that does not fit in 64 bits is rejected
 where it is written.
 
 ---
 
-### 4.6 Lossless lexing
+### 4.7 Lossless lexing
 
 Every character of the source lands either in a token or in a piece of **trivia** — whitespace, a
 comment, a continuation underscore, or a line terminator. Concatenating a logical line's trivia,
@@ -310,8 +333,19 @@ builder.defineOpaqueType("Order", Order.class)
 ```
 
 ```basic
-DECLARE order Order
+DECLARE purchase Order
 DECLARE buyer Customer
+```
+
+A registered type name is reserved like any other, so **a variable may not be named after its
+type**. `DECLARE order Order` is rejected — which is worth knowing in advance, because naming a
+variable after its type is the first thing most people reach for. It is the same rule that bans
+`userId` beside `UserID`, and the diagnostic says so rather than merely reporting a reserved word:
+
+```
+line 3: 'order' collides with the opaque type 'Order';
+        a variable may not share a name with a type
+    DECLARE order Order
 ```
 
 ### 5.2 Absence
@@ -322,7 +356,7 @@ ordinary Java value: an opaque array element starts as `null`, and a Java functi
 it. A script that must branch on absence uses a function the embedder supplies:
 
 ```basic
-IF ORDER_WAS_FOUND(order) THEN
+IF ORDER_WAS_FOUND(purchase) THEN
 ```
 
 ### 5.3 Arrays
@@ -341,12 +375,12 @@ DECLARE names[n * 2] STRING
 - Arrays are one-dimensional; there are no arrays of arrays
 - An array may not be FINAL, and array elements can never be final
 - `LENGTH(a)` returns the size
-- An array has no expression type: `LET x = numbers` is an error. An array may appear as a
+- An array has no expression type: `x = numbers` is an error. An array may appear as a
   bare argument in a function call, and nowhere else
 
 ```basic
 SORT_ITEMS(items)        ' legal: bare array name as an argument
-LET copy = items         ' error: an array is not an expression
+copy = items         ' error: an array is not an expression
 ```
 
 ### 5.4 Assignability
@@ -355,10 +389,51 @@ A value of type `S` may be assigned to, or passed as, a target of type `T` when:
 
 - `S` and `T` are the same type, or
 - `S` is `INTEGER` and `T` is `DECIMAL`, or
-- `S` and `T` are opaque types and `S`'s Java class is assignable to `T`'s
+- `S` and `T` are opaque types and `S`'s Java class is assignable to `T`'s, or
+- `S` and `T` are arrays with the **same** element type
 
-Opaque assignability follows Java, interfaces included, and is computed once at `seal()`.
+Opaque assignability follows Java, interfaces included. Nothing has to compute or cache a lattice:
+the registered classes carry it already, so the check is `Class.isAssignableFrom`.
+
 Nothing else converts implicitly. There is no narrowing and no cast.
+
+**Arrays are invariant.** An array of `RushOrder` is not an array of `Order`, even though a
+`RushOrder` is an `Order`. Java arrays are covariant here and pay for it with a runtime
+`ArrayStoreException`; BUBAS closes the hole statically instead, and can afford to because array
+assignability is consulted in exactly one place — matching an array argument against a function
+parameter. Arrays are never assigned and never returned.
+
+The reason it matters is that an array crosses into Java as the interpreter's **backing store**,
+not a copy, which is what makes an in-place reorder visible to the script
+([§10.2](#102-signatures-are-derived-from-java)). Under covariance a handler declaring `Order[]`
+could store a plain `Order` into an array the script declared as `RushOrder`, and the only thing
+standing in the way would be a Java exception raised inside embedder code, with nothing naming the
+line that passed the array.
+
+```basic
+DECLARE rushes[10] RushOrder
+SORT_ORDERS(rushes)
+' error: SORT_ORDERS expects Order[], found RushOrder[]
+```
+
+The cost is that a function which only *reads* is refused too, where reading would have been safe.
+Such a function can declare `ANY_ARRAY` instead, at the price of casting `BubasArray.raw()`.
+
+> **Rationale (not normative).** Array assignment is absent by choice, not by omission. Keeping
+> arrays out of expressions keeps the language small, and it steers orchestration scripts away from
+> moving data around — which is Java's job, and the whole premise of the two layers.
+>
+> The capability is not withheld, only the spelling. An integration that genuinely needs to put a
+> whole array into a variable defines a command for it, and the handler receives both arrays and
+> does as it likes:
+>
+> ```basic
+> COPY orders INTO archive
+> ```
+>
+> The restriction is that this may not be written as an assignment. That is deliberate: a script
+> author reading `=` should be able to assume one value moved, not that an entire collection was
+> aliased or copied — and which of those happened would be invisible at the assignment.
 
 ### 5.5 Type vocabulary outside BUBAS source
 
@@ -436,7 +511,7 @@ Parentheses are mandatory in an expression. A function used in an expression mus
 `VOID`.
 
 ```basic
-LET order = LOAD_ORDER(orderId)
+purchase = LOAD_ORDER(orderId)
 IF VALIDATE_ORDER(order) AND IS_URGENT(order) THEN
 ```
 
@@ -483,25 +558,58 @@ DECLARE items[COUNT_ORDERS()] Order
 A `FINAL` variable requires an initializer and can never be reassigned. Finality is not a state
 a variable enters later: what is final is final from its declaration.
 
-### 7.3 Assignment
+**A declaration may appear only at the top level of a program** — never inside an `IF` arm, a `DO`
+or a `FOR`.
 
 ```basic
-LET count = 0
-LET numbers[i] = numbers[i] + 1
+PROGRAM P
+    DECLARE total DECIMAL          ' here
+    IF over THEN
+        DECLARE note STRING        ' error: only at the top level
+    END IF
+END.
 ```
 
-The target must be declared and not final. The value must be assignable to the target's
-declared type.
+The rule is not about `DECLARE`, which is only a pattern like any other. It covers **any statement
+whose pattern creates a variable** — anything carrying a `new` precondition or a `final`
+postcondition — so a custom `FETCH {type:T} INTO {new > identifier/T:out > initialized}` is bound
+by it too.
+
+> **Rationale (not normative).** BUBAS has no local variables. A declaration inside a block would
+> therefore look scoped while being global: the name would outlive the block, keep its value after
+> it, and collide with a later declaration elsewhere — none of which the indentation suggests. The
+> appearance of locality without the substance is worse than not offering it.
+>
+> It also nudges in the direction the two layers already point. A script needing variables declared
+> deep inside nested blocks is doing work that belongs in Java, and having to hoist every
+> declaration to the top makes that visible while the script is being written rather than after.
+>
+> The analysis gets simpler as a side effect — declaredness stops needing flow analysis entirely —
+> but that is a consequence, not the reason.
+
+### 7.3 Assignment
+
+Assignment has no keyword. BUBAS is not BASIC; `LET` faded out of the languages that had it, and
+no language written since asks for it on the most frequent line in every script.
+
+```basic
+count = 0
+numbers[i] = numbers[i] + 1
+```
+
+The target must be declared and not final. The value must be assignable to the target's declared
+type. Assignment is the one built-in whose pattern carries no keyword at all, which is why a
+pattern is not required to begin with one — see [§9.1](#91-matching).
 
 ### 7.4 Conditionals
 
 ```basic
 IF score >= 90 THEN
-    LET grade = "A"
+    grade = "A"
 ELSEIF score >= 80 THEN
-    LET grade = "B"
+    grade = "B"
 ELSE
-    LET grade = "C"
+    grade = "C"
 END IF
 ```
 
@@ -513,11 +621,11 @@ without needing a special rule.
 
 ```basic
 DO WHILE count < 10          DO
-    LET count = count + 1        LET count = count + 1
+    count = count + 1            count = count + 1
 END DO                       END DO UNTIL count >= 10
 
 DO UNTIL done                DO
-    LET done = STEP_DONE()       LET done = STEP_DONE()
+    done = STEP_DONE()           done = STEP_DONE()
 END DO                       END DO WHILE NOT done
 ```
 
@@ -544,7 +652,7 @@ END FOR
 ```basic
 FOR i = 0 TO 100
     IF MATCHES(items[i]) THEN
-        LET hit = i
+        hit = i
         EXIT FOR
     END IF
 END FOR
@@ -593,6 +701,20 @@ Variable state is a pair, not a single enum.
 `FINAL` implies `INITIALIZED` at the point of declaration. A variable never becomes final later,
 and never becomes uninitialized.
 
+**Only initialization is flow-sensitive.** Because a declaration may appear only at the top level
+([§7.2](#72-declarations)), it always runs, on every path, before anything that could use it.
+Declaredness therefore needs no flow analysis at all: a name is known to every line after its
+declaration and to none before, and a write needs no declaredness check that a read does not
+already imply. What varies by path is only whether the variable holds a value.
+
+```basic
+DECLARE x INTEGER
+IF c THEN
+    x = 1
+END IF
+x = x + 1        ' error: x is not definitely initialized
+```
+
 ### 8.2 Definite assignment
 
 Reading a variable requires it to be `INITIALIZED` on every path reaching that point.
@@ -604,6 +726,8 @@ Reading a variable requires it to be `INITIALIZED` on every path reaching that p
 - **Post-test loop**: the body runs at least once, so unconditional assignments in it count
 - **FOR loop variable**: assigned on entry, so it is `INITIALIZED` after the loop either way
 - **RETURN, EXIT**: abrupt; such paths do not contribute to the merge at the join point
+- **An indexed target changes nothing.** `a[i] = 5` does not make `a` initialized, because it
+  already was: an array is fully initialized at its declaration
 
 ### 8.3 Rejected at compile time
 
@@ -636,9 +760,42 @@ token, so `PAY a + b VIA acct` splits unambiguously.
 
 If a line matches two patterns, that is a compile error. Overlap is also checked at `seal()` by
 approximating each pattern as a regular language over token classes and testing pairwise
-intersection. The check is conservative and can reject a pair that would never actually collide;
-`skipOverlapAnalysis(true)` disables it, both for startup cost in production and for grammars
-whose author knows better.
+intersection — the emptiness test for the intersection of two regular languages, over a product of
+their automata. Every colliding pair is reported at once, so an embedder registering a vocabulary
+sees all of its conflicts in one go rather than one per attempt.
+
+The check has to run at `seal()` and not before: whether `PAY {expression:a} VIA {var:b}` and
+`PAY {expression:a} FROM {var:b}` collide depends on `FROM` being reserved by the other pattern,
+which is not known until every pattern is registered.
+
+The approximation errs towards warning — an expression is modelled as one-or-more expression
+tokens with no bracket structure, so a pair may be reported that no real line could hit, but no
+colliding pair can slip through. `skipOverlapAnalysis(true)` disables it, both for startup cost in
+production and for grammars whose author knows better.
+
+A pattern need not begin with a keyword. The built-in assignment begins with a placeholder and its
+only literal is `=`, so requiring a leading word would make the most frequent statement in the
+language inexpressible. `{var:x} IS SET` is a perfectly good pattern.
+
+What a pattern must have is **at least one literal**, of any kind. A pattern made only of
+placeholders reserves nothing, is invisible to the reserved-word mechanism, and matches by shape
+alone; `{var:a} {var:b}` is rejected.
+
+The matcher therefore tries every registered pattern rather than pre-filtering on a first word.
+That costs nothing at the scale a language vocabulary reaches, and the reserved-word rule does
+most of the narrowing anyway: a pattern beginning with `{expression:e}` cannot match
+`VALIDATE order AGAINST rules`, because an expression cannot begin at a reserved token.
+
+When a line matches nothing, the diagnostic depends on what can be said. If its first token is a
+reserved word beginning one or more patterns, it names them; otherwise it reports an unknown
+statement.
+
+```
+line 12: PAY does not match its pattern
+    PAY {expression:amount} VIA {var:account}
+
+line 17: unknown statement FOO
+```
 
 A pattern may not begin with a structural keyword — `PROGRAM`, `IF`, `ELSEIF`, `ELSE`, `DO`,
 `WHILE`, `UNTIL`, `FOR`, `EXIT`, `RETURN`, `END` — because those drive block parsing rather than
@@ -672,14 +829,62 @@ An unnamed placeholder takes its **kind** as its name: `{expression}` is named `
 at most one placeholder of each kind may be left unnamed. State keywords may not be used as
 placeholder names, which is what makes `{var:total}` and `{var:initialized}` distinguishable.
 
+**A placeholder may not be named after a type** — neither a built-in scalar nor a registered
+opaque type. This is checked at `seal()`, because opaque types are not known when a pattern is
+parsed.
+
+The rule exists to make constraint resolution total. A constraint `/X` means "the same type as
+placeholder `X`" when the pattern has one by that name, and "the type named `X`" otherwise. If a
+pattern could contain `{type:Order}` while `Order` were also a registered opaque type, `/Order`
+would have two readings and nothing could choose between them. Forbidding the collision means the
+two cases can never both apply.
+
+> **Rationale (not normative).** The rule is not the only defensible answer. A placeholder name is
+> local to one pattern while an opaque type name is global, and locality is the stronger claim — so
+> letting a placeholder shadow a type would be perfectly coherent, with the pattern simply meaning
+> its own `X`.
+>
+> Shadowing only starts to pay, though, when a command set has grown large enough that avoiding
+> collisions becomes a chore. That is not the size BUBAS is built for. A command set is expected to
+> number ten or a few tens, small enough that its author can hold the whole vocabulary in view as
+> one thing. At that size choosing a different placeholder name costs nothing, and no reader ever
+> has to work out which `X` a constraint meant. A vocabulary that has outgrown being comprehensible
+> as a unit has a problem that a shadowing rule would not fix.
+
 ### 9.3 Kinds
 
 | Kind | Captures |
 |------|----------|
-| `var` | A variable name, with state requirements and guarantees |
+| `var` | A reference to storage: a name, optionally followed by `[expression]` |
+| `identifier` | A bare variable name, never indexed |
 | `expression` | A full expression, evaluated lazily by the handler |
 | `literal` | A literal, required to be a compile-time constant |
 | `type` | A type designator |
+
+**`var` and `identifier` differ in exactly one thing: appetite.** A `var` swallows an index if one
+is there, so `ADD 5 TO totals[3]` matches `ADD {literal/NUMBER:n} TO {var:total}`. An `identifier`
+never does, which is what a pattern needs when it supplies the brackets itself.
+
+Only an `identifier` may be created. `{new > var:x}` is not merely a hole that fails to match a
+name — it is a pattern that should never have been written, because `a[i]` is not a name, and
+registration rejects it. For the same reason a `var` placeholder may not be immediately followed
+by a literal `[`: given `a[1]`, nothing could say whether the hole took `a` or `a[1]`.
+
+The static type of a `var` is the type of the *reference*, so an indexed one has the array's
+element type. That is what lets a single assignment pattern serve both `x = 5` and `a[i] = 5`.
+
+A `literal` placeholder constrained to `INTEGER`, `DECIMAL` or `NUMBER` accepts an optional `+` or
+`-` before the number, and captures the signed value. The lexer deliberately does not produce
+signed literals — `-10` is unary minus applied to `10`, so that `a-10` and `a - 10` tokenize alike
+— so the sign is reassembled here, at the only layer that knows a constant is required.
+
+```
+ADD {literal/NUMBER:amount} TO {mutable:initialized > var:total > initialized}
+
+ADD 50.50 TO total     ' matches
+ADD -50.50 TO total    ' matches
+ADD 3 - 5 TO total     ' no match: a literal is not an expression
+```
 
 ### 9.4 Constraints
 
@@ -698,12 +903,13 @@ A constraint follows the kind after `/`.
 
 **Type references.** A constraint may instead name another placeholder in the same pattern:
 
-| Written | Means |
-|---------|-------|
-| `/T` where `T` is a `{type:T}` hole | the type actually written at that position |
-| `/x` where `x` is a `{var:x}` hole | that variable's declared type |
-| `/e` where `e` is an `{expression:e}` hole | that expression's static type |
-| `/a[]` where `a` is array-typed | that array's element type |
+| Written | Means                                                                   |
+|---------|-------------------------------------------------------------------------|
+| `/T` where `T` is a `{type:T}` hole | the type actually written at that position                             |
+| `/x` where `x` is a `{var:x}` hole | the static type of that reference — the element type when it is indexed |
+| `/x` where `x` is an `{identifier:x}` hole | that variable's declared type                                           |
+| `/e` where `e` is an `{expression:e}` hole | that expression's static type                                           |
+| `/a[]` where `a` is array-typed | that array's element type                                               |
 
 References resolve within the pattern regardless of position, so a placeholder may refer to one
 declared later.
@@ -757,26 +963,43 @@ combined with a `declared` or `initialized` prefix; the postcondition of a custo
 **verified when its handler returns**, and a handler that fails to deliver what its pattern
 promises raises an error at its own statement rather than corrupting the analyser's model.
 
-### 9.6 Built-in patterns
+### 9.6 The standard statements
 
-The built-ins are ordinary patterns, and expand to core AST nodes rather than handler calls —
-which is what allows them to be compiled to standalone Java.
+A language without declaration and assignment is unusable, so the standard module supplies them.
+They are **ordinary patterns with ordinary implementations** — nothing in the language privileges
+them, nothing treats them specially at run time, and an embedder who wants different ones simply
+does not install these. Shipping them only spares every integration from writing declaration and
+assignment for itself.
 
 ```
-DECLARE {new > var/T:name > declared} {type:T}
-DECLARE {new > var/T:name > initialized} {type:T} = {expression/T:init}
-DECLARE {new > var/T:name > final} {type:T} FINAL = {expression/T:init}
-DECLARE {new > var/ARRAY/T:name > initialized}[{expression/INTEGER:size}] {type:T}
+DECLARE {new > identifier/T:name > declared} {type:T}
+DECLARE {new > identifier/T:name > initialized} {type:T} = {expression/T:init}
+DECLARE {new > identifier/T:name > final} {type:T} FINAL = {expression/T:init}
+DECLARE {new > identifier/ARRAY/T:name > initialized}[{expression/INTEGER:size}] {type:T}
 
-LET {mutable:declared > var:name > initialized} = {expression/name:value}
-LET {initialized > var/ARRAY:a}[{expression/INTEGER:index}] = {expression/a[]:value}
+{mutable:declared > var:name > initialized} = {expression/name:value}
 ```
 
-Two things to note. `{expression/name:value}` and `{expression/a[]:value}` express, for the first
-time, that an assignment's right-hand side must match the target's declared type or element type.
-And each `DECLARE` variant constrains its `new` placeholder by referring to the `{type:T}` hole
-that appears later in the same pattern — type references resolve within a pattern regardless of
-order, so a forward reference is fine.
+Three things to note.
+
+**One assignment pattern serves both `x = 5` and `a[i] = 5`,** because a `var` absorbs an index
+and the static type of an indexed reference is the element type. `{expression/name:value}` then
+expresses, for the first time, that the right-hand side must match whatever the target actually
+is.
+
+**Each `DECLARE` variant constrains its creating placeholder by naming the `{type:T}` hole that
+appears later in the same pattern.** Type references resolve within a pattern regardless of order,
+so a forward reference is fine.
+
+**On a creating placeholder the constraint is not a check.** `/T` is the type the runtime declares
+the variable with; the handler neither chooses it nor supplies it. Everywhere else a constraint
+validates what was written, but here it instructs.
+
+That last point is why `DECLARE x INTEGER` has an **empty implementation**. The placeholder carries
+a type constraint, so name, type and finality are fixed before the handler runs and the runtime has
+already made the slot; with a `declared` postcondition there is no value to supply and nothing left
+to do. The other four do one thing each — evaluate the initializer and write it, or allocate the
+array — which is the whole of what makes them "built in".
 
 ### 9.7 Custom statements
 
@@ -812,8 +1035,13 @@ Placeholder kinds map to parameter types:
 | `literal` | its Java value directly — `long`, `BigDecimal`, `String`, `boolean` — or `Value` when unconstrained |
 | `type` | `BubasType` |
 
-Expression placeholders are **lazy**: evaluated when, and as often as, the handler asks. That is
-what lets a custom statement express control flow rather than only side effects. Note that the
+This is the general division of labour: **a function receives its arguments evaluated; a command
+receives expressions unevaluated and decides whether, and how often, to evaluate them.**
+
+Expression placeholders are therefore **lazy**: evaluated when, and as often as, the handler asks.
+That is what lets a custom statement express control flow rather than only side effects. The sole
+expression with a cap is the index of an indexed `var` reference, for the reason given in
+[§10.8](#108-values-and-arguments). Note that the
 unnamed `{expression}` below is named `expression`, and the parameter matches:
 
 ```java
@@ -843,7 +1071,9 @@ once per sealed language, through a public no-arg constructor or a public static
 method — deliberately the same contract `ServiceLoader` uses, so one class works through either
 registration route.
 
-The implementation is **the single public method the class declares**. Its name is irrelevant;
+The implementation is **the single public instance method the class declares**. Static methods are
+excluded, which is what lets a `provider()` factory coexist with it: the class is instantiated, so
+a static method could never have been the one being called. Its name is irrelevant;
 helpers are private. Declaring none, or more than one, fails at `seal()` naming the class, so a
 stray public helper is a reported error rather than a silent substitution. Overrides of `Object`
 methods are ignored.
@@ -962,7 +1192,7 @@ method, because the class carries everything a nested builder used to declare.
 BubasProgram prog = lang.compile(source);
 
 for (long id : orderIds) {
-    Value result = prog.newInterpreter()
+    Value result = Interpreter.of(prog)
         .argument("orderId", id)
         .argument("region", "EU")
         .registerService(Transaction.class, tx)
@@ -1106,7 +1336,7 @@ reads it from there:
 ```basic
 PROGRAM Loans
     SET_LOAN_DIGITS 4
-    LET rate = LOAN_INTEREST(principal)
+    rate = LOAN_INTEREST(principal)
 END.
 ```
 
@@ -1140,12 +1370,19 @@ public interface ExpressionArg {
 }
 
 public interface VariableArg {
-    String    name();                      // the script variable's name, for diagnostics
-    BubasType type();                      // resolved: /NUMBER may be INTEGER or DECIMAL
-    boolean   isFinal();                   // resolved: open when no mutability prefix is given
-    Value     get();
-    void      set(Value value);
-    void      set(Object javaValue);
+    String     name();                     // the script variable's name, for diagnostics
+    BubasType  type();                     // the reference's type: element type when indexed
+    boolean    isFinal();                  // resolved: open when no mutability prefix is given
+    boolean    isIndexed();
+    ArrayIndex index();                    // fails unless isIndexed(); always the same instance
+    Value      get();
+    void       set(Value value);
+    void       set(Object javaValue);
+}
+
+public interface ArrayIndex {
+    void evaluate();                       // once; a second call throws
+    long get();                            // fails unless evaluate() has been called
 }
 
 public interface LiteralArg {
@@ -1155,6 +1392,52 @@ public interface LiteralArg {
 
 `as(Class)` is checked against the registered opaque type rather than blind-casting, so a
 mismatch produces a BUBAS diagnostic instead of a `ClassCastException`.
+
+#### An indexed reference
+
+When a `var` placeholder matched `A[5]`, the index arrives **unevaluated**, like every other
+expression a command receives. It is the one expression with a cap: **at most once**. The reason
+is specific to what it does — it selects *which* location is read or written, so a second
+evaluation could pick a different element and leave `get()` and `set(...)` disagreeing about what
+they touched. It may also have side effects, and a command may legitimately never need it.
+
+An index is always `INTEGER`, so `ArrayIndex` deals in `long` directly: there is no `Value` to
+unwrap and no `asLong()` to write.
+
+```java
+public void call(StatementContext ctx, VariableArg target) {
+    target.index().evaluate();                      // once
+    ctx.log("INFO", "clearing slot " + target.index().get());
+    target.set(0L);
+}
+```
+
+`get()` and `set(...)` may be used **only after** `evaluate()` has been called, and `evaluate()`
+throws on a second call. There is no memoisation and no hidden evaluation.
+
+A handler may ignore a `var` placeholder completely — leave its index unevaluated and never read
+or write the location. That is ordinary laziness, and it means the index expression's side effects
+never happen at all. Given
+
+```basic
+SELECT 2 FROM A[4] AND B[4]
+```
+
+a handler that needs only the second source evaluates only `B`'s index; `A`'s never runs. What a
+handler may not do is touch a location without having evaluated the index that selects it.
+
+**There is no `get(index)` or `set(index, value)`.** A `var` names one location and can reach no
+other. Given `MODIFY A[5]`, the handler alters `A[5]`; it has no way to reach `A[6]`, and that is
+not an oversight but the guarantee the script author reads off the line.
+
+#### A whole array
+
+An array-typed placeholder is the opposite case and is unrestricted. `RESET A FROM 3 TO 7` matches
+`{var/ARRAY:a}` with no index at all, so `get()` yields the array itself — the interpreter's
+backing store, as [§10.2](#102-signatures-are-derived-from-java) describes. The handler may write
+elements 3 through 7, or every element, or none. Nothing in the line promised otherwise.
+
+The difference is visible in the source: `A[5]` names one slot, `A` names the array.
 
 `VariableArg` is deliberately small, because the pattern has already decided almost everything.
 
@@ -1178,6 +1461,9 @@ before does not matter.
 | `> initialized` | creates the slot | `set(...)` |
 | `> final` | creates the slot, sealing after the first write | `set(...)` exactly once |
 
+Only an `identifier` placeholder creates anything; the type it is declared with comes from the
+placeholder's constraint.
+
 Whether the handler did its part is verified when it returns.
 
 ---
@@ -1189,10 +1475,10 @@ Every failure aborts the run. BUBAS has no error handling construct, no recovery
 
 ```java
 try {
-    Value result = prog.newInterpreter().argument("orderId", 42L).run();
+    Value result = Interpreter.of(prog).argument("orderId", 42L).run();
 } catch (BubasException e) {
     e.getLine();        // 14
-    e.getSourceLine();  // "LET x = a / b"
+    e.getSourceLine();  // "x = a / b"
     e.getMessage();     // "division by zero"
     e.getCause();       // the underlying Java exception, if any
 }
@@ -1202,17 +1488,34 @@ try {
 call. Anything thrown by a Java function is wrapped with the line information of the statement
 that called it.
 
+### Definition errors
+
+A `BubasException` always points at a line of BUBAS source and is aimed at the script author.
+Mistakes in how the embedder *defined* the language are a different category, raised at
+registration or at `seal()` rather than at compilation, and read by a different person. They are
+`BubasDefinitionException`: a malformed pattern, an implementation class whose signature does not
+match its declaration, a name collision, two patterns that could match one line. It carries no
+line number, because there is no source to point at — it names the pattern or the class instead.
+
+```
+in pattern "FETCH INTO {new > var:out > initialized}": 'out' creates a variable
+and so must carry a type constraint, otherwise nothing could type its later uses
+```
+
 Compilation failures are reported before any execution, as a list, so a script author sees every
 problem at once rather than one per attempt.
 
 ---
 
-## 12. Standard Prelude
+## 12. The Standard Module
 
-Every sealed language automatically registers exactly the functions the specification itself
-depends on, and nothing more:
+Everything a language needs but nobody should have to write: the statements of
+[§9.6](#96-the-standard-statements) and the few functions the specification itself depends on.
 
 ```
+DECLARE x T                  the four declaration forms
+x = e                        assignment, indexed or not
+
 TO_INTEGER(s STRING) -> INTEGER
 TO_DECIMAL(s STRING) -> DECIMAL
 LENGTH(a ANY_ARRAY)  -> INTEGER
@@ -1221,45 +1524,74 @@ LENGTH(a ANY_ARRAY)  -> INTEGER
 There is no `TO_STRING`: `"" + x` already converts, and a second way to do one thing invites
 inconsistency. There is no null test, because there is no null in the language.
 
-Larger vocabularies — string manipulation, regular expressions, date handling, mathematics —
-ship as optional packages installed explicitly (Phase 2):
+None of it is privileged. These are ordinary patterns and ordinary functions, installed like any
+other vocabulary and excluded by not installing them — a language that wants a different
+declaration syntax, or none, is free to have one. The standard module depends only on the API, so a
+vocabulary library never has to depend on the interpreter.
 
-```java
-BubasStrings.installInto(builder);
-BubasRegex.installInto(builder);
-```
+Larger vocabularies — string manipulation, regular expressions, date handling, mathematics — ship
+as further packages, installed the same way (Phase 2).
 
 ---
 
 ## 13. Code Generation
 
-A `BubasProgram` can be compiled to Java source. Because every function and statement
-implementation is a named static method rather than a lambda, generated code calls them
-directly:
+A `BubasProgram` can be compiled to another language. Java is the first target; the design does not
+assume it is the only one.
 
-```java
-// generated
-private final LoadOrder fn_loadOrder = new LoadOrder();
-private final Validate  cmd_validate = new Validate();
-...
-Order order = fn_loadOrder.call(ctx, orderId);
-cmd_validate.call(ctx, v_order, rulesThunk);
+### What the back ends share
+
+Both the interpreter and every code generator consume the same **core tree**, produced once by
+lowering the checked program. The core tree exists for exactly this reason. In the syntax tree a
+`+` could mean integer addition, decimal addition or string concatenation, and each back end would
+have to work that out for itself — as many chances to decide differently as there are back ends,
+in precisely the subtle ways a debugged script would only discover in production. Lowering makes
+the choice once, so what a back end receives is a named operation rather than a specification to
+re-read:
+
+```
+Binary("+", INTEGER, DECIMAL)   →   AddDecimal(WidenToDecimal(l), r)
+Binary("+", STRING, INTEGER)    →   Concat(l, TextOf(r))
+Binary("+", INTEGER, INTEGER)   →   AddIntegerChecked(l, r)
+Binary("=", DECIMAL, DECIMAL)   →   CompareDecimalByValue(l, r)
 ```
 
-The output needs the implementation classes and the BUBAS runtime on the classpath, and nothing
-else — the registration code does not have to run first. Had implementations been lambdas, every
-call would have dispatched through the registry by string key, and the compiled program would
-have been unable to run without first re-executing the whole builder.
+Widening, text conversion, overflow checks, bounds checks and the `MathContext` a decimal division
+reads are all explicit nodes. Nothing is inferred twice.
 
-The runtime is still required, for `DECIMAL` division reading the interpreter's `MathContext` at
-each site, for overflow, division-by-zero and bounds checks emitted inline, for postcondition
-verification after a custom statement, and for the expression thunks that lazy statement
-placeholders need.
+It is a lowered **tree**, not a flat instruction list: keeping `IF`, `DO` and `FOR` structure means
+a Java generator emits natural Java rather than reconstructing control flow from jumps, and source
+positions survive so generated code maps back to the script.
 
-The generated code and the interpreter are two implementations of one semantics, so **a conformance
-suite is mandatory**: every test program must run through both backends and produce identical
-results and identical errors. Divergence between the two is the characteristic bug of this
-design, and only the suite will catch it.
+### Commands
+
+Every statement pattern is a command with an implementation, including the standard ones. A code
+generator may therefore always fall back to emitting a call to the very implementation the
+interpreter calls — which is the guarantee that any vocabulary compiles at all.
+
+A command that wants better output supplies a **target-independent semantic description** of what
+it does, and the generator uses that instead. Assignment described that way becomes an assignment
+in the target language rather than a call into the runtime. The form of that description is a
+Phase 3 question and deliberately not settled here; what is settled is that it is optional, and
+that its absence costs output quality rather than correctness.
+
+### Limits
+
+Functions and commands are Java classes. A target that is not Java can share the core semantics but
+cannot call the vocabulary: every function would need an implementation in that language. The
+equivalence guarantee covers what BUBAS pins, and stops where the embedder's code begins.
+
+### Conformance
+
+The generated code and the interpreter are separate implementations of one operation set, so **a
+conformance suite is mandatory**: every test program must run through both back ends and produce
+identical results and identical errors. Divergence is the characteristic bug of this design, and
+only the suite will catch it.
+
+Stepping is deliberately not part of it. Compiled output targets production and carries no BUBAS
+debugging; a script is debugged interpreted, and generated Java is debugged as Java — which is why
+readable output that maps back to the source is a requirement on the generator rather than a
+nicety.
 
 ---
 
@@ -1303,18 +1635,18 @@ public final class OrderVocabulary {
 
 ```basic
 PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
-    DECLARE order Order
+    DECLARE purchase Order
     DECLARE total DECIMAL
     DECLARE taxRate DECIMAL FINAL = 0.07
 
-    LET order = LOAD_ORDER(orderId)
+    purchase = LOAD_ORDER(orderId)
 
-    IF NOT ORDER_WAS_FOUND(order) THEN
+    IF NOT ORDER_WAS_FOUND(purchase) THEN
         LOG_EVENT "ERROR", "no such order: " + orderId
         RETURN FALSE
     END IF
 
-    LET total = ORDER_TOTAL(order) * (1.0 + taxRate)
+    total = ORDER_TOTAL(purchase) * (1.0 + taxRate)
 
     IF total > limit THEN
         LOG_EVENT "INFO", "over limit: " + total
@@ -1329,7 +1661,7 @@ END.
 ```java
 BubasProgram prog = lang.compile(source);
 
-boolean approved = prog.newInterpreter()
+boolean approved = Interpreter.of(prog)
     .argument("orderId", 42L)
     .argument("limit", new BigDecimal("1000.00"))
     .run()
@@ -1355,7 +1687,7 @@ INTEGER   DECIMAL   STRING   BOOLEAN
 ### Built-in pattern keywords
 
 ```
-DECLARE   LET   FINAL
+DECLARE   FINAL
 ```
 
 ### Reserved at seal

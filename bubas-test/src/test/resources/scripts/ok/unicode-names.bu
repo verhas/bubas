@@ -1,0 +1,9 @@
+'OK
+' A name may hold any Unicode letter: the audience's vocabulary is not necessarily English.
+PROGRAM Unicode
+    DECLARE Kündigung INTEGER
+    DECLARE añoFiscal INTEGER
+    Kündigung = 1
+    añoFiscal = 2
+    ASSERT "both names resolve", Kündigung + añoFiscal = 3
+END.

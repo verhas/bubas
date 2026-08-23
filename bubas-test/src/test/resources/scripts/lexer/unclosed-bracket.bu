@@ -1,0 +1,9 @@
+'NO-COMPILE
+' An unclosed bracket is reported against the line it opened on, not where the parse gave up.
+' ERROR: opened here is never closed
+' LINE: 7
+PROGRAM P
+    DECLARE n INTEGER
+    n = (1 + 2
+    ASSERT "unreachable", n = 0
+END.

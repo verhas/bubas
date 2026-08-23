@@ -1,0 +1,9 @@
+'NO-COMPILE
+' INTEGER is 64 bits, and a literal that does not fit is caught by the lexer.
+' ERROR: does not fit in INTEGER
+' LINE: 7
+PROGRAM P
+    DECLARE n INTEGER
+    n = 99999999999999999999
+    ASSERT "unreachable", n = 0
+END.

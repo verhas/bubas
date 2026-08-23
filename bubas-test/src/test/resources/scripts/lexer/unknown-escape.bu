@@ -1,0 +1,9 @@
+'NO-COMPILE
+' Only \n \t \r \\ and \" are escapes; anything else is a mistake rather than a literal backslash.
+' ERROR: unknown escape sequence
+' LINE: 7
+PROGRAM P
+    DECLARE s STRING
+    s = "a\qb"
+    PRINT s
+END.

@@ -1,0 +1,36 @@
+'OK
+' Pre-test, post-test, both keywords, and EXIT DO.
+PROGRAM P
+    DECLARE count INTEGER
+    DECLARE total INTEGER
+    count = 0
+    DO WHILE count < 5
+        count = count + 1
+    END DO
+    ASSERT "DO WHILE tests before the body", count = 5
+    count = 0
+    DO UNTIL count >= 3
+        count = count + 1
+    END DO
+    ASSERT "DO UNTIL is the same test negated", count = 3
+    count = 0
+    DO
+        count = count + 1
+    END DO UNTIL count >= 4
+    ASSERT "a post-test loop always runs once", count = 4
+    count = 10
+    DO
+        count = count + 1
+    END DO WHILE count < 5
+    ASSERT "even when the condition was false all along", count = 11
+    total = 0
+    count = 0
+    DO WHILE TRUE
+        count = count + 1
+        IF count > 3 THEN
+            EXIT DO
+        END IF
+        total = total + count
+    END DO
+    ASSERT "EXIT DO leaves the loop at once", total = 6
+END.

@@ -1,0 +1,11 @@
+'NO-COMPILE
+' The body of a FOR loop may not assign the variable the loop is counting with.
+' ERROR: is the variable of an enclosing FOR loop
+' LINE: 8
+PROGRAM P
+    DECLARE i INTEGER
+    FOR i = 0 TO 3
+        i = 9
+    END FOR
+    ASSERT "unreachable", i = 0
+END.

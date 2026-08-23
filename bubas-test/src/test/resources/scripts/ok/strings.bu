@@ -1,0 +1,15 @@
+'OK
+' Concatenation, the escapes the lexer recognises, and ordering.
+PROGRAM P
+    DECLARE s STRING
+    s = "a" + "b"
+    ASSERT "concatenation", s = "ab"
+    s = "n=" + 42
+    ASSERT "a STRING on the left coerces what follows", s = "n=42"
+    s = "" + 1 + "x"
+    ASSERT "coercion chains from the left", s = "1x"
+    s = "a\tb\nc\\d\"e"
+    ASSERT "every escape the lexer knows", s <> ""
+    ASSERT "strings compare in order", "apple" < "banana"
+    ASSERT "equal strings", "same" = "same"
+END.

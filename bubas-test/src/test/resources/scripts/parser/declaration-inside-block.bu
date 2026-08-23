@@ -1,0 +1,12 @@
+'NO-COMPILE
+' Declarations are top level only: BUBAS has no local variables, so one inside a block would look
+' scoped while being global.
+' ERROR: may only be declared at the top level
+PROGRAM P
+    DECLARE n INTEGER
+    n = 1
+    IF n = 1 THEN
+        DECLARE m INTEGER
+        m = 2
+    END IF
+END.

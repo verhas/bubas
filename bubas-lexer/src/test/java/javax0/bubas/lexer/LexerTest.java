@@ -10,7 +10,6 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 class LexerTest {
@@ -169,7 +168,7 @@ class LexerTest {
         void a_comment_only_line_is_a_line_with_no_tokens() {
             final var l = lines("' just a note\n' and another");
             assertThat(l).hasSize(2);
-            assertThat(l).allMatch(x -> !x.hasTokens());
+            assertThat(l).noneMatch(LogicalLine::hasTokens);
             assertThat(l.getFirst().trivia())
                     .extracting(Trivia::type)
                     .containsExactly(TriviaType.COMMENT, TriviaType.NEWLINE);
@@ -377,10 +376,30 @@ class LexerTest {
         }
 
         @Test
-        void rejects_an_unexpected_character() {
-            assertThatThrownBy(() -> Lexer.lex("LET x = 1 # 2"))
-                    .isInstanceOf(BubasException.class)
-                    .hasMessage("unexpected character '#'");
+        void any_other_character_is_punctuation() {
+            // The lexer does not judge whether a character belongs where it was written; the
+            // parser does, and can say so far more precisely. This is also what lets a statement
+            // pattern be lexed by this same lexer, braces and all.
+            assertThat(tokens("x = 1 # 2 @ 3"))
+                    .filteredOn(t -> t.type() == TokenType.PUNCT)
+                    .extracting(Token::text)
+                    .containsExactly("#", "@");
+        }
+
+        @Test
+        void braces_are_tokens_and_are_balanced_like_other_brackets() {
+            assertThat(tokens("{var:x}"))
+                    .extracting(Token::type, Token::text)
+                    .containsExactly(
+                            Tuple.tuple(TokenType.PUNCT, "{"),
+                            Tuple.tuple(TokenType.WORD, "var"),
+                            Tuple.tuple(TokenType.PUNCT, ":"),
+                            Tuple.tuple(TokenType.WORD, "x"),
+                            Tuple.tuple(TokenType.PUNCT, "}"));
+            assertThat(failure("{var:x").getMessage()).isEqualTo("'{' opened here is never closed");
+            assertThat(failure("var:x}").getMessage()).isEqualTo("unmatched '}'");
+            assertThat(failure("f({a]").getMessage())
+                    .isEqualTo("']' does not match '{' opened on line 1");
         }
 
         @Test

@@ -1,0 +1,11 @@
+'NO-COMPILE
+' An opaque value has no text form; the embedder exposes one if the domain wants it.
+' ERROR: has no text form
+' LINE: 9
+PROGRAM P
+    DECLARE p Parcel
+    DECLARE s STRING
+    p = WRAP(1)
+    s = "p=" + p
+    ASSERT "unreachable", s = ""
+END.

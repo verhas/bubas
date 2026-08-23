@@ -1,0 +1,10 @@
+'NO-COMPILE
+' A variable must definitely hold a value before anything reads it.
+' ERROR: is read before it is assigned
+' LINE: 8
+PROGRAM P
+    DECLARE n INTEGER
+    DECLARE m INTEGER
+    m = n + 1
+    ASSERT "unreachable", m = 0
+END.

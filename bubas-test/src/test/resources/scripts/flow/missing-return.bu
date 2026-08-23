@@ -1,0 +1,11 @@
+'NO-COMPILE
+' A program declaring RETURNS must return on every path.
+' ERROR: can reach its end without returning a value
+' LINE: 5
+PROGRAM P RETURNS BOOLEAN
+    DECLARE n INTEGER
+    n = 1
+    IF n = 1 THEN
+        RETURN TRUE
+    END IF
+END.

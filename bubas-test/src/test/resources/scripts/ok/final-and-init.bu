@@ -1,0 +1,11 @@
+'OK
+' The declaration forms that carry a value, and a FINAL that is read but never written again.
+PROGRAM P
+    DECLARE rate DECIMAL FINAL = 0.07
+    DECLARE base DECIMAL = 100.0
+    DECLARE tax DECIMAL
+    tax = base * rate
+    ASSERT "a FINAL keeps its value", rate = 0.07
+    ASSERT "an initialised declaration is assigned from the start", base = 100.0
+    ASSERT "arithmetic over both", tax = 7.0
+END.

@@ -1,0 +1,11 @@
+'NO-COMPILE
+' A condition is a BOOLEAN, and a number is not one.
+' ERROR: IF needs a BOOLEAN condition
+' LINE: 8
+PROGRAM P
+    DECLARE n INTEGER
+    n = 1
+    IF n THEN
+        PRINT "x"
+    END IF
+END.

@@ -1,0 +1,8 @@
+'OK
+' Comments end at the physical line, and an apostrophe inside a string is not a comment.
+PROGRAM Comments
+    ' a whole-line comment
+    DECLARE s STRING          ' an end-of-line comment
+    s = "it's fine"
+    ASSERT "an apostrophe in a string is data", s = "it's fine"
+END.

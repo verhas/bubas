@@ -1,0 +1,11 @@
+'OK
+' Keywords are matched ignoring case, so the same statement may be written in any casing.
+' Variable names are the opposite: see flow/spelled-differently.bu.
+PROGRAM P
+    declare total INTEGER
+    total = 1
+    if total = 1 then
+        total = total + 1
+    End If
+    ASSERT "one variable, keywords in three casings", total = 2
+END.

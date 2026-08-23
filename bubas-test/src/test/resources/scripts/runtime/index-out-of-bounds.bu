@@ -1,0 +1,11 @@
+'RUN-TIME-ERROR
+' An index outside the array names both the index and the size.
+' ERROR: index 5 is outside an array of 2
+' LINE: 9
+PROGRAM P
+    DECLARE a[2] INTEGER
+    DECLARE i INTEGER
+    i = 5
+    a[i] = 1
+    ASSERT "unreachable", a[0] = 1
+END.

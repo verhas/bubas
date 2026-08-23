@@ -1,0 +1,8 @@
+'NO-COMPILE
+' A variable nothing ever reads is usually a rename left half finished.
+' ERROR: declared but never read
+' LINE: 6
+PROGRAM P
+    DECLARE spare INTEGER
+    spare = 1
+END.

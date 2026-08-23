@@ -1,0 +1,409 @@
+package javax0.bubas.analyser;
+
+import javax0.bubas.api.BubasDefinitionException;
+import javax0.bubas.api.BubasType;
+import javax0.bubas.api.Context;
+import javax0.bubas.api.ExpressionArg;
+import javax0.bubas.api.StatementContext;
+import javax0.bubas.api.VariableArg;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
+
+class BubasLanguageTest {
+
+    public static final class Order {
+    }
+
+    public static final class Customer {
+    }
+
+    public static final class LoadOrder {
+        public Order call(Context ctx, long orderId) {
+            return new Order();
+        }
+
+        private static String unused() {
+            return "helpers are private";
+        }
+    }
+
+    public static final class OrderTotal {
+        public BigDecimal call(Context ctx, Order order) {
+            return BigDecimal.ONE;
+        }
+    }
+
+    public static final class LogEvent {
+        public void call(Context ctx, String level, String message) {
+        }
+    }
+
+    public static final class Validate {
+        public void call(StatementContext ctx, VariableArg item, ExpressionArg rules) {
+        }
+    }
+
+    public static final class MadeByProvider {
+        private MadeByProvider() {
+        }
+
+        public static MadeByProvider provider() {
+            return new MadeByProvider();
+        }
+
+        public void call(StatementContext ctx, VariableArg item) {
+        }
+    }
+
+    private static BubasLanguage.Builder base() {
+        return BubasLanguage.builder()
+                .defineOpaqueType("Order", Order.class)
+                .defineFunction("LOAD_ORDER", LoadOrder.class);
+    }
+
+    private static String rejection(BubasLanguage.Builder builder) {
+        return catchThrowableOfType(BubasDefinitionException.class, builder::seal).getMessage();
+    }
+
+    @Nested
+    @DisplayName("sealing")
+    class Sealing {
+
+        @Test
+        void a_language_builds_and_seals() {
+            final var language = base()
+                    .defineStatement("VALIDATE {initialized > var:item} AGAINST {expression:rules}",
+                            Validate.class)
+                    .seal();
+            assertThat(language.opaqueType("Order")).contains(BubasType.opaque("Order", Order.class));
+            assertThat(language.commands()).hasSize(1);
+        }
+
+        @Test
+        void a_signature_is_derived_from_the_java_method() {
+            final var signature = base().seal().function("LOAD_ORDER").orElseThrow();
+            assertThat(signature.parameters()).singleElement()
+                    .extracting(FunctionSignature.Parameter::type).isEqualTo(BubasType.INTEGER);
+            assertThat(signature.returnType()).isEqualTo(BubasType.opaque("Order", Order.class));
+            assertThat(signature).hasToString("LOAD_ORDER(orderId INTEGER) -> Order");
+        }
+
+        @Test
+        void a_void_function_reads_without_an_arrow() {
+            final var language = base().defineFunction("LOG_EVENT", LogEvent.class).seal();
+            assertThat(language.function("LOG_EVENT").orElseThrow())
+                    .hasToString("LOG_EVENT(level STRING, message STRING)");
+        }
+
+        @Test
+        void an_opaque_parameter_resolves_to_its_registered_type() {
+            final var language = base().defineFunction("ORDER_TOTAL", OrderTotal.class).seal();
+            assertThat(language.function("ORDER_TOTAL").orElseThrow().parameters())
+                    .singleElement().extracting(FunctionSignature.Parameter::type)
+                    .isEqualTo(BubasType.opaque("Order", Order.class));
+        }
+
+        @Test
+        void a_function_is_found_case_insensitively_and_the_vocabulary_reserves_it() {
+            final var language = base().seal();
+            assertThat(language.function("load_order")).isPresent();
+            assertThat(language.vocabulary().isReserved("load_order")).isTrue();
+            assertThat(language.vocabulary().isTypeName("ORDER")).isTrue();
+        }
+
+        @Test
+        void a_provider_method_may_stand_in_for_a_constructor() {
+            assertThatCode(() -> base()
+                    .defineStatement("TOUCH {var:item}", MadeByProvider.class)
+                    .seal()).doesNotThrowAnyException();
+        }
+    }
+
+    @Nested
+    @DisplayName("implementation classes")
+    class Implementations {
+
+        public static final class Empty {
+        }
+
+        public static final class TwoMethods {
+            public void call(Context ctx) {
+            }
+
+            public void also(Context ctx) {
+            }
+        }
+
+        public static final class NoContext {
+            public void call(long orderId) {
+            }
+        }
+
+        public static final class WrongInteger {
+            public void call(Context ctx, int orderId) {
+            }
+        }
+
+        public static final class WithToString {
+            public void call(Context ctx) {
+            }
+
+            @Override
+            public String toString() {
+                return "an Object override is not the implementation";
+            }
+        }
+
+        @Test
+        void a_class_with_no_public_method_is_rejected() {
+            assertThat(rejection(base().defineFunction("F", Empty.class)))
+                    .contains("declares no public instance method");
+        }
+
+        @Test
+        void a_class_with_two_public_methods_is_rejected() {
+            assertThat(rejection(base().defineFunction("F", TwoMethods.class)))
+                    .contains("declares 2 public instance methods")
+                    .contains("helpers must be private");
+        }
+
+        @Test
+        void an_object_override_does_not_count_as_the_implementation() {
+            assertThatCode(() -> base().defineFunction("F", WithToString.class).seal())
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        void a_function_must_take_a_context_first() {
+            assertThat(rejection(base().defineFunction("F", NoContext.class)))
+                    .contains("must take a Context as its first parameter");
+        }
+
+        @Test
+        void int_is_not_a_bubas_type_and_the_diagnostic_says_why() {
+            assertThat(rejection(base().defineFunction("F", WrongInteger.class)))
+                    .contains("is not a BUBAS type")
+                    .contains("INTEGER is 64-bit, so use long");
+        }
+    }
+
+    @Nested
+    @DisplayName("commands")
+    class Commands {
+
+        public static final class WrongArity {
+            public void call(StatementContext ctx, VariableArg only) {
+            }
+        }
+
+        public static final class WrongKind {
+            public void call(StatementContext ctx, ExpressionArg item, ExpressionArg rules) {
+            }
+        }
+
+        public static final class FunctionShaped {
+            public void call(Context ctx, VariableArg item) {
+            }
+        }
+
+        private static final String VALIDATE =
+                "VALIDATE {initialized > var:item} AGAINST {expression:rules}";
+
+        @Test
+        void a_command_must_take_a_statement_context_first() {
+            assertThat(rejection(base().defineStatement("TOUCH {var:item}", FunctionShaped.class)))
+                    .contains("must take a StatementContext as its first parameter");
+        }
+
+        @Test
+        void the_parameter_count_must_match_the_placeholders() {
+            assertThat(rejection(base().defineStatement(VALIDATE, WrongArity.class)))
+                    .contains("the pattern has 2 placeholder(s)")
+                    .contains("takes 1 beside the context");
+        }
+
+        @Test
+        void each_placeholder_kind_fixes_its_parameter_type() {
+            assertThat(rejection(base().defineStatement(VALIDATE, WrongKind.class)))
+                    .contains("'item' is a var, so its parameter must be VariableArg");
+        }
+    }
+
+    @Nested
+    @DisplayName("name collisions")
+    class Collisions {
+
+        @Test
+        void two_type_names_may_not_share_one_java_class() {
+            assertThat(rejection(base().defineOpaqueType("Purchase", Order.class)))
+                    .contains("both registered against")
+                    .contains("must be one-to-one");
+        }
+
+        @Test
+        void a_function_may_not_be_named_after_a_core_keyword() {
+            assertThat(rejection(base().defineFunction("WHILE", LogEvent.class)))
+                    .contains("collides with the core keyword WHILE");
+        }
+
+        @Test
+        void a_function_may_not_collide_with_an_opaque_type() {
+            assertThat(rejection(base().defineFunction("order", LogEvent.class)))
+                    .contains("collides with opaque type 'Order'");
+        }
+
+        @Test
+        void a_function_may_not_collide_with_a_pattern_keyword() {
+            assertThat(rejection(base()
+                    .defineStatement("VALIDATE {var:item}", MadeByProvider.class)
+                    .defineFunction("validate", LogEvent.class)))
+                    .contains("collides with a keyword of the pattern");
+        }
+
+        @Test
+        void a_placeholder_may_not_be_named_after_a_type() {
+            assertThat(rejection(base()
+                    .defineStatement("TOUCH {var:Order}", MadeByProvider.class)))
+                    .contains("is named after a type");
+            assertThat(rejection(base()
+                    .defineStatement("TOUCH {var:INTEGER}", MadeByProvider.class)))
+                    .contains("is named after a type");
+        }
+    }
+
+    @Nested
+    @DisplayName("constraint resolution")
+    class Constraints {
+
+        public static final class OneLiteral {
+            public void call(StatementContext ctx, long times) {
+            }
+        }
+
+        public static final class OneValue {
+            public void call(StatementContext ctx, javax0.bubas.api.Value v) {
+            }
+        }
+
+        public static final class OneVar {
+            public void call(StatementContext ctx, VariableArg v) {
+            }
+        }
+
+        public static final class VarAndExpression {
+            public void call(StatementContext ctx, VariableArg a, ExpressionArg e) {
+            }
+        }
+
+        @Test
+        void a_constraint_naming_nothing_is_rejected() {
+            assertThat(rejection(base().defineStatement("TOUCH {var/Nonsense:x}", OneVar.class)))
+                    .contains("'Nonsense' names no placeholder in this pattern, no built-in type, "
+                            + "and no registered opaque type");
+        }
+
+        @Test
+        void a_registered_opaque_type_resolves() {
+            assertThatCode(() -> base()
+                    .defineStatement("TOUCH {var/Order:x}", OneVar.class).seal())
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        void a_reference_to_a_placeholder_in_the_same_pattern_resolves() {
+            assertThatCode(() -> base()
+                    .defineStatement("PUT {var:a} INTO {expression/a:e}", VarAndExpression.class)
+                    .seal()).doesNotThrowAnyException();
+        }
+
+        @Test
+        void an_element_reference_needs_the_target_to_be_an_array() {
+            assertThat(rejection(base()
+                    .defineStatement("PUT {var:a} INTO {expression/a[]:e}", VarAndExpression.class)))
+                    .contains("which is not declared to be an array; constrain it with /ARRAY");
+            assertThatCode(() -> base()
+                    .defineStatement("PUT {var/ARRAY:a} INTO {expression/a[]:e}",
+                            VarAndExpression.class).seal()).doesNotThrowAnyException();
+        }
+
+        @Test
+        void an_element_reference_to_a_missing_placeholder_is_rejected() {
+            assertThat(rejection(base()
+                    .defineStatement("PUT {var:a} INTO {expression/z[]:e}", VarAndExpression.class)))
+                    .contains("refers to a placeholder named 'z', which this pattern does not have");
+        }
+
+        @Test
+        void an_exact_match_against_NUMBER_makes_no_sense() {
+            assertThat(rejection(base()
+                    .defineStatement("SCALE BY {literal/=NUMBER:n}", OneValue.class)))
+                    .contains("not a type but a choice between INTEGER and DECIMAL");
+        }
+
+        @Test
+        void a_constrained_literal_fixes_its_java_parameter_type() {
+            assertThatCode(() -> base()
+                    .defineStatement("RETRY {literal/INTEGER:times}", OneLiteral.class).seal())
+                    .doesNotThrowAnyException();
+            assertThat(rejection(base()
+                    .defineStatement("RETRY {literal/INTEGER:times}", OneValue.class)))
+                    .contains("must be long, not Value");
+        }
+
+        @Test
+        void an_unconstrained_literal_arrives_as_a_value() {
+            assertThatCode(() -> base()
+                    .defineStatement("RETRY {literal:times}", OneValue.class).seal())
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        void a_literal_is_never_opaque_and_never_an_array() {
+            assertThat(rejection(base()
+                    .defineStatement("RETRY {literal/Order:n}", OneValue.class)))
+                    .contains("a constant is never opaque");
+            assertThat(rejection(base()
+                    .defineStatement("RETRY {literal/ARRAY:n}", OneValue.class)))
+                    .contains("a constant is never an array");
+        }
+    }
+
+    @Nested
+    @DisplayName("overlap analysis at seal")
+    class Overlap {
+
+        public static final class Two {
+            public void call(StatementContext ctx, VariableArg target, ExpressionArg value) {
+            }
+        }
+
+        public static final class TwoVars {
+            public void call(StatementContext ctx, VariableArg target, VariableArg source) {
+            }
+        }
+
+        @Test
+        void colliding_patterns_are_rejected_when_the_language_seals() {
+            assertThat(rejection(base()
+                    .defineStatement("SET {var:target} TO {expression:value}", Two.class)
+                    .defineStatement("SET {var:target} TO {var:source}", TwoVars.class)))
+                    .contains("could match the same line");
+        }
+
+        @Test
+        void the_check_can_be_skipped() {
+            assertThatCode(() -> base()
+                    .defineStatement("SET {var:target} TO {expression:value}", Two.class)
+                    .defineStatement("SET {var:target} TO {var:source}", TwoVars.class)
+                    .skipOverlapAnalysis(true)
+                    .seal()).doesNotThrowAnyException();
+        }
+    }
+}

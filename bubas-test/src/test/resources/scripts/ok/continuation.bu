@@ -1,0 +1,17 @@
+'OK
+' All three continuation forms: an open bracket, a trailing operator, and a lone underscore.
+PROGRAM Continuation
+    DECLARE total INTEGER
+    DECLARE which INTEGER
+    total = 1 +
+            2 +
+            3
+    ASSERT "a trailing operator continues the line", total = 6
+
+    which = CONTENTS(WRAP(
+            7))
+    ASSERT "an open bracket continues the line", which = 7
+
+    ASSERT "an underscore continues the line", _
+            total = 6
+END.

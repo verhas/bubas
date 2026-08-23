@@ -1,0 +1,11 @@
+'NO-COMPILE
+' An IF without an ELSE guarantees nothing: the path that skipped it assigned nothing.
+' ERROR: is read before it is assigned
+' LINE: 10
+PROGRAM P
+    DECLARE n INTEGER
+    IF TRUE THEN
+        n = 1
+    END IF
+    ASSERT "unreachable", n = 1
+END.

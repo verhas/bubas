@@ -1,0 +1,18 @@
+'OK
+' Integer arithmetic: precedence, unary minus, truncating division and MOD.
+PROGRAM P
+    DECLARE n INTEGER
+    n = 2 + 3 * 4
+    ASSERT "multiplication binds tighter than addition", n = 14
+    n = (2 + 3) * 4
+    ASSERT "brackets override precedence", n = 20
+    n = -5 + 2
+    ASSERT "unary minus", n = -3
+    n = 7 / 2
+    ASSERT "integer division truncates towards zero", n = 3
+    n = 7 MOD 3
+    ASSERT "MOD is the remainder", n = 1
+    ASSERT "comparison yields a BOOLEAN", 3 < 4
+    ASSERT "inequality", 3 <> 4
+    ASSERT "the largest INTEGER survives a round trip", n + 9223372036854775806 = 9223372036854775807
+END.

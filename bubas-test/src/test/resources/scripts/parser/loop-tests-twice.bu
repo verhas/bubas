@@ -1,0 +1,10 @@
+'NO-COMPILE
+' A DO loop may not test its condition at both ends.
+' ERROR: already tests its condition at DO
+PROGRAM P
+    DECLARE n INTEGER
+    n = 0
+    DO WHILE n < 3
+        n = n + 1
+    END DO WHILE n < 5
+END.

@@ -1,0 +1,11 @@
+'NO-COMPILE
+' Comparing two opaque values is the embedder's business, not the language's.
+' ERROR: cannot be compared
+' LINE: 9
+PROGRAM P
+    DECLARE p Parcel
+    DECLARE b BOOLEAN
+    p = WRAP(1)
+    b = p = p
+    ASSERT "unreachable", b
+END.

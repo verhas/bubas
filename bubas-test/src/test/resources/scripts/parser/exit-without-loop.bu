@@ -1,0 +1,8 @@
+'NO-COMPILE
+' EXIT names the loop it leaves, and there must be one of that kind to leave.
+' ERROR: EXIT names the loop it leaves
+PROGRAM P
+    DECLARE n INTEGER
+    n = 0
+    EXIT
+END.

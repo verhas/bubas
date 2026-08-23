@@ -1,0 +1,9 @@
+'NO-COMPILE
+' What is final is final from its declaration.
+' ERROR: is final and cannot be changed
+' LINE: 7
+PROGRAM P
+    DECLARE rate DECIMAL FINAL = 1.0
+    rate = 2.0
+    ASSERT "unreachable", rate = 1.0
+END.

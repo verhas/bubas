@@ -1,0 +1,7 @@
+'RUN-TIME-ERROR
+' A failing ASSERT reports its own message, which is how every other script here reports itself.
+' ERROR: assertion failed: two plus two is five
+' LINE: 6
+PROGRAM P
+    ASSERT "two plus two is five", 2 + 2 = 5
+END.

@@ -6,9 +6,6 @@ BUBAS is an orchestration language for subject matter experts, embedded in Java 
 See [`README.md`](README.md) for the pitch and [`SPEC.md`](SPEC.md) for the language definition
 and API contract.
 
-**Phase 1 in progress.** `bubas-api` and `bubas-lexer` exist and are green; the analyser, runtime
-and support modules have not been started.
-
 ## The specification is the contract
 
 `SPEC.md` is normative. When code and specification disagree, the specification wins unless the
@@ -54,6 +51,34 @@ mistaken for oversights:
   open (`/NUMBER`, or no mutability prefix), and the two cases cannot be split into separate
   patterns because their token shapes are identical and overlap analysis rejects the pair. Adding
   the missing two back re-implements checks the analyser already made.
+- **Declarations are top level only, and the rule is about patterns, not about `DECLARE`.** Any
+  statement whose pattern creates a variable — a `new` precondition or a `final` postcondition —
+  may appear only in the program body, never inside an `IF` arm, a `DO` or a `FOR`. BUBAS has no
+  local variables, so a declaration inside a block would look scoped while being global: it would
+  outlive the block and collide with a later declaration, none of which the indentation suggests.
+  The simpler analysis that follows — declaredness needs no flow analysis at all — is a
+  consequence, not the reason, so do not relax the rule to buy convenience back.
+- **Arrays are invariant, unlike Java's.** `Order[]` accepts only `Order[]`, never `RushOrder[]`.
+  An array crosses into Java as the interpreter's backing store, so covariance would let a handler
+  declaring `Order[]` store a plain `Order` into an array the script declared as `RushOrder` —
+  caught, if at all, by an `ArrayStoreException` inside embedder code with nothing naming the line
+  that passed it. This costs read-only functions the ability to take an array of a subtype; that is
+  the accepted price, not an oversight. Array assignability is consulted in exactly one place,
+  matching an argument to a parameter, because arrays are never assigned and never returned.
+- **A `var` reaches exactly one location, and there is no `get(index)` / `set(index, value)`.**
+  Given `MODIFY A[5]` the handler alters `A[5]` and has no way to reach `A[6]`. That is the
+  guarantee the script author reads off the line. An array-typed placeholder is the opposite and
+  deliberately unrestricted: `RESET A FROM 3 TO 7` hands over the backing store, and the handler
+  may write whatever it likes. The difference is visible in the source — `A[5]` names a slot, `A`
+  names the array.
+- **A variable may not be named after its type.** Registered opaque type names are reserved like
+  everything else, so `DECLARE order Order` is rejected. It is the same rule that bans `userId`
+  beside `UserID`, but it bites where people least expect it, so the diagnostic must name the type
+  rather than just report a reserved word.
+- **Assignment has no keyword, so a pattern need not begin with one.** `x = 5` is the built-in
+  assignment pattern; its only literal is `=`. Requiring a leading word would make the most
+  frequent statement in the language inexpressible. What a pattern must have is at least one
+  literal of any kind — one made only of placeholders reserves nothing and would match by shape.
 - **Trivia has exactly one owner, and lexing is lossless.** Everything between two tokens belongs
   to the earlier token; everything before a line's first token belongs to the line; a terminator
   belongs to the line it ends. Leading-plus-trailing trivia gives every gap two plausible owners
@@ -67,27 +92,39 @@ mistaken for oversights:
 
 ## Build and layout
 
-Maven, Java 21. Every artefact ships a `module-info.java` and a `META-INF/services` entry, so
-extension discovery works for embedders on the module path and on the classpath alike.
+Every artefact ships a `module-info.java` and a `META-INF/services` entry, so extension discovery
+works for embedders on the module path and on the classpath alike.
 
 | Module | Contents | Depends on |
 |--------|----------|-----------|
 | `bubas-api` | `BubasType`, `Value`, `Context` interfaces, `VariableArg`, `ExpressionArg`, `LiteralArg`, `BubasArray`, `BubasException`, the extension SPI | — |
 | `bubas-lexer` | Tokens, logical-line assembly, continuation and comment handling | api |
-| `bubas-analyser` | Parser, pattern matcher and overlap analysis, type checker, definite assignment | api, lexer |
-| `bubas-runtime` | `BubasLanguage`, `BubasProgram`, `Interpreter`, dispatcher, variable store | api, analyser |
+| `bubas-analyser` | `BubasLanguage`, `BubasProgram`, pattern matcher and overlap analysis, parser, type checker, definite assignment | api, lexer |
+| `bubas-runtime` | `Interpreter`, dispatcher, variable store | api, analyser |
 | `bubas-support` | Mandatory prelude and the optional packages | api |
+| `bubas-test` | The `.bu` script corpus and the runner that executes it | api, analyser, runtime, support (test scope) |
+
+The pattern matcher sits with the parser deliberately. They would be separable only at the cost of
+an interface module and runtime injection of its implementation, to solve a dependency that does
+not exist: every pattern, function and opaque type is registered and the language sealed before the
+first source line is matched, so the parser's vocabulary is complete and immutable by the time it
+runs — a plain field, not an injected service.
+
+`BubasLanguage` owns `compile()`, so it belongs with the analyser, not the runtime. Nothing is
+resolved by name at run time: the compiler bakes resolved implementations and classes into the AST,
+so the registries never outlive analysis. Execution is entered with `Interpreter.of(program)` —
+a factory method on `BubasProgram` would make the analyser depend on the runtime.
 
 `bubas-codegen` joins in phase 3. `bubas-support` depends only on `bubas-api`, which is the point
 of splitting the API out: a third party writing a function library must not have to depend on the
 interpreter.
 
-Tests are JUnit 5 with AssertJ, and run on the classpath rather than the module path
-(`useModulePath=false` in surefire) because they exercise package-internal behaviour. The
-`-parameters` compiler flag is on for every module: BUBAS parameter names are derived from Java
-parameter names.
+Tests run on the classpath rather than the module path because they exercise package-internal
+behaviour. The `-parameters` compiler flag is on because BUBAS parameter names are derived from
+Java parameter names.
 
-Still undecided: whether the interpreter/codegen conformance suite is its own module.
+`bubas-test` is that module for phase 1, and it is where the conformance suite belongs when
+code generation arrives: the same corpus, run through a second backend.
 
 ## Conventions
 
@@ -109,4 +146,31 @@ Two obligations beyond ordinary unit tests:
    must run through both the interpreter and the generated Java and produce identical results
    *and* identical errors. Divergence between the two is the characteristic bug of that design,
    and nothing else will catch it.
+
+### The script corpus
+
+`bubas-test/src/test/resources/scripts/**/*.bu` holds whole programs, each run end to end by
+`ScriptTest`. A script declares its own expectation in a header comment, so adding a case means
+adding one file and nothing else:
+
+```
+'NO-COMPILE                  ' or 'RUN-TIME-ERROR, or 'OK
+' What this script is for, in a sentence.
+' ERROR: a fragment the diagnostic must contain
+' LINE: 8
+```
+
+`ERROR` and `LINE` are optional but expected for the two failing outcomes — asserting only that
+compilation failed is exactly the insufficiency rule 1 is about. An `'OK` script proves itself with
+`ASSERT "what is being claimed", <condition>`, a command the test environment registers, so a
+script that runs to the end has checked its own results rather than merely not crashing.
+
+Two things to know before adding scripts:
+
+- **Line numbers include the header**, so the first statement of a five-line header sits on line 6.
+  Rather than counting, guess and run: the runner prints the full diagnostic it got, including the
+  line it names, which is the number to write down.
+- **A variable nothing reads is a compile error**, so a script probing a later stage will trip the
+  unused-variable check first and report that instead. Give every variable a reader — usually the
+  trailing `ASSERT "unreachable", ...` the failing scripts carry.
 

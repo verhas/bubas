@@ -1,0 +1,9 @@
+'NO-COMPILE
+' Concatenation coerces only when the left operand is a STRING.
+' ERROR: a STRING can only be added to a STRING
+' LINE: 7
+PROGRAM P
+    DECLARE s STRING
+    s = 42 + "x"
+    ASSERT "unreachable", s = "42x"
+END.

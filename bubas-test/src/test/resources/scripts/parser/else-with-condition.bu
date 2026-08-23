@@ -1,0 +1,12 @@
+'NO-COMPILE
+' ELSE takes nothing; a further condition is ELSEIF.
+' ERROR: write ELSEIF for another condition
+PROGRAM P
+    DECLARE n INTEGER
+    n = 1
+    IF n = 1 THEN
+        n = 2
+    ELSE n = 3 THEN
+        n = 4
+    END IF
+END.

@@ -1,0 +1,7 @@
+'NO-COMPILE
+' What a program returns must be what it declared it returns.
+' ERROR: declares RETURNS INTEGER, so it cannot return STRING
+' LINE: 6
+PROGRAM P RETURNS INTEGER
+    RETURN "text"
+END.

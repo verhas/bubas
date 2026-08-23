@@ -1,0 +1,10 @@
+'NO-COMPILE
+' Two names differing only in case cannot both exist, so a reference that differs in case from
+' its declaration is a typo rather than a second variable.
+' ERROR: is declared as 'total' on line 7
+' LINE: 8
+PROGRAM P
+    DECLARE total INTEGER
+    Total = 1
+    ASSERT "unreachable", total = 1
+END.

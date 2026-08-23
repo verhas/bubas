@@ -1,0 +1,7 @@
+'NO-COMPILE
+' Every name must be declared before it is used.
+' ERROR: 'ghost' is not declared
+' LINE: 6
+PROGRAM P
+    ghost = 1
+END.

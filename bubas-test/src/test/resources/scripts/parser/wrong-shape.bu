@@ -1,0 +1,6 @@
+'NO-COMPILE
+' A known keyword used with the wrong shape names the pattern it failed to match.
+' ERROR: ASSERT does not match its pattern
+PROGRAM P
+    ASSERT "only a message"
+END.

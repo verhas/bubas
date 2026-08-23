@@ -1,0 +1,10 @@
+'RUN-TIME-ERROR
+' Overflow is an error, never a silent wraparound.
+' ERROR: integer overflow
+' LINE: 8
+PROGRAM P
+    DECLARE n INTEGER
+    n = 9223372036854775807
+    n = n + 1
+    ASSERT "unreachable", n = 0
+END.

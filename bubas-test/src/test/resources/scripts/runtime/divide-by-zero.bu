@@ -1,0 +1,11 @@
+'RUN-TIME-ERROR
+' Division by zero is an error, not a value.
+' ERROR: division by zero
+' LINE: 9
+PROGRAM P
+    DECLARE n INTEGER
+    DECLARE z INTEGER
+    z = 0
+    n = 1 / z
+    ASSERT "unreachable", n = 0
+END.

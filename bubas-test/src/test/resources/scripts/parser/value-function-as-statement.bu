@@ -1,0 +1,6 @@
+'NO-COMPILE
+' A function that returns a value may not stand alone; the result would be discarded silently.
+' ERROR: cannot stand alone as a statement
+PROGRAM P
+    WRAP(1)
+END.

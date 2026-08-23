@@ -1,0 +1,11 @@
+'NO-COMPILE
+' EXIT DO needs a DO to leave; a FOR will not do.
+' ERROR: has no enclosing DO loop to leave
+' LINE: 8
+PROGRAM P
+    DECLARE i INTEGER
+    FOR i = 0 TO 3
+        EXIT DO
+    END FOR
+    ASSERT "unreachable", i = 0
+END.

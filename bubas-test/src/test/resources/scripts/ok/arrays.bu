@@ -1,0 +1,22 @@
+'OK
+' Allocation, default elements, indexed read and write, LENGTH, and a computed index.
+PROGRAM P
+    DECLARE numbers[4] INTEGER
+    DECLARE words[2] STRING
+    DECLARE i INTEGER
+    DECLARE total INTEGER
+    ASSERT "LENGTH reports the declared size", LENGTH(numbers) = 4
+    ASSERT "INTEGER elements start at zero", numbers[0] = 0
+    ASSERT "STRING elements start empty", words[1] = ""
+    FOR i = 0 TO LENGTH(numbers) - 1
+        numbers[i] = i * i
+    END FOR
+    ASSERT "a computed index reads what it wrote", numbers[3] = 9
+    total = 0
+    FOR i = 0 TO 3
+        total = total + numbers[i]
+    END FOR
+    ASSERT "walking the array", total = 14
+    words[0] = "hello"
+    ASSERT "strings in arrays", words[0] + " " + words[1] = "hello "
+END.

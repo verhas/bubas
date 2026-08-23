@@ -1,0 +1,6 @@
+'NO-COMPILE
+' A line that begins with a word no pattern begins with.
+' ERROR: unknown statement FROBNICATE
+PROGRAM P
+    FROBNICATE 1
+END.

@@ -1,0 +1,9 @@
+'NO-COMPILE
+' A number running straight into a name is rejected where it is written, not left to the parser.
+' ERROR: malformed number literal
+' LINE: 7
+PROGRAM P
+    DECLARE n INTEGER
+    n = 1e5
+    ASSERT "unreachable", n = 0
+END.

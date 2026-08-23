@@ -1,0 +1,9 @@
+'NO-COMPILE
+' A block that is never closed.
+' ERROR: expected END
+PROGRAM P
+    DECLARE n INTEGER
+    n = 1
+    IF n = 1 THEN
+        n = 2
+END.
