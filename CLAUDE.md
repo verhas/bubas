@@ -6,9 +6,6 @@ BUBAS is an orchestration language for subject matter experts, embedded in Java 
 See [`README.md`](README.md) for the pitch and [`SPEC.md`](SPEC.md) for the language definition
 and API contract.
 
-**Phase 1 in progress.** `bubas-api` and `bubas-lexer` exist and are green; the analyser, runtime
-and support modules have not been started.
-
 ## The specification is the contract
 
 `SPEC.md` is normative. When code and specification disagree, the specification wins unless the
@@ -60,6 +57,10 @@ mistaken for oversights:
   deliberately unrestricted: `RESET A FROM 3 TO 7` hands over the backing store, and the handler
   may write whatever it likes. The difference is visible in the source — `A[5]` names a slot, `A`
   names the array.
+- **A variable may not be named after its type.** Registered opaque type names are reserved like
+  everything else, so `DECLARE order Order` is rejected. It is the same rule that bans `userId`
+  beside `UserID`, but it bites where people least expect it, so the diagnostic must name the type
+  rather than just report a reserved word.
 - **Assignment has no keyword, so a pattern need not begin with one.** `x = 5` is the built-in
   assignment pattern; its only literal is `=`. Requiring a leading word would make the most
   frequent statement in the language inexpressible. What a pattern must have is at least one
@@ -77,8 +78,8 @@ mistaken for oversights:
 
 ## Build and layout
 
-Maven, Java 21. Every artefact ships a `module-info.java` and a `META-INF/services` entry, so
-extension discovery works for embedders on the module path and on the classpath alike.
+Every artefact ships a `module-info.java` and a `META-INF/services` entry, so extension discovery
+works for embedders on the module path and on the classpath alike.
 
 | Module | Contents | Depends on |
 |--------|----------|-----------|
@@ -103,10 +104,9 @@ a factory method on `BubasProgram` would make the analyser depend on the runtime
 of splitting the API out: a third party writing a function library must not have to depend on the
 interpreter.
 
-Tests are JUnit 5 with AssertJ, and run on the classpath rather than the module path
-(`useModulePath=false` in surefire) because they exercise package-internal behaviour. The
-`-parameters` compiler flag is on for every module: BUBAS parameter names are derived from Java
-parameter names.
+Tests run on the classpath rather than the module path because they exercise package-internal
+behaviour. The `-parameters` compiler flag is on because BUBAS parameter names are derived from
+Java parameter names.
 
 Still undecided: whether the interpreter/codegen conformance suite is its own module.
 

@@ -12,4 +12,5 @@ module bubas.analyser {
     requires bubas.lexer;
     exports javax0.bubas.analyser;
     exports javax0.bubas.analyser.pattern;
+    exports javax0.bubas.analyser.match;
 }

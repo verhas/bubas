@@ -27,7 +27,15 @@ public record Token(TokenType type, String text, int line, int column, Object va
                     List<Trivia> trailing) {
 
     /**
-     * True when this token is spelled exactly {@code text}.
+     * True when this token is spelled {@code text}, ignoring case. Keywords are case-insensitive
+     * and symbols have no case, so this is the comparison every caller wants.
+     * <p>
+     * It is for comparing keywords and symbols, <em>not</em> the content of a string literal.
+     * BUBAS string data is case-sensitive, and a literal's {@link #text()} keeps its quotes, so
+     * comparing one through this method would be wrong in a way nothing would report. Names are
+     * not compared here either: a variable or function reference must be spelled as it was
+     * declared, and the analyser checks that against the symbol table, where it can say
+     * "declared as 'userId'" rather than merely "no match".
      * <p>
      * There is deliberately no token type to compare as well. No text is producible by two
      * different types: {@code > / = + - * <} and the two-character comparisons are only ever

@@ -219,7 +219,7 @@ explicit `_` keeps each layer's rule statable on its own:
 
 ```basic
 IF NOT _
-   ORDER_WAS_FOUND(order) THEN
+   ORDER_WAS_FOUND(purchase) THEN
 
 FOR i = 0 TO _
     LENGTH(items) - 1
@@ -332,8 +332,19 @@ builder.defineOpaqueType("Order", Order.class)
 ```
 
 ```basic
-DECLARE order Order
+DECLARE purchase Order
 DECLARE buyer Customer
+```
+
+A registered type name is reserved like any other, so **a variable may not be named after its
+type**. `DECLARE order Order` is rejected — which is worth knowing in advance, because naming a
+variable after its type is the first thing most people reach for. It is the same rule that bans
+`userId` beside `UserID`, and the diagnostic says so rather than merely reporting a reserved word:
+
+```
+line 3: 'order' collides with the opaque type 'Order';
+        a variable may not share a name with a type
+    DECLARE order Order
 ```
 
 ### 5.2 Absence
@@ -344,7 +355,7 @@ ordinary Java value: an opaque array element starts as `null`, and a Java functi
 it. A script that must branch on absence uses a function the embedder supplies:
 
 ```basic
-IF ORDER_WAS_FOUND(order) THEN
+IF ORDER_WAS_FOUND(purchase) THEN
 ```
 
 ### 5.3 Arrays
@@ -458,7 +469,7 @@ Parentheses are mandatory in an expression. A function used in an expression mus
 `VOID`.
 
 ```basic
-order = LOAD_ORDER(orderId)
+purchase = LOAD_ORDER(orderId)
 IF VALIDATE_ORDER(order) AND IS_URGENT(order) THEN
 ```
 
@@ -664,9 +675,18 @@ token, so `PAY a + b VIA acct` splits unambiguously.
 
 If a line matches two patterns, that is a compile error. Overlap is also checked at `seal()` by
 approximating each pattern as a regular language over token classes and testing pairwise
-intersection. The check is conservative and can reject a pair that would never actually collide;
-`skipOverlapAnalysis(true)` disables it, both for startup cost in production and for grammars
-whose author knows better.
+intersection — the emptiness test for the intersection of two regular languages, over a product of
+their automata. Every colliding pair is reported at once, so an embedder registering a vocabulary
+sees all of its conflicts in one go rather than one per attempt.
+
+The check has to run at `seal()` and not before: whether `PAY {expression:a} VIA {var:b}` and
+`PAY {expression:a} FROM {var:b}` collide depends on `FROM` being reserved by the other pattern,
+which is not known until every pattern is registered.
+
+The approximation errs towards warning — an expression is modelled as one-or-more expression
+tokens with no bracket structure, so a pair may be reported that no real line could hit, but no
+colliding pair can slip through. `skipOverlapAnalysis(true)` disables it, both for startup cost in
+production and for grammars whose author knows better.
 
 A pattern need not begin with a keyword. The built-in assignment begins with a placeholder and its
 only literal is `=`, so requiring a leading word would make the most frequent statement in the
@@ -1465,18 +1485,18 @@ public final class OrderVocabulary {
 
 ```basic
 PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
-    DECLARE order Order
+    DECLARE purchase Order
     DECLARE total DECIMAL
     DECLARE taxRate DECIMAL FINAL = 0.07
 
-    order = LOAD_ORDER(orderId)
+    purchase = LOAD_ORDER(orderId)
 
-    IF NOT ORDER_WAS_FOUND(order) THEN
+    IF NOT ORDER_WAS_FOUND(purchase) THEN
         LOG_EVENT "ERROR", "no such order: " + orderId
         RETURN FALSE
     END IF
 
-    total = ORDER_TOTAL(order) * (1.0 + taxRate)
+    total = ORDER_TOTAL(purchase) * (1.0 + taxRate)
 
     IF total > limit THEN
         LOG_EVENT "INFO", "over limit: " + total

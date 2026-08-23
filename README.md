@@ -9,18 +9,18 @@ sequencing, deciding and looping comes from a vocabulary that Java developers de
 
 ```basic
 PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
-    DECLARE order Order
+    DECLARE purchase Order
     DECLARE total DECIMAL
     DECLARE taxRate DECIMAL FINAL = 0.07
 
-    order = LOAD_ORDER(orderId)
+    purchase = LOAD_ORDER(orderId)
 
-    IF NOT ORDER_WAS_FOUND(order) THEN
+    IF NOT ORDER_WAS_FOUND(purchase) THEN
         LOG_EVENT "ERROR", "no such order: " + orderId
         RETURN FALSE
     END IF
 
-    total = ORDER_TOTAL(order) * (1.0 + taxRate)
+    total = ORDER_TOTAL(purchase) * (1.0 + taxRate)
 
     IF total > limit THEN
         LOG_EVENT "INFO", "over limit: " + total

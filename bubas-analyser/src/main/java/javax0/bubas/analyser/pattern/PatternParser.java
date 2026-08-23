@@ -1,5 +1,6 @@
 package javax0.bubas.analyser.pattern;
 
+import javax0.bubas.analyser.Keywords;
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.lexer.Lexer;
@@ -294,6 +295,11 @@ public final class PatternParser {
                         + "Use identifier when the pattern supplies the brackets");
             }
         }
+        for (int i = 0; i < elements.size(); i++) {
+            if (elements.get(i) instanceof Placeholder p && p.kind() == Kind.EXPRESSION) {
+                checkExpressionBoundary(p, i + 1 < elements.size() ? elements.get(i + 1) : null);
+            }
+        }
         final var names = new HashSet<String>();
         for (final var p : placeholders) {
             if (!names.add(p.name())) {
@@ -326,6 +332,36 @@ public final class PatternParser {
             throw error("'" + p.name() + "' creates a variable and so must carry a type constraint, "
                     + "otherwise nothing could type its later uses");
         }
+    }
+
+    /**
+     * An expression runs to the first token that cannot continue one, so whatever follows it in a
+     * pattern has to be such a token. Otherwise the expression swallows it and the pattern can
+     * never match. An operator or an opening bracket continues an expression, and so does a word
+     * like {@code AND} — which is why {@code X {expression:a} AND {expression:b}} is rejected while
+     * {@code SELECT 2 FROM {var:a} AND {var:b}} is fine.
+     */
+    private void checkExpressionBoundary(Placeholder p, PatternElement next) {
+        if (next == null) {
+            return;
+        }
+        if (!(next instanceof Literal literal)) {
+            throw error("'" + p.name() + "' is an expression followed by another placeholder; "
+                    + "nothing would say where the first one ends");
+        }
+        if (continuesAnExpression(literal)) {
+            throw error("'" + p.name() + "' is an expression followed by '" + literal.text()
+                    + "', which can itself appear inside an expression, so the expression would "
+                    + "swallow it");
+        }
+    }
+
+    private static boolean continuesAnExpression(Literal literal) {
+        if (literal.isWord()) {
+            return Keywords.isExpressionWord(literal.text());
+        }
+        return literal.type() == TokenType.OPERATOR
+                || "(".equals(literal.text()) || "[".equals(literal.text());
     }
 
     /**

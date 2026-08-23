@@ -2,6 +2,7 @@ package javax0.bubas.analyser.pattern;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -25,6 +26,16 @@ public record StatementPattern(String source, List<PatternElement> elements) {
                 .filter(Literal::isWord)
                 .map(l -> l.text().toUpperCase(Locale.ROOT))
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * The word this pattern begins with, when it begins with one. Assignment begins with a
+     * placeholder and has none, which is why this is optional rather than a plain string.
+     */
+    public Optional<String> keyword() {
+        return elements.getFirst() instanceof Literal first && first.isWord()
+                ? Optional.of(first.text())
+                : Optional.empty();
     }
 
     public List<Placeholder> placeholders() {
