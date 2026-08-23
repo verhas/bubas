@@ -108,7 +108,8 @@ class SymbolTableTest {
             final var table = table();
             table.declare(line("userId"), name("userId"), BubasType.INTEGER, false);
             assertThat(rejection(() -> table.reference(line("userid"), name("userid"))))
-                    .isEqualTo("'userid' is declared as 'userId' (at 1:1)");
+                    .isEqualTo("'userid' is declared as 'userId' on line 1; every reference must "
+                            + "match the declaration character for character (at 1:1)");
         }
     }
 

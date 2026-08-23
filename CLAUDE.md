@@ -102,6 +102,7 @@ works for embedders on the module path and on the classpath alike.
 | `bubas-analyser` | `BubasLanguage`, `BubasProgram`, pattern matcher and overlap analysis, parser, type checker, definite assignment | api, lexer |
 | `bubas-runtime` | `Interpreter`, dispatcher, variable store | api, analyser |
 | `bubas-support` | Mandatory prelude and the optional packages | api |
+| `bubas-test` | The `.bu` script corpus and the runner that executes it | api, analyser, runtime, support (test scope) |
 
 The pattern matcher sits with the parser deliberately. They would be separable only at the cost of
 an interface module and runtime injection of its implementation, to solve a dependency that does
@@ -122,7 +123,8 @@ Tests run on the classpath rather than the module path because they exercise pac
 behaviour. The `-parameters` compiler flag is on because BUBAS parameter names are derived from
 Java parameter names.
 
-Still undecided: whether the interpreter/codegen conformance suite is its own module.
+`bubas-test` is that module for phase 1, and it is where the conformance suite belongs when
+code generation arrives: the same corpus, run through a second backend.
 
 ## Conventions
 
@@ -144,4 +146,31 @@ Two obligations beyond ordinary unit tests:
    must run through both the interpreter and the generated Java and produce identical results
    *and* identical errors. Divergence between the two is the characteristic bug of that design,
    and nothing else will catch it.
+
+### The script corpus
+
+`bubas-test/src/test/resources/scripts/**/*.bu` holds whole programs, each run end to end by
+`ScriptTest`. A script declares its own expectation in a header comment, so adding a case means
+adding one file and nothing else:
+
+```
+'NO-COMPILE                  ' or 'RUN-TIME-ERROR, or 'OK
+' What this script is for, in a sentence.
+' ERROR: a fragment the diagnostic must contain
+' LINE: 8
+```
+
+`ERROR` and `LINE` are optional but expected for the two failing outcomes — asserting only that
+compilation failed is exactly the insufficiency rule 1 is about. An `'OK` script proves itself with
+`ASSERT "what is being claimed", <condition>`, a command the test environment registers, so a
+script that runs to the end has checked its own results rather than merely not crashing.
+
+Two things to know before adding scripts:
+
+- **Line numbers include the header**, so the first statement of a five-line header sits on line 6.
+  Rather than counting, guess and run: the runner prints the full diagnostic it got, including the
+  line it names, which is the number to write down.
+- **A variable nothing reads is a compile error**, so a script probing a later stage will trip the
+  unused-variable check first and report that instead. Give every variable a reader — usually the
+  trailing `ASSERT "unreachable", ...` the failing scripts carry.
 

@@ -87,7 +87,9 @@ public final class SymbolTable {
             throw error(line, name, "'" + name.text() + "' is not declared");
         }
         if (!variable.name().equals(name.text())) {
-            throw error(line, name, "'" + name.text() + "' is declared as '" + variable.name() + "'");
+            throw error(line, name, "'" + name.text() + "' is declared as '" + variable.name()
+                    + "' on line " + variable.declaredAt().line()
+                    + "; every reference must match the declaration character for character");
         }
         return variable;
     }

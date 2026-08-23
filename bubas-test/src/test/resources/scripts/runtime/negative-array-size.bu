@@ -1,5 +1,7 @@
 'RUN-TIME-ERROR
-' An array size is computed, so a nonsense size is caught where it is computed.
+' An array size is an expression, so a nonsense size is caught when it is computed.
+' ERROR: an array cannot have -1 elements
+' LINE: 8
 PROGRAM P
     DECLARE n INTEGER
     n = -1
