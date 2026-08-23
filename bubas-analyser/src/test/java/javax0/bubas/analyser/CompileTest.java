@@ -1,12 +1,10 @@
 package javax0.bubas.analyser;
 
 import javax0.bubas.analyser.symbol.Variable;
+import javax0.bubas.support.Standard;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Context;
-import javax0.bubas.api.ExpressionArg;
-import javax0.bubas.api.StatementContext;
-import javax0.bubas.api.VariableArg;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -45,32 +43,19 @@ class CompileTest {
         }
     }
 
-    public static final class Declare {
-        public void call(StatementContext ctx, VariableArg name, BubasType type) {
-        }
+    /** A builder with the standard declaration and assignment statements already installed. */
+    private static BubasLanguage.Builder standard() {
+        final var builder = BubasLanguage.builder();
+        Standard.STATEMENTS.forEach(builder::defineStatement);
+        return builder;
     }
 
-    public static final class DeclareFinal {
-        public void call(StatementContext ctx, VariableArg name, BubasType type, ExpressionArg init) {
-        }
-    }
-
-    public static final class Assign {
-        public void call(StatementContext ctx, VariableArg name, ExpressionArg value) {
-        }
-    }
-
-    private static final BubasLanguage LANGUAGE = BubasLanguage.builder()
+    private static final BubasLanguage LANGUAGE = standard()
             .defineOpaqueType("Order", Order.class)
             .defineFunction("LOAD_ORDER", LoadOrder.class)
             .defineFunction("ORDER_WAS_FOUND", OrderWasFound.class)
             .defineFunction("ORDER_TOTAL", OrderTotal.class)
             .defineFunction("LOG_EVENT", LogEvent.class)
-            .defineStatement("DECLARE {new > identifier/T:name > declared} {type:T}", Declare.class)
-            .defineStatement("DECLARE {new > identifier/T:name > final} {type:T} FINAL "
-                    + "= {expression/T:init}", DeclareFinal.class)
-            .defineStatement("{mutable:declared > var:name > initialized} = {expression/name:value}",
-                    Assign.class)
             .seal();
 
     /**

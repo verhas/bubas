@@ -2,7 +2,6 @@ package javax0.bubas.analyser.core;
 
 import javax0.bubas.analyser.CommandDefinition;
 import javax0.bubas.analyser.FunctionSignature;
-import javax0.bubas.api.BubasType;
 import javax0.bubas.lexer.LogicalLine;
 
 import java.util.List;
@@ -12,9 +11,13 @@ import java.util.Map;
  * A statement with every decision made.
  * <p>
  * The source's variety is already reduced: {@code UNTIL} is a {@code WHILE} over a negated
- * condition, a built-in declaration is an assignment or an allocation, and {@code EXIT} names the
- * loop it leaves by identity rather than by kind. Every back end therefore implements the same
- * handful of shapes.
+ * condition, and {@code EXIT} names the loop it leaves by identity rather than by kind. Every back
+ * end therefore implements the same handful of shapes.
+ * <p>
+ * Every statement pattern is an {@link Invoke}, including the ones the standard module supplies.
+ * Assignment and declaration are commands like any other; nothing here privileges them. What a
+ * code generator does with a command is a question for the command's own semantic description, not
+ * for this tree.
  * <p>
  * Each node keeps its {@link LogicalLine}, so an interpreter can report a failure against the
  * source and a code generator can emit output that maps back to it — which is what makes debugging
@@ -23,20 +26,6 @@ import java.util.Map;
 public sealed interface CoreStatement {
 
     LogicalLine line();
-
-    /** Writes a variable. */
-    record Assign(int slot, CoreExpression value, LogicalLine line) implements CoreStatement {
-    }
-
-    /** Writes one array element, bounds-checked. */
-    record AssignElement(int slot, CoreExpression index, CoreExpression value, LogicalLine line)
-            implements CoreStatement {
-    }
-
-    /** Creates an array of {@code size} elements, each holding its type's default. */
-    record Allocate(int slot, CoreExpression size, BubasType elementType, LogicalLine line)
-            implements CoreStatement {
-    }
 
     record Arm(CoreExpression condition, List<CoreStatement> body) {
     }

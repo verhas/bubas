@@ -3,8 +3,8 @@ package javax0.bubas.analyser.type;
 import javax0.bubas.analyser.BubasLanguage;
 import javax0.bubas.analyser.flow.FlowAnalyser;
 import javax0.bubas.analyser.statement.StatementParser;
+import javax0.bubas.support.Standard;
 import javax0.bubas.api.BubasException;
-import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
@@ -24,6 +24,16 @@ class TypeCheckerTest {
     public static final class Order {
     }
 
+    public static final class LogEvent {
+        public void call(Context ctx, String message) {
+        }
+    }
+
+    public static final class Show {
+        public void call(StatementContext ctx, VariableArg value) {
+        }
+    }
+
     public static final class LoadOrder {
         public Order call(Context ctx, long orderId) {
             return new Order();
@@ -36,46 +46,23 @@ class TypeCheckerTest {
         }
     }
 
-    public static final class LogEvent {
-        public void call(Context ctx, String message) {
-        }
-    }
-
-    public static final class Declare {
-        public void call(StatementContext ctx, VariableArg name, BubasType type) {
-        }
-    }
-
-    public static final class DeclareArray {
-        public void call(StatementContext ctx, VariableArg name, ExpressionArg size, BubasType type) {
-        }
-    }
-
-    public static final class Assign {
-        public void call(StatementContext ctx, VariableArg name, ExpressionArg value) {
-        }
-    }
-
-    public static final class Show {
-        public void call(StatementContext ctx, VariableArg value) {
-        }
-    }
-
     public static final class Scale {
         public void call(StatementContext ctx, ExpressionArg by) {
         }
     }
 
-    private static final BubasLanguage LANGUAGE = BubasLanguage.builder()
+    /** A builder with the standard declaration and assignment statements already installed. */
+    private static BubasLanguage.Builder standard() {
+        final var builder = BubasLanguage.builder();
+        Standard.STATEMENTS.forEach(builder::defineStatement);
+        return builder;
+    }
+
+    private static final BubasLanguage LANGUAGE = standard()
             .defineOpaqueType("Order", Order.class)
             .defineFunction("LOAD_ORDER", LoadOrder.class)
             .defineFunction("ORDER_TOTAL", OrderTotal.class)
             .defineFunction("LOG_EVENT", LogEvent.class)
-            .defineStatement("DECLARE {new > identifier/T:name > declared} {type:T}", Declare.class)
-            .defineStatement("DECLARE {new > identifier/ARRAY/T:name > initialized}"
-                    + "[{expression/INTEGER:size}] {type:T}", DeclareArray.class)
-            .defineStatement("{mutable:declared > var:name > initialized} = {expression/name:value}",
-                    Assign.class)
             .defineStatement("SHOW {initialized > var:value}", Show.class)
             .defineStatement("SCALE BY {expression/NUMBER:by}", Scale.class)
             .seal();

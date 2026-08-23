@@ -8,24 +8,13 @@
         <artifactId>bubas-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>bubas-analyser</artifactId>
-    <name>BUBAS Analyser</name>
-    <description>Patterns, parser, type checker and definite assignment</description>
+    <artifactId>bubas-support</artifactId>
+    <name>BUBAS Support</name>
+    <description>The standard statements and functions, and the optional packages</description>
     <dependencies>
         <dependency>
             <groupId>com.javax0.bubas</groupId>
             <artifactId>bubas-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.javax0.bubas</groupId>
-            <artifactId>bubas-lexer</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.javax0.bubas</groupId>
-            <artifactId>bubas-support</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

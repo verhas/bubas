@@ -1,6 +1,7 @@
 package javax0.bubas.analyser.statement;
 
 import javax0.bubas.analyser.BubasLanguage;
+import javax0.bubas.support.Standard;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Context;
@@ -11,8 +12,6 @@ import javax0.bubas.lexer.Lexer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
@@ -44,29 +43,23 @@ class StatementParserTest {
         }
     }
 
-    public static final class Declare {
-        public void call(StatementContext ctx, VariableArg name, BubasType type) {
-        }
-    }
-
-    public static final class Assign {
-        public void call(StatementContext ctx, VariableArg name, ExpressionArg value) {
-        }
-    }
-
     public static final class AddTo {
         public void call(StatementContext ctx, long amount, VariableArg total) {
         }
     }
 
-    private static final BubasLanguage LANGUAGE = BubasLanguage.builder()
+    /** A builder with the standard declaration and assignment statements already installed. */
+    private static BubasLanguage.Builder standard() {
+        final var builder = BubasLanguage.builder();
+        Standard.STATEMENTS.forEach(builder::defineStatement);
+        return builder;
+    }
+
+    private static final BubasLanguage LANGUAGE = standard()
             .defineOpaqueType("Order", Order.class)
             .defineFunction("LOAD_ORDER", LoadOrder.class)
             .defineFunction("LOG_EVENT", LogEvent.class)
             .defineFunction("COUNT_ORDERS", CountOrders.class)
-            .defineStatement("DECLARE {new > identifier/T:name > declared} {type:T}", Declare.class)
-            .defineStatement("{mutable:declared > var:name > initialized} = {expression/name:value}",
-                    Assign.class)
             .defineStatement("VALIDATE {initialized > var:item} AGAINST {expression:rules}",
                     Validate.class)
             .defineStatement("ADD {literal/INTEGER:amount} TO {mutable:initialized > var:total"
