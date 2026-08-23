@@ -315,7 +315,7 @@ public final class PatternParser {
             throw error("only a var or identifier placeholder has conditions; '" + p.name()
                     + "' is a " + p.kind().spelling());
         }
-        if (p.kind() == Kind.VAR && creates(p)) {
+        if (p.kind() == Kind.VAR && p.creates()) {
             throw error("'" + p.name() + "' would create a variable, but a var may be an indexed "
                     + "reference such as a[i], which is not a name; use identifier");
         }
@@ -328,7 +328,7 @@ public final class PatternParser {
             throw error("'" + p.name() + "' is made final but required to exist already; "
                     + "a final postcondition implies the variable is new");
         }
-        if (creates(p) && p.constraint() == null) {
+        if (p.creates() && p.constraint() == null) {
             throw error("'" + p.name() + "' creates a variable and so must carry a type constraint, "
                     + "otherwise nothing could type its later uses");
         }
@@ -362,14 +362,6 @@ public final class PatternParser {
         }
         return literal.type() == TokenType.OPERATOR
                 || "(".equals(literal.text()) || "[".equals(literal.text());
-    }
-
-    /**
-     * A placeholder creates a variable when it says {@code new}, or implies it by making one final.
-     */
-    private static boolean creates(Placeholder p) {
-        return p.preconditions().contains(Precondition.NEW)
-                || p.postconditions().contains(Postcondition.FINAL);
     }
 
     // ---------------------------------------------------------------- token helpers

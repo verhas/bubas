@@ -23,10 +23,10 @@ import java.util.Set;
  * keywords, function names and opaque type names, so a variable may not be called {@code order}
  * when {@code Order} is a registered type.
  * <p>
- * Declaredness is lexical, not flow-sensitive: a {@code DECLARE} anywhere makes the name known to
- * every later line, even one on a path where the declaration would not have run. Whether the
- * variable then holds a value is {@link Assignment}'s business, and that <em>is</em>
- * flow-sensitive — which is what makes a conditional declaration safe rather than clever.
+ * Declaredness needs no flow analysis. A declaration may appear only at the top level of a program,
+ * so it always runs, on every path, before anything that could use it: a name is known to every
+ * line after its declaration and to none before. Whether the variable then holds a value is
+ * {@link Assignment}'s business, and that is the only part that varies by path.
  */
 public final class SymbolTable {
 

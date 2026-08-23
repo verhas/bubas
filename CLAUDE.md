@@ -51,12 +51,13 @@ mistaken for oversights:
   open (`/NUMBER`, or no mutability prefix), and the two cases cannot be split into separate
   patterns because their token shapes are identical and overlap analysis rejects the pair. Adding
   the missing two back re-implements checks the analyser already made.
-- **Declaredness is lexical, initialization is flow-sensitive.** A `DECLARE` anywhere makes the
-  name known to every later line; whether it holds a value follows the flow rules. So a write needs
-  no declaredness check — the symbol table is built in source order — and declaring the same name
-  in both arms of an `IF` is a redeclaration, not a merge. Making declaredness flow-sensitive would
-  buy only that symmetric case, for a second axis through the whole analysis and a check on every
-  write.
+- **Declarations are top level only, and the rule is about patterns, not about `DECLARE`.** Any
+  statement whose pattern creates a variable — a `new` precondition or a `final` postcondition —
+  may appear only in the program body, never inside an `IF` arm, a `DO` or a `FOR`. BUBAS has no
+  local variables, so a declaration inside a block would look scoped while being global: it would
+  outlive the block and collide with a later declaration, none of which the indentation suggests.
+  The simpler analysis that follows — declaredness needs no flow analysis at all — is a
+  consequence, not the reason, so do not relax the rule to buy convenience back.
 - **Arrays are invariant, unlike Java's.** `Order[]` accepts only `Order[]`, never `RushOrder[]`.
   An array crosses into Java as the interpreter's backing store, so covariance would let a handler
   declaring `Order[]` store a plain `Order` into an array the script declared as `RushOrder` —

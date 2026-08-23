@@ -38,6 +38,15 @@ public record StatementPattern(String source, List<PatternElement> elements) {
                 : Optional.empty();
     }
 
+    /**
+     * True when matching this pattern brings a variable into existence. Such a statement may appear
+     * only at the top level of a program: BUBAS has no local variables, so a declaration inside a
+     * block would look scoped while being global.
+     */
+    public boolean declaresVariable() {
+        return placeholders().stream().anyMatch(Placeholder::creates);
+    }
+
     public List<Placeholder> placeholders() {
         return elements.stream()
                 .filter(Placeholder.class::isInstance)

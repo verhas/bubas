@@ -14,4 +14,14 @@ import java.util.Set;
 public record Placeholder(Kind kind, String name, Constraint constraint,
                           Set<Precondition> preconditions,
                           Set<Postcondition> postconditions) implements PatternElement {
+
+    /**
+     * True when this placeholder brings a variable into existence: it says {@code new}, or implies
+     * it by making one {@code final}. Only an {@link Kind#IDENTIFIER} can, since {@code a[i]} is
+     * not a name.
+     */
+    public boolean creates() {
+        return preconditions.contains(Precondition.NEW)
+                || postconditions.contains(Postcondition.FINAL);
+    }
 }

@@ -557,6 +557,35 @@ DECLARE items[COUNT_ORDERS()] Order
 A `FINAL` variable requires an initializer and can never be reassigned. Finality is not a state
 a variable enters later: what is final is final from its declaration.
 
+**A declaration may appear only at the top level of a program** — never inside an `IF` arm, a `DO`
+or a `FOR`.
+
+```basic
+PROGRAM P
+    DECLARE total DECIMAL          ' here
+    IF over THEN
+        DECLARE note STRING        ' error: only at the top level
+    END IF
+END.
+```
+
+The rule is not about `DECLARE`, which is only a pattern like any other. It covers **any statement
+whose pattern creates a variable** — anything carrying a `new` precondition or a `final`
+postcondition — so a custom `FETCH {type:T} INTO {new > identifier/T:out > initialized}` is bound
+by it too.
+
+> **Rationale (not normative).** BUBAS has no local variables. A declaration inside a block would
+> therefore look scoped while being global: the name would outlive the block, keep its value after
+> it, and collide with a later declaration elsewhere — none of which the indentation suggests. The
+> appearance of locality without the substance is worse than not offering it.
+>
+> It also nudges in the direction the two layers already point. A script needing variables declared
+> deep inside nested blocks is doing work that belongs in Java, and having to hoist every
+> declaration to the top makes that visible while the script is being written rather than after.
+>
+> The analysis gets simpler as a side effect — declaredness stops needing flow analysis entirely —
+> but that is a consequence, not the reason.
+
 ### 7.3 Assignment
 
 Assignment has no keyword. BUBAS is not BASIC; `LET` faded out of the languages that had it, and
@@ -671,38 +700,19 @@ Variable state is a pair, not a single enum.
 `FINAL` implies `INITIALIZED` at the point of declaration. A variable never becomes final later,
 and never becomes uninitialized.
 
-**Declaredness is lexical; initialization is flow-sensitive.** A `DECLARE` anywhere makes the name
-known to every later line, including lines on a path where the declaration would not have run.
-Whether the variable then holds a value follows the flow rules below, which is what keeps a
-conditional declaration safe rather than clever:
-
-```basic
-IF c THEN
-    DECLARE x INTEGER = 1
-END IF
-x = x + 1        ' error: x is not definitely initialized
-```
-
-Two consequences follow.
-
-**A name may be declared once, not once per path.** Declaring the same name in both arms of an `IF`
-is a redeclaration, and rejected. The spelling that works is the one that also reads better:
+**Only initialization is flow-sensitive.** Because a declaration may appear only at the top level
+([§7.2](#72-declarations)), it always runs, on every path, before anything that could use it.
+Declaredness therefore needs no flow analysis at all: a name is known to every line after its
+declaration and to none before, and a write needs no declaredness check that a read does not
+already imply. What varies by path is only whether the variable holds a value.
 
 ```basic
 DECLARE x INTEGER
 IF c THEN
     x = 1
-ELSE
-    x = 2
 END IF
+x = x + 1        ' error: x is not definitely initialized
 ```
-
-**A write needs no declaredness check.** The symbol table is built in source order, so a reference
-before its `DECLARE` is already undeclared and one after it is simply known. Making declaredness
-flow-sensitive instead would buy only the symmetric declaration above, at the price of a second
-axis through the whole analysis, a check on every write, and a diagnostic distinguishing "not
-declared on this path" from "not declared at all" — a distinction the script author would have to
-be taught.
 
 ### 8.2 Definite assignment
 
