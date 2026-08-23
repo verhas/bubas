@@ -671,6 +671,39 @@ Variable state is a pair, not a single enum.
 `FINAL` implies `INITIALIZED` at the point of declaration. A variable never becomes final later,
 and never becomes uninitialized.
 
+**Declaredness is lexical; initialization is flow-sensitive.** A `DECLARE` anywhere makes the name
+known to every later line, including lines on a path where the declaration would not have run.
+Whether the variable then holds a value follows the flow rules below, which is what keeps a
+conditional declaration safe rather than clever:
+
+```basic
+IF c THEN
+    DECLARE x INTEGER = 1
+END IF
+x = x + 1        ' error: x is not definitely initialized
+```
+
+Two consequences follow.
+
+**A name may be declared once, not once per path.** Declaring the same name in both arms of an `IF`
+is a redeclaration, and rejected. The spelling that works is the one that also reads better:
+
+```basic
+DECLARE x INTEGER
+IF c THEN
+    x = 1
+ELSE
+    x = 2
+END IF
+```
+
+**A write needs no declaredness check.** The symbol table is built in source order, so a reference
+before its `DECLARE` is already undeclared and one after it is simply known. Making declaredness
+flow-sensitive instead would buy only the symmetric declaration above, at the price of a second
+axis through the whole analysis, a check on every write, and a diagnostic distinguishing "not
+declared on this path" from "not declared at all" — a distinction the script author would have to
+be taught.
+
 ### 8.2 Definite assignment
 
 Reading a variable requires it to be `INITIALIZED` on every path reaching that point.

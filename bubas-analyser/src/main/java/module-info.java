@@ -14,4 +14,5 @@ module bubas.analyser {
     exports javax0.bubas.analyser.pattern;
     exports javax0.bubas.analyser.match;
     exports javax0.bubas.analyser.expression;
+    exports javax0.bubas.analyser.symbol;
 }

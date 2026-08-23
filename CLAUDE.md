@@ -51,6 +51,12 @@ mistaken for oversights:
   open (`/NUMBER`, or no mutability prefix), and the two cases cannot be split into separate
   patterns because their token shapes are identical and overlap analysis rejects the pair. Adding
   the missing two back re-implements checks the analyser already made.
+- **Declaredness is lexical, initialization is flow-sensitive.** A `DECLARE` anywhere makes the
+  name known to every later line; whether it holds a value follows the flow rules. So a write needs
+  no declaredness check — the symbol table is built in source order — and declaring the same name
+  in both arms of an `IF` is a redeclaration, not a merge. Making declaredness flow-sensitive would
+  buy only that symmetric case, for a second axis through the whole analysis and a check on every
+  write.
 - **Arrays are invariant, unlike Java's.** `Order[]` accepts only `Order[]`, never `RushOrder[]`.
   An array crosses into Java as the interpreter's backing store, so covariance would let a handler
   declaring `Order[]` store a plain `Order` into an array the script declared as `RushOrder` —
