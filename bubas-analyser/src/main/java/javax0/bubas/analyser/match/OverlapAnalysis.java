@@ -101,19 +101,23 @@ public final class OverlapAnalysis {
         return steps;
     }
 
-    /** Whether one token could satisfy both classes at once. */
+    /**
+     * Whether one token could satisfy both classes at once. The nested switch is exhaustive over
+     * the sealed hierarchy, so the four combinations are visible as the table they are and no cast
+     * is needed anywhere.
+     */
     private boolean compatible(TokenClass a, TokenClass b) {
-        // AI: please replace it with record pattern
-        if (a instanceof TokenClass.Exact left && b instanceof TokenClass.Exact right) {
-            return left.type() == right.type() && left.text().equalsIgnoreCase(right.text());
-        }
-        if (a instanceof TokenClass.Exact exact) {
-            return admits((TokenClass.Any) b, exact);
-        }
-        if (b instanceof TokenClass.Exact exact) {
-            return admits((TokenClass.Any) a, exact);
-        }
-        return admits((TokenClass.Any) a, (TokenClass.Any) b);
+        return switch (a) {
+            case TokenClass.Exact left -> switch (b) {
+                case TokenClass.Exact(var type, var text) ->
+                        left.type() == type && left.text().equalsIgnoreCase(text);
+                case TokenClass.Any right -> admits(right, left);
+            };
+            case TokenClass.Any left -> switch (b) {
+                case TokenClass.Exact right -> admits(left, right);
+                case TokenClass.Any right -> admits(left, right);
+            };
+        };
     }
 
     private boolean admits(TokenClass.Any any, TokenClass.Exact exact) {

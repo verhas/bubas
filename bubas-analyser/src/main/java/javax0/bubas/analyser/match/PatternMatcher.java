@@ -123,12 +123,12 @@ public final class PatternMatcher {
     }
 
     private boolean identifier(Placeholder placeholder) {
-        return name(placeholder).map(token -> bind(new Binding.Name(placeholder, token)))
+        return name().map(token -> bind(new Binding.Name(placeholder, token)))
                 .orElse(false);
     }
 
     private boolean reference(Placeholder placeholder) {
-        final var name = name(placeholder);
+        final var name = name();
         if (name.isEmpty()) {
             return false;
         }
@@ -137,8 +137,7 @@ public final class PatternMatcher {
     }
 
     /** One unreserved word, consumed. */
-    // AI: Why do we need this argument? Seems to be superfluous.
-    private Optional<Token> name(Placeholder placeholder) {
+    private Optional<Token> name() {
         if (done() || tokens.get(at).type() != TokenType.WORD
                 || !vocabulary.isAvailableName(tokens.get(at).text())) {
             return Optional.empty();

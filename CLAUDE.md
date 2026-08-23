@@ -51,6 +51,13 @@ mistaken for oversights:
   open (`/NUMBER`, or no mutability prefix), and the two cases cannot be split into separate
   patterns because their token shapes are identical and overlap analysis rejects the pair. Adding
   the missing two back re-implements checks the analyser already made.
+- **Arrays are invariant, unlike Java's.** `Order[]` accepts only `Order[]`, never `RushOrder[]`.
+  An array crosses into Java as the interpreter's backing store, so covariance would let a handler
+  declaring `Order[]` store a plain `Order` into an array the script declared as `RushOrder` —
+  caught, if at all, by an `ArrayStoreException` inside embedder code with nothing naming the line
+  that passed it. This costs read-only functions the ability to take an array of a subtype; that is
+  the accepted price, not an oversight. Array assignability is consulted in exactly one place,
+  matching an argument to a parameter, because arrays are never assigned and never returned.
 - **A `var` reaches exactly one location, and there is no `get(index)` / `set(index, value)`.**
   Given `MODIFY A[5]` the handler alters `A[5]` and has no way to reach `A[6]`. That is the
   guarantee the script author reads off the line. An array-typed placeholder is the opposite and

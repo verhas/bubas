@@ -88,7 +88,7 @@ final class PatternAutomaton {
         return switch (placeholder.kind()) {
             case IDENTIFIER -> single(from, TokenClass.Any.NAME);
             case TYPE -> single(from, TokenClass.Any.TYPE_NAME);
-            case EXPRESSION -> oneOrMore(from, TokenClass.Any.EXPRESSION);
+            case EXPRESSION -> expressionRun(from);
             case LITERAL -> constant(from, placeholder);
             case VAR -> reference(from);
         };
@@ -100,10 +100,10 @@ final class PatternAutomaton {
         return to;
     }
 
-    // AI: Why do we need this argument when it is always Any.EXPRESSION?
-    private int oneOrMore(int from, TokenClass on) {
-        final int to = single(from, on);
-        edge(to, on, to);
+    /** One or more expression tokens. No other class is ever repeated. */
+    private int expressionRun(int from) {
+        final int to = single(from, TokenClass.Any.EXPRESSION);
+        edge(to, TokenClass.Any.EXPRESSION, to);
         return to;
     }
 
@@ -137,7 +137,7 @@ final class PatternAutomaton {
         edge(name, null, to);
         final int open = newState();
         edge(name, new TokenClass.Exact(TokenType.PUNCT, "["), open);
-        final int index = oneOrMore(open, TokenClass.Any.EXPRESSION);
+        final int index = expressionRun(open);
         edge(index, new TokenClass.Exact(TokenType.PUNCT, "]"), to);
         return to;
     }

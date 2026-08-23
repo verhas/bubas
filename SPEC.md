@@ -388,10 +388,35 @@ A value of type `S` may be assigned to, or passed as, a target of type `T` when:
 
 - `S` and `T` are the same type, or
 - `S` is `INTEGER` and `T` is `DECIMAL`, or
-- `S` and `T` are opaque types and `S`'s Java class is assignable to `T`'s
+- `S` and `T` are opaque types and `S`'s Java class is assignable to `T`'s, or
+- `S` and `T` are arrays with the **same** element type
 
-Opaque assignability follows Java, interfaces included, and is computed once at `seal()`.
+Opaque assignability follows Java, interfaces included. Nothing has to compute or cache a lattice:
+the registered classes carry it already, so the check is `Class.isAssignableFrom`.
+
 Nothing else converts implicitly. There is no narrowing and no cast.
+
+**Arrays are invariant.** An array of `RushOrder` is not an array of `Order`, even though a
+`RushOrder` is an `Order`. Java arrays are covariant here and pay for it with a runtime
+`ArrayStoreException`; BUBAS closes the hole statically instead, and can afford to because array
+assignability is consulted in exactly one place — matching an array argument against a function
+parameter. Arrays are never assigned and never returned.
+
+The reason it matters is that an array crosses into Java as the interpreter's **backing store**,
+not a copy, which is what makes an in-place reorder visible to the script
+([§10.2](#102-signatures-are-derived-from-java)). Under covariance a handler declaring `Order[]`
+could store a plain `Order` into an array the script declared as `RushOrder`, and the only thing
+standing in the way would be a Java exception raised inside embedder code, with nothing naming the
+line that passed the array.
+
+```basic
+DECLARE rushes[10] RushOrder
+SORT_ORDERS(rushes)
+' error: SORT_ORDERS expects Order[], found RushOrder[]
+```
+
+The cost is that a function which only *reads* is refused too, where reading would have been safe.
+Such a function can declare `ANY_ARRAY` instead, at the price of casting `BubasArray.raw()`.
 
 ### 5.5 Type vocabulary outside BUBAS source
 
@@ -743,6 +768,16 @@ An unnamed placeholder takes its **kind** as its name: `{expression}` is named `
 `{new > var/T}` is named `var`. Placeholder names must be unique within a pattern, which is why
 at most one placeholder of each kind may be left unnamed. State keywords may not be used as
 placeholder names, which is what makes `{var:total}` and `{var:initialized}` distinguishable.
+
+**A placeholder may not be named after a type** — neither a built-in scalar nor a registered
+opaque type. This is checked at `seal()`, because opaque types are not known when a pattern is
+parsed.
+
+The rule exists to make constraint resolution total. A constraint `/X` means "the same type as
+placeholder `X`" when the pattern has one by that name, and "the type named `X`" otherwise. If a
+pattern could contain `{type:Order}` while `Order` were also a registered opaque type, `/Order`
+would have two readings and nothing could choose between them. Forbidding the collision means the
+two cases can never both apply.
 
 ### 9.3 Kinds
 
