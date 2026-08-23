@@ -17,6 +17,7 @@
         <module>bubas-lexer</module>
         <module>bubas-analyser</module>
         <module>bubas-support</module>
+        <module>bubas-runtime</module>
     </modules>
 
     <properties>

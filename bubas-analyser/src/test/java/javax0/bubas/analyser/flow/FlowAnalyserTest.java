@@ -247,6 +247,13 @@ class FlowAnalyserTest {
         }
 
         @Test
+        void a_FOR_variable_counts_as_read_even_when_the_body_ignores_it() {
+            // "do this five times" is idiomatic and must not be an unused variable.
+            assertThat(reject("DECLARE i INTEGER\nFOR i = 0 TO 4\n    LOG_EVENT \"x\"\nEND FOR"))
+                    .isNull();
+        }
+
+        @Test
         void a_declared_variable_nobody_reads_is_rejected() {
             assertThat(reject("DECLARE spare INTEGER")).contains("declared but never read");
         }

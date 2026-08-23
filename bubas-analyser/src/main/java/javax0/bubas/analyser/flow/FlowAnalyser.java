@@ -140,7 +140,9 @@ public final class FlowAnalyser {
     }
 
     private Assignment forLoop(Statement.For loop, Assignment entry) {
-        final var variable = symbols.resolve(loop.line(), loop.variable());
+        // The loop reads the variable on every bound test, so counting with it is a use even when
+        // the body ignores it: FOR i = 0 TO 4 meaning "five times" must not be an unused variable.
+        final var variable = symbols.reference(loop.line(), loop.variable());
         if (variable.type() != BubasType.INTEGER) {
             throw error(loop.line(), "'" + variable.name() + "' is " + variable.type()
                     + "; a FOR variable counts, so it must be INTEGER");
