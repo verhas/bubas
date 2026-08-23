@@ -30,13 +30,16 @@ import java.util.Optional;
 public final class BubasLanguage {
 
     private final Vocabulary vocabulary;
+    private final ConstraintResolver constraints;
     private final Map<String, BubasType.Opaque> opaqueTypes;
     private final Map<String, FunctionSignature> functions;
     private final List<CommandDefinition> commands;
 
-    private BubasLanguage(Vocabulary vocabulary, Map<String, BubasType.Opaque> opaqueTypes,
+    private BubasLanguage(Vocabulary vocabulary, ConstraintResolver constraints,
+                          Map<String, BubasType.Opaque> opaqueTypes,
                           Map<String, FunctionSignature> functions, List<CommandDefinition> commands) {
         this.vocabulary = vocabulary;
+        this.constraints = constraints;
         this.opaqueTypes = Map.copyOf(opaqueTypes);
         this.functions = Map.copyOf(functions);
         this.commands = List.copyOf(commands);
@@ -48,6 +51,11 @@ public final class BubasLanguage {
 
     public Vocabulary vocabulary() {
         return vocabulary;
+    }
+
+    /** Resolves a pattern constraint against the types this language registered. */
+    public ConstraintResolver constraints() {
+        return constraints;
     }
 
     public Optional<BubasType> opaqueType(String name) {
@@ -126,7 +134,7 @@ public final class BubasLanguage {
             if (!skipOverlapAnalysis) {
                 new OverlapAnalysis(vocabulary).check(patterns);
             }
-            return new BubasLanguage(vocabulary, types, signatures, definitions);
+            return new BubasLanguage(vocabulary, constraints, types, signatures, definitions);
         }
 
         /** Registered types, keyed canonically. The class-to-type mapping must stay one-to-one. */

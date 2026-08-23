@@ -69,6 +69,19 @@ public final class SymbolTable {
      *                        declaration
      */
     public Variable reference(LogicalLine line, Token name) {
+        final var variable = resolve(line, name);
+        read.add(Keywords.canonical(name.text()));
+        return variable;
+    }
+
+    /**
+     * Resolves without recording a read, for an assignment target: writing to a variable is not
+     * using it, and a variable only ever written is still a variable nobody needed.
+     *
+     * @throws BubasException when the name is undeclared, or spelled differently from its
+     *                        declaration
+     */
+    public Variable resolve(LogicalLine line, Token name) {
         final var variable = byCanonicalName.get(Keywords.canonical(name.text()));
         if (variable == null) {
             throw error(line, name, "'" + name.text() + "' is not declared");
@@ -76,7 +89,6 @@ public final class SymbolTable {
         if (!variable.name().equals(name.text())) {
             throw error(line, name, "'" + name.text() + "' is declared as '" + variable.name() + "'");
         }
-        read.add(Keywords.canonical(name.text()));
         return variable;
     }
 
