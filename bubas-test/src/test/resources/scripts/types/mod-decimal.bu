@@ -1,0 +1,9 @@
+'NO-COMPILE
+' MOD is defined for whole numbers only.
+' ERROR: MOD is defined for INTEGER only
+' LINE: 7
+PROGRAM P
+    DECLARE d DECIMAL
+    d = 5.0 MOD 2
+    ASSERT "unreachable", d = 1.0
+END.

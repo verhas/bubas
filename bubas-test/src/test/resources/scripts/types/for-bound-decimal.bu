@@ -1,0 +1,12 @@
+'NO-COMPILE
+' A FOR loop counts, so its bounds are whole numbers.
+' ERROR: must be INTEGER, not DECIMAL
+' LINE: 9
+PROGRAM P
+    DECLARE i INTEGER
+    DECLARE d DECIMAL
+    d = 3.0
+    FOR i = 0 TO d
+        PRINT "x"
+    END FOR
+END.

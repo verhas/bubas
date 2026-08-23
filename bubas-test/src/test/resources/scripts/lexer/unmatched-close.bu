@@ -1,0 +1,9 @@
+'NO-COMPILE
+' A closing bracket with nothing open.
+' ERROR: unmatched ')'
+' LINE: 7
+PROGRAM P
+    DECLARE n INTEGER
+    n = 1 + 2)
+    ASSERT "unreachable", n = 0
+END.

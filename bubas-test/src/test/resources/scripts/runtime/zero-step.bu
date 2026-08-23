@@ -1,0 +1,12 @@
+'RUN-TIME-ERROR
+' A FOR loop with a step of zero would never finish.
+' ERROR: step of zero
+' LINE: 9
+PROGRAM P
+    DECLARE i INTEGER
+    DECLARE by INTEGER
+    by = 0
+    FOR i = 0 TO 3 STEP by
+        PRINT "x"
+    END FOR
+END.

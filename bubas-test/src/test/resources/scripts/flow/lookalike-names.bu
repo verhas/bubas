@@ -1,0 +1,10 @@
+'NO-COMPILE
+' Names are unique ignoring case, so a lookalike pair can never reach a reader.
+' ERROR: names are unique ignoring case
+' LINE: 7
+PROGRAM P
+    DECLARE userId INTEGER
+    DECLARE UserID STRING
+    userId = 1
+    UserID = "x"
+END.

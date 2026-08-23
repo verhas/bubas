@@ -1,0 +1,10 @@
+'NO-COMPILE
+' A DO loop must test its condition at one end or the other.
+' ERROR: tests its condition nowhere
+PROGRAM P
+    DECLARE n INTEGER
+    n = 0
+    DO
+        n = n + 1
+    END DO
+END.

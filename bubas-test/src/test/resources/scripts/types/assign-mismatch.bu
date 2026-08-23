@@ -1,0 +1,9 @@
+'NO-COMPILE
+' The right-hand side must match whatever the target actually is.
+' ERROR: must be INTEGER, but this one is STRING
+' LINE: 7
+PROGRAM P
+    DECLARE n INTEGER
+    n = "text"
+    ASSERT "unreachable", n = 1
+END.

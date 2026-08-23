@@ -1,0 +1,9 @@
+'NO-COMPILE
+' An argument must be assignable to the parameter it is given for.
+' ERROR: WRAP takes INTEGER for
+' LINE: 7
+PROGRAM P
+    DECLARE p Parcel
+    p = WRAP("text")
+    ASSERT "unreachable", CONTENTS(p) = 0
+END.

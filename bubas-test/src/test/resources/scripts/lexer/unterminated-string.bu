@@ -1,0 +1,9 @@
+'NO-COMPILE
+' A string literal never spans a line break, so an unclosed quote ends at the line.
+' ERROR: unterminated string literal
+' LINE: 7
+PROGRAM P
+    DECLARE s STRING
+    s = "no closing quote
+    PRINT s
+END.

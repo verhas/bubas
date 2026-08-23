@@ -1,0 +1,11 @@
+'NO-COMPILE
+' An array index counts, so it is an INTEGER.
+' ERROR: array index must be INTEGER
+' LINE: 9
+PROGRAM P
+    DECLARE a[3] INTEGER
+    DECLARE s STRING
+    s = "x"
+    a[s] = 1
+    ASSERT "unreachable", a[0] = 1
+END.

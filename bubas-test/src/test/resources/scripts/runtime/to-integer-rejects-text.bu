@@ -1,0 +1,9 @@
+'RUN-TIME-ERROR
+' Text that is not a number is an error naming the text, not a zero.
+' ERROR: is not an INTEGER
+' LINE: 7
+PROGRAM P
+    DECLARE n INTEGER
+    n = TO_INTEGER("twelve")
+    ASSERT "unreachable", n = 0
+END.

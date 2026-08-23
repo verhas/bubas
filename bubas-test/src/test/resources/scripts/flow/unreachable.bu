@@ -1,0 +1,8 @@
+'NO-COMPILE
+' Nothing follows a RETURN on the same path.
+' ERROR: cannot be reached
+' LINE: 7
+PROGRAM P
+    RETURN
+    PRINT "never"
+END.

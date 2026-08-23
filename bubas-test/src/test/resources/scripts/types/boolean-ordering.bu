@@ -1,0 +1,9 @@
+'NO-COMPILE
+' BOOLEAN values have no order, only equality.
+' ERROR: BOOLEAN values compare only with = and <>
+' LINE: 7
+PROGRAM P
+    DECLARE b BOOLEAN
+    b = TRUE < FALSE
+    ASSERT "unreachable", b
+END.
