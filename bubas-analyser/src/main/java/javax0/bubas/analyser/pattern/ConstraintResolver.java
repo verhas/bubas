@@ -46,10 +46,23 @@ public final class ConstraintResolver {
     public ResolvedConstraint resolve(StatementPattern pattern, Constraint constraint) {
         return switch (constraint) {
             case Constraint.ArrayOf(var element) -> new ResolvedConstraint.Array(
-                    element == null ? null : resolve(pattern, element));
+                    element == null ? null : elementConstraint(pattern, element));
             case Constraint.ElementOf(var name) -> element(pattern, name);
             case Constraint.Named(var name, var exact) -> named(pattern, name, exact);
         };
+    }
+
+    /**
+     * An array's element type has to be a type. {@code NUMBER} is a choice between two, not one of
+     * them, so there is no array of NUMBER to constrain anything to.
+     */
+    private ResolvedConstraint elementConstraint(StatementPattern pattern, Constraint element) {
+        final var resolved = resolve(pattern, element);
+        if (resolved instanceof ResolvedConstraint.Numeric) {
+            throw error(pattern, "'ARRAY/NUMBER' asks for an array of NUMBER, which is not a type "
+                    + "but a choice between INTEGER and DECIMAL");
+        }
+        return resolved;
     }
 
     private ResolvedConstraint named(StatementPattern pattern, String name, boolean exact) {
