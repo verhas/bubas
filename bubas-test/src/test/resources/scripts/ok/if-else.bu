@@ -1,0 +1,30 @@
+'OK
+' The whole IF chain: taken arm, skipped arm, ELSEIF, ELSE and nesting.
+PROGRAM P
+    DECLARE score INTEGER
+    DECLARE grade STRING
+    score = 85
+    IF score >= 90 THEN
+        grade = "A"
+    ELSEIF score >= 80 THEN
+        grade = "B"
+    ELSE
+        grade = "C"
+    END IF
+    ASSERT "the first matching arm wins", grade = "B"
+    score = 50
+    IF score >= 90 THEN
+        grade = "A"
+    ELSEIF score >= 80 THEN
+        grade = "B"
+    ELSE
+        grade = "C"
+    END IF
+    ASSERT "ELSE catches the rest", grade = "C"
+    IF score = 50 THEN
+        IF score < 100 THEN
+            grade = "nested"
+        END IF
+    END IF
+    ASSERT "nested IF", grade = "nested"
+END.

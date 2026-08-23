@@ -1,0 +1,9 @@
+'NO-COMPILE
+' NOT is a BOOLEAN operator, and a number is not a truth value.
+' ERROR: NOT
+' LINE: 7
+PROGRAM P
+    DECLARE b BOOLEAN
+    b = NOT 1
+    ASSERT "unreachable", b
+END.

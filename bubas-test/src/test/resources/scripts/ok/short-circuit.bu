@@ -1,0 +1,9 @@
+'OK
+' AND and OR stop as soon as the answer is known. The right operand here would fail at run
+' time if it were ever evaluated, so reaching the end is the proof.
+PROGRAM P
+    DECLARE z INTEGER
+    z = 0
+    ASSERT "AND does not evaluate its right operand after FALSE", NOT (FALSE AND 10 / z = 1)
+    ASSERT "OR does not evaluate its right operand after TRUE", TRUE OR 10 / z = 1
+END.

@@ -1,0 +1,11 @@
+'OK
+' Keywords and names are matched ignoring case, which is why two names differing only in case
+' collide. The same statement written in three casings is the same statement.
+PROGRAM P
+    declare total INTEGER
+    Total = 1
+    if TOTAL = 1 then
+        total = total + 1
+    End If
+    ASSERT "one variable, three spellings", ToTaL = 2
+END.

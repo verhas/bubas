@@ -1,0 +1,8 @@
+'RUN-TIME-ERROR
+' An array size is computed, so a nonsense size is caught where it is computed.
+PROGRAM P
+    DECLARE n INTEGER
+    n = -1
+    DECLARE a[n] INTEGER
+    ASSERT "unreachable", LENGTH(a) = 0
+END.

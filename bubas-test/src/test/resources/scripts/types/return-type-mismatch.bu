@@ -1,0 +1,8 @@
+'NO-COMPILE
+' What a program returns must be what it declared it returns.
+' ERROR: must be INTEGER
+' LINE: 7
+PROGRAM P RETURNS INTEGER
+    DECLARE n INTEGER
+    RETURN "text"
+END.

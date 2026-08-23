@@ -1,0 +1,14 @@
+'OK
+' NOT binds tightest, then AND, then OR.
+PROGRAM P
+    DECLARE b BOOLEAN
+    b = NOT FALSE
+    ASSERT "NOT", b
+    b = TRUE AND FALSE
+    ASSERT "AND", NOT b
+    b = TRUE OR FALSE AND FALSE
+    ASSERT "AND binds tighter than OR", b
+    b = (TRUE OR FALSE) AND FALSE
+    ASSERT "brackets override that too", NOT b
+    ASSERT "BOOLEAN equality", TRUE <> FALSE
+END.

@@ -1,0 +1,15 @@
+'OK
+' DECIMAL is exact where DOUBLE is not, and INTEGER promotes to DECIMAL when they meet.
+PROGRAM P
+    DECLARE d DECIMAL
+    d = 0.1 + 0.2
+    ASSERT "no binary floating point rounding", d = 0.3
+    d = 10.0 / 4.0
+    ASSERT "exact division stays exact", d = 2.5
+    d = 1 + 2.5
+    ASSERT "an INTEGER promotes to DECIMAL", d = 3.5
+    d = 2.50
+    ASSERT "comparison is by value, not by scale", d = 2.5
+    d = -1.5 * 2
+    ASSERT "sign and promotion together", d = -3.0
+END.

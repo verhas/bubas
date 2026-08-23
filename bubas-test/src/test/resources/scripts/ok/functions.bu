@@ -1,0 +1,15 @@
+'OK
+' Calls nest, opaque values survive a round trip, and the prelude converts text.
+PROGRAM P
+    DECLARE p Parcel
+    DECLARE n INTEGER
+    DECLARE d DECIMAL
+    p = WRAP(6 * 7)
+    ASSERT "an argument is an arbitrary expression", CONTENTS(p) = 42
+    ASSERT "calls nest", CONTENTS(WRAP(CONTENTS(WRAP(5)))) = 5
+    n = TO_INTEGER("-17")
+    ASSERT "TO_INTEGER", n = -17
+    d = TO_DECIMAL("2.50")
+    ASSERT "TO_DECIMAL", d = 2.5
+    PRINT "a function returning nothing is a statement"
+END.
