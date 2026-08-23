@@ -152,10 +152,11 @@ orchestration means one `Interpreter` per thread, all sharing one `BubasProgram`
 | Pattern matcher | Matches a logical line against the registered patterns |
 | Parser | Block structures, expressions, function calls → AST |
 | Symbol table | Variable declarations, types and states |
-| Analyser | Type checking, definite assignment, reachability, use checking |
+| Analyser | Definite assignment, reachability, use checking |
+| Lowering | Types every expression and emits the core tree every back end consumes |
 | Interpreter | Executes the AST |
 | Function dispatcher | Evaluates arguments, invokes Java implementations |
-| Code generator | Compiles the AST to Java source (Phase 3) |
+| Code generator | Emits target-language source from the core tree (Phase 3) |
 
 ---
 
@@ -962,10 +963,13 @@ combined with a `declared` or `initialized` prefix; the postcondition of a custo
 **verified when its handler returns**, and a handler that fails to deliver what its pattern
 promises raises an error at its own statement rather than corrupting the analyser's model.
 
-### 9.6 Built-in patterns
+### 9.6 The standard statements
 
-The built-ins are ordinary patterns, and expand to core AST nodes rather than handler calls —
-which is what allows them to be compiled to standalone Java.
+A language without declaration and assignment is unusable, so the standard module supplies them.
+They are **ordinary patterns with ordinary implementations** — nothing in the language privileges
+them, nothing treats them specially at run time, and an embedder who wants different ones simply
+does not install these. Shipping them only spares every integration from writing declaration and
+assignment for itself.
 
 ```
 DECLARE {new > identifier/T:name > declared} {type:T}
@@ -990,6 +994,12 @@ so a forward reference is fine.
 **On a creating placeholder the constraint is not a check.** `/T` is the type the runtime declares
 the variable with; the handler neither chooses it nor supplies it. Everywhere else a constraint
 validates what was written, but here it instructs.
+
+That last point is why `DECLARE x INTEGER` has an **empty implementation**. The placeholder carries
+a type constraint, so name, type and finality are fixed before the handler runs and the runtime has
+already made the slot; with a `declared` postcondition there is no value to supply and nothing left
+to do. The other four do one thing each — evaluate the initializer and write it, or allocate the
+array — which is the whole of what makes them "built in".
 
 ### 9.7 Custom statements
 
@@ -1497,12 +1507,15 @@ problem at once rather than one per attempt.
 
 ---
 
-## 12. Standard Prelude
+## 12. The Standard Module
 
-Every sealed language automatically registers exactly the functions the specification itself
-depends on, and nothing more:
+Everything a language needs but nobody should have to write: the statements of
+[§9.6](#96-the-standard-statements) and the few functions the specification itself depends on.
 
 ```
+DECLARE x T                  the four declaration forms
+x = e                        assignment, indexed or not
+
 TO_INTEGER(s STRING) -> INTEGER
 TO_DECIMAL(s STRING) -> DECIMAL
 LENGTH(a ANY_ARRAY)  -> INTEGER
@@ -1511,45 +1524,74 @@ LENGTH(a ANY_ARRAY)  -> INTEGER
 There is no `TO_STRING`: `"" + x` already converts, and a second way to do one thing invites
 inconsistency. There is no null test, because there is no null in the language.
 
-Larger vocabularies — string manipulation, regular expressions, date handling, mathematics —
-ship as optional packages installed explicitly (Phase 2):
+None of it is privileged. These are ordinary patterns and ordinary functions, installed like any
+other vocabulary and excluded by not installing them — a language that wants a different
+declaration syntax, or none, is free to have one. The standard module depends only on the API, so a
+vocabulary library never has to depend on the interpreter.
 
-```java
-BubasStrings.installInto(builder);
-BubasRegex.installInto(builder);
-```
+Larger vocabularies — string manipulation, regular expressions, date handling, mathematics — ship
+as further packages, installed the same way (Phase 2).
 
 ---
 
 ## 13. Code Generation
 
-A `BubasProgram` can be compiled to Java source. Because every function and statement
-implementation is a named static method rather than a lambda, generated code calls them
-directly:
+A `BubasProgram` can be compiled to another language. Java is the first target; the design does not
+assume it is the only one.
 
-```java
-// generated
-private final LoadOrder fn_loadOrder = new LoadOrder();
-private final Validate  cmd_validate = new Validate();
-...
-Order order = fn_loadOrder.call(ctx, orderId);
-cmd_validate.call(ctx, v_order, rulesThunk);
+### What the back ends share
+
+Both the interpreter and every code generator consume the same **core tree**, produced once by
+lowering the checked program. The core tree exists for exactly this reason. In the syntax tree a
+`+` could mean integer addition, decimal addition or string concatenation, and each back end would
+have to work that out for itself — as many chances to decide differently as there are back ends,
+in precisely the subtle ways a debugged script would only discover in production. Lowering makes
+the choice once, so what a back end receives is a named operation rather than a specification to
+re-read:
+
+```
+Binary("+", INTEGER, DECIMAL)   →   AddDecimal(WidenToDecimal(l), r)
+Binary("+", STRING, INTEGER)    →   Concat(l, TextOf(r))
+Binary("+", INTEGER, INTEGER)   →   AddIntegerChecked(l, r)
+Binary("=", DECIMAL, DECIMAL)   →   CompareDecimalByValue(l, r)
 ```
 
-The output needs the implementation classes and the BUBAS runtime on the classpath, and nothing
-else — the registration code does not have to run first. Had implementations been lambdas, every
-call would have dispatched through the registry by string key, and the compiled program would
-have been unable to run without first re-executing the whole builder.
+Widening, text conversion, overflow checks, bounds checks and the `MathContext` a decimal division
+reads are all explicit nodes. Nothing is inferred twice.
 
-The runtime is still required, for `DECIMAL` division reading the interpreter's `MathContext` at
-each site, for overflow, division-by-zero and bounds checks emitted inline, for postcondition
-verification after a custom statement, and for the expression thunks that lazy statement
-placeholders need.
+It is a lowered **tree**, not a flat instruction list: keeping `IF`, `DO` and `FOR` structure means
+a Java generator emits natural Java rather than reconstructing control flow from jumps, and source
+positions survive so generated code maps back to the script.
 
-The generated code and the interpreter are two implementations of one semantics, so **a conformance
-suite is mandatory**: every test program must run through both backends and produce identical
-results and identical errors. Divergence between the two is the characteristic bug of this
-design, and only the suite will catch it.
+### Commands
+
+Every statement pattern is a command with an implementation, including the standard ones. A code
+generator may therefore always fall back to emitting a call to the very implementation the
+interpreter calls — which is the guarantee that any vocabulary compiles at all.
+
+A command that wants better output supplies a **target-independent semantic description** of what
+it does, and the generator uses that instead. Assignment described that way becomes an assignment
+in the target language rather than a call into the runtime. The form of that description is a
+Phase 3 question and deliberately not settled here; what is settled is that it is optional, and
+that its absence costs output quality rather than correctness.
+
+### Limits
+
+Functions and commands are Java classes. A target that is not Java can share the core semantics but
+cannot call the vocabulary: every function would need an implementation in that language. The
+equivalence guarantee covers what BUBAS pins, and stops where the embedder's code begins.
+
+### Conformance
+
+The generated code and the interpreter are separate implementations of one operation set, so **a
+conformance suite is mandatory**: every test program must run through both back ends and produce
+identical results and identical errors. Divergence is the characteristic bug of this design, and
+only the suite will catch it.
+
+Stepping is deliberately not part of it. Compiled output targets production and carries no BUBAS
+debugging; a script is debugged interpreted, and generated Java is debugged as Java — which is why
+readable output that maps back to the source is a requirement on the generator rather than a
+nicety.
 
 ---
 
