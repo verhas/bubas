@@ -418,6 +418,22 @@ SORT_ORDERS(rushes)
 The cost is that a function which only *reads* is refused too, where reading would have been safe.
 Such a function can declare `ANY_ARRAY` instead, at the price of casting `BubasArray.raw()`.
 
+> **Rationale (not normative).** Array assignment is absent by choice, not by omission. Keeping
+> arrays out of expressions keeps the language small, and it steers orchestration scripts away from
+> moving data around — which is Java's job, and the whole premise of the two layers.
+>
+> The capability is not withheld, only the spelling. An integration that genuinely needs to put a
+> whole array into a variable defines a command for it, and the handler receives both arrays and
+> does as it likes:
+>
+> ```basic
+> COPY orders INTO archive
+> ```
+>
+> The restriction is that this may not be written as an assignment. That is deliberate: a script
+> author reading `=` should be able to assume one value moved, not that an entire collection was
+> aliased or copied — and which of those happened would be invisible at the assignment.
+
 ### 5.5 Type vocabulary outside BUBAS source
 
 `NUMBER`, `ARRAY` and `VOID` never appear in BUBAS source. `NUMBER` and `ARRAY` are pattern
@@ -779,6 +795,18 @@ pattern could contain `{type:Order}` while `Order` were also a registered opaque
 would have two readings and nothing could choose between them. Forbidding the collision means the
 two cases can never both apply.
 
+> **Rationale (not normative).** The rule is not the only defensible answer. A placeholder name is
+> local to one pattern while an opaque type name is global, and locality is the stronger claim — so
+> letting a placeholder shadow a type would be perfectly coherent, with the pattern simply meaning
+> its own `X`.
+>
+> Shadowing only starts to pay, though, when a command set has grown large enough that avoiding
+> collisions becomes a chore. That is not the size BUBAS is built for. A command set is expected to
+> number ten or a few tens, small enough that its author can hold the whole vocabulary in view as
+> one thing. At that size choosing a different placeholder name costs nothing, and no reader ever
+> has to work out which `X` a constraint meant. A vocabulary that has outgrown being comprehensible
+> as a unit has a problem that a shadowing rule would not fix.
+
 ### 9.3 Kinds
 
 | Kind | Captures |
@@ -990,7 +1018,9 @@ once per sealed language, through a public no-arg constructor or a public static
 method — deliberately the same contract `ServiceLoader` uses, so one class works through either
 registration route.
 
-The implementation is **the single public method the class declares**. Its name is irrelevant;
+The implementation is **the single public instance method the class declares**. Static methods are
+excluded, which is what lets a `provider()` factory coexist with it: the class is instantiated, so
+a static method could never have been the one being called. Its name is irrelevant;
 helpers are private. Declaring none, or more than one, fails at `seal()` naming the class, so a
 stray public helper is a reported error rather than a silent substitution. Overrides of `Object`
 methods are ignored.
