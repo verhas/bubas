@@ -93,6 +93,27 @@ mistaken for oversights:
   prevent. `bubas-support` is the proof: it registers the whole standard module through
   `Standard::register` while still requiring `bubas.api` alone. The narrowing is static and a
   caller can cast back to `Builder`; it keeps an honest bundle in its remit and is not a sandbox.
+- **A wildcard is a parameter and never a return type.** `Value` maps to `ANY` and `BubasArray` to
+  `ANY_ARRAY`, both accepting almost anything in a signature; neither may be returned, and `seal()`
+  says so. A returned wildcard would put a value of unknown type into the script, where nothing
+  downstream could check it. Parameters are safe because the unknown never propagates: it reaches
+  Java and stops.
+- **Only the spread form calls a variadic function.** Java accepts `join(array)` and
+  `join("a","b")` alike; BUBAS takes only the second. Arrays here are invariant first-class values,
+  and admitting both revives the overload ambiguity the single form avoids. An embedder wanting an
+  array declares an array parameter. A *command* may not be variadic at all — its parameters match
+  pattern placeholders, which are fixed in number.
+- **A command's name is its pattern skeleton, and `@BubasCommandName` replaces it rather than
+  aliasing it.** Naming by keyword was rejected because keywords are not unique — `DECLARE` names
+  four patterns — and a keyword-only name is *lossy*: `PAY {var}` and `PAY {var} = {e}` both reduce
+  to `PAY`, and no rule can say which was meant. JNI is the cautionary precedent: a short decorated
+  name binds fine until an overload appears, then resolves to nothing. An identifier derived by
+  dropping information is stable only until the set it is drawn from grows.
+- **The BUNIT framework must not depend on its own DSL.** `bubas-bunit` knows no statement by name;
+  a statement declares what it does through annotations the framework defines, and the framework
+  reads those. Adding a `switch` on a keyword there would make the vocabulary unswappable, which is
+  the only thing the module split buys. It is the same rule as the language's own: `DECLARE` is an
+  ordinary pattern, not a built-in.
 - **Extension registration is opt-in, discovery is not** — and discovery is planned, not built.
   `ServiceLoader` finds whatever is on the classpath; the builder decides what gets registered.
   Registering automatically would let an unrelated jar reserve a word an existing script uses as a
@@ -109,12 +130,15 @@ works for embedders on the module path and on the classpath alike.
 
 | Module | Contents | Depends on |
 |--------|----------|-----------|
-| `bubas-api` | `BubasType`, `Value`, `Context` interfaces, `VariableArg`, `ExpressionArg`, `LiteralArg`, `BubasArray`, `BubasException`, `Registrar`, the extension SPI | — |
+| `bubas-api` | `BubasType`, `TypeNames`, `Value`, `Context` interfaces, `VariableArg`, `ExpressionArg`, `LiteralArg`, `BubasArray`, `BubasException`, `Registrar`, `BubasCallInterceptor`, `@BubasCommandName`, the extension SPI | — |
 | `bubas-lexer` | Tokens, logical-line assembly, continuation and comment handling | api |
-| `bubas-analyser` | `BubasLanguage`, `BubasProgram`, pattern matcher and overlap analysis, parser, type checker, definite assignment | api, lexer |
+| `bubas-analyser` | `BubasLanguage`, `BubasProgram`, pattern matcher and overlap analysis, parser, lowering, definite assignment | api, lexer (transitive) |
 | `bubas-runtime` | `Interpreter`, dispatcher, variable store | api, analyser |
 | `bubas-support` | Mandatory prelude and the optional packages | api |
 | `bubas-test` | The `.bu` script corpus and the runner that executes it | api, analyser, runtime, support (test scope) |
+| `bubas-bunit` | The mocking framework: recorder, `BubasCallInterceptor`, consistency checker, `TestResult` | api, analyser, runtime |
+| `bubas-bunit-commands` | One DSL over it: the statements a BUBAS unit test is written with | api, bunit |
+| `bubas-bunit-standard` | The assembly an application depends on: sealed test language and `BunitSuite` | both, analyser, support |
 
 The pattern matcher sits with the parser deliberately. They would be separable only at the cost of
 an interface module and runtime injection of its implementation, to solve a dependency that does
@@ -130,6 +154,9 @@ a factory method on `BubasProgram` would make the analyser depend on the runtime
 `bubas-codegen` joins in phase 3. `bubas-support` depends only on `bubas-api`, which is the point
 of splitting the API out: a third party writing a function library must not have to depend on the
 interpreter.
+
+`bubas-analyser` declares `requires transitive bubas.lexer` because its own public API returns
+`LogicalLine` — a core tree or a diagnostic cannot be read without it.
 
 Tests run on the classpath rather than the module path because they exercise package-internal
 behaviour. The `-parameters` compiler flag is on because BUBAS parameter names are derived from

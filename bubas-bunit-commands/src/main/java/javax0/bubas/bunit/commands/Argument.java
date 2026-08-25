@@ -1,9 +1,11 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.NamesParameter;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
 
 /** {@code ARGUMENT "orderId" IS 42} — supplies one of the subject's parameters. */
+@NamesParameter("name")
 public final class Argument {
 
     public static final String PATTERN = "ARGUMENT {literal/STRING:name} IS {expression:value}";

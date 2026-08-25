@@ -211,8 +211,7 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
      * BUBAS cannot construct, so nothing else could have been meant.
      */
     private Value token(Value given, BubasType expected) {
-        if (given != null && expected instanceof BubasType.Opaque
-                && given.type() == BubasType.STRING) {
+        if (given != null && Token.named(expected, given.type())) {
             return new Boxed(expected, new Token(given.asString()));
         }
         return given;

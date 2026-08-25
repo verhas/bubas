@@ -9,7 +9,9 @@
  */
 module bubas.analyser {
     requires bubas.api;
-    requires bubas.lexer;
+    // transitive: LogicalLine and Token appear in this module's own public API,
+    // so anything reading a core tree or a diagnostic needs to see them too.
+    requires transitive bubas.lexer;
     exports javax0.bubas.analyser;
     exports javax0.bubas.analyser.pattern;
     exports javax0.bubas.analyser.match;

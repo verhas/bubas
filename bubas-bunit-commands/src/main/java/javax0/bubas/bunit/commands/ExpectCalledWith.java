@@ -1,5 +1,6 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.MatchesArguments;
 import javax0.bubas.bunit.NamesTarget;
 import javax0.bubas.bunit.Expectation;
 import javax0.bubas.api.ExpressionArg;
@@ -10,6 +11,7 @@ import java.util.List;
 /** {@code "APPROVE _" WAS CALLED WITH "o1"} */
 @Expectation
 @NamesTarget("name")
+@MatchesArguments("a")
 public final class ExpectCalledWith {
 
     public static final String PATTERN =

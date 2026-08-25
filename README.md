@@ -205,10 +205,54 @@ source ──▶ lexer ──▶ pattern matcher ──▶ parser ──▶ symb
 | `bubas-runtime` | `Interpreter` and dispatch |
 | `bubas-support` | the standard statements and functions |
 | `bubas-test` | executable `.bu` programs and the runner that checks them |
+| `bubas-bunit` | the mocking framework for testing BUBAS programs |
+| `bubas-bunit-commands` | the statements a BUBAS unit test is written with |
+| `bubas-bunit-standard` | the assembled test framework, which is what you depend on |
 
 Lowering produces a typed core tree that the interpreter executes. It exists so that a future code
 generator consumes the same tree rather than re-deriving semantics from the AST — divergence
 between backends is the characteristic bug of that design, and a shared IR is what prevents it.
+
+## Testing a BUBAS program
+
+A BUBAS program is tested in BUBAS. The test replaces the host's vocabulary with mocks and asserts
+on what the program did with it — the decisions and the sequencing, which is all a BUBAS program
+has.
+
+```basic
+PROGRAM OverLimitIsRejected
+    "LOAD_ORDER"  WITH 42   RETURNS "o1"
+    "ORDER_TOTAL" WITH "o1" RETURNS 1500.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 42
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+
+    RESULT IS FALSE
+    "APPROVE _" WAS NOT CALLED
+END.
+```
+
+```java
+var results = BunitSuite.of(orderLanguage, subjectSource).runAll(tests);
+System.out.println(BunitSuite.report(results));
+```
+
+`"o1"` is a **token**: a stand-in for an `Order` that carries identity and nothing else. A script
+can hold an opaque value and pass it but never look inside, so it cannot tell a token from the real
+thing — which is why a test never has to construct one. The opacity that exists for encapsulation
+buys total mockability.
+
+Mocking happens at dispatch, so the program under test is compiled against the **real** language.
+There is no parallel vocabulary to drift out of step, and running the same test without the mocks
+installed runs it against the real implementations.
+
+Before a test executes, its mocks are checked: a mocked command that would leave a variable
+unwritten, an argument for a parameter the program does not take, a mock answering the wrong type
+or declared for the wrong number of arguments — each is reported with a line, in the test, before
+the program runs. See [`BUNIT.md`](BUNIT.md) for why it is built this way.
 
 ## Try it
 
@@ -231,8 +275,9 @@ finishes has verified itself rather than merely not crashed.
 
 ## Status
 
-**Implemented and executable.** The front end, analyser and interpreter all work; `mvn test` runs
-405 tests, 63 of which are whole BUBAS programs executed end to end.
+**Implemented and executable.** The front end, analyser and interpreter all work, and BUBAS
+programs can be unit tested in BUBAS; `mvn test` runs 504 tests, 67 of which are whole BUBAS
+programs executed end to end.
 
 | Phase | Scope | State |
 |-------|-------|-------|
@@ -241,6 +286,7 @@ finishes has verified itself rather than merely not crashed.
 | 3 | Code generation to Java, plus the interpreter/codegen conformance suite | not started |
 | 4 | Vocabulary export and prompt tooling for LLM code generation | not started |
 | 5 | Diagnostics, profiling, hardening | ongoing |
+| — | BUNIT: unit testing BUBAS programs in BUBAS | done, still growing |
 
 Not built yet, beyond the phase table: extension discovery. `SPEC.md` describes a builder API for
 registering functions and commands found on the classpath by `ServiceLoader`; today registration is
@@ -256,6 +302,7 @@ Six language questions remain deliberately open and are listed in
 ## Documentation
 
 - [`SPEC.md`](SPEC.md) — the language definition and Java API reference; normative
+- [`BUNIT.md`](BUNIT.md) — how BUBAS programs are unit tested, and why that design
 - [`CLAUDE.md`](CLAUDE.md) — conventions for working in this repository
 
 ## Contributing

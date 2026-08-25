@@ -1,5 +1,7 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.SuppliesResult;
+import javax0.bubas.bunit.MatchesArguments;
 import javax0.bubas.bunit.DeclaresMock;
 import javax0.bubas.bunit.NamesTarget;
 import javax0.bubas.api.ExpressionArg;
@@ -10,6 +12,8 @@ import java.util.List;
 /** {@code "LOAD_ORDER" WITH 42 RETURNS "o1"} */
 @NamesTarget("name")
 @DeclaresMock
+@MatchesArguments("a")
+@SuppliesResult("value")
 public final class MockWith {
 
     public static final String PATTERN =

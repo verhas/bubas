@@ -8,9 +8,9 @@
         <artifactId>bubas-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>bubas-bunit-commands</artifactId>
-    <name>BUBAS BUnit Commands</name>
-    <description>The statements a BUBAS unit test is written with, and the recorder they call</description>
+    <artifactId>bubas-bunit-standard</artifactId>
+    <name>BUBAS BUnit Standard</name>
+    <description>The assembled BUNIT: the framework, the standard statements, and a suite runner</description>
     <dependencies>
         <dependency>
             <groupId>com.javax0.bubas</groupId>
@@ -19,6 +19,21 @@
         <dependency>
             <groupId>com.javax0.bubas</groupId>
             <artifactId>bubas-bunit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.javax0.bubas</groupId>
+            <artifactId>bubas-bunit-commands</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.javax0.bubas</groupId>
+            <artifactId>bubas-analyser</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.javax0.bubas</groupId>
+            <artifactId>bubas-support</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

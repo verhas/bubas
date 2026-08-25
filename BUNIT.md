@@ -1,10 +1,31 @@
 # BUNIT — unit testing BUBAS programs
 
-**Design notes, not a specification.** Nothing here is built. Decisions that are settled are marked
-as such; everything else is an argument in progress. When BUNIT is implemented, the settled parts
-move into `SPEC.md` and this file keeps only what is still open.
+**Design notes.** BUNIT is built and runs; this file records *why* it is shaped as it is, which
+the code cannot say for itself. Everything shown here works unless a section says otherwise, and
+the questions still open are gathered at the end.
 
-Syntax shown as *verified* was compiled against the current analyser; the rest is sketch.
+```basic
+PROGRAM OverLimitIsRejected
+    "LOAD_ORDER"  WITH 42   RETURNS "o1"
+    "ORDER_TOTAL" WITH "o1" RETURNS 1500.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 42
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+
+    RESULT IS FALSE
+    "APPROVE _" WAS NOT CALLED
+END.
+```
+
+```java
+var results = BunitSuite.of(myLanguage, subjectSource).runAll(tests);
+if (!BunitSuite.allPassed(results)) {
+    System.out.println(BunitSuite.report(results));
+}
+```
 
 ## What it is
 
@@ -223,12 +244,32 @@ consistency check. It walks the same shape the flow analyser walks, tracking for
 what the mock supplies, and merging at joins the way definite assignment merges — the guarantee is
 what holds on *every* path, not what some path happened to set.
 
-What it must catch:
+What it catches, all before the subject runs:
 
-- a mocked command that does not set a non-opaque variable its pattern writes
-- a mock that supplies a value on one path and not on another
-- a mocked name that no longer exists in the subject's language, or the wrong argument count
-- a mock whose supplied value does not match the declared return type
+- a mocked command that does not supply a non-opaque variable its pattern writes
+- a supply on one path and not on another
+- a name the subject's language does not have, as a function or a command
+- a supply for a variable the command does not write, or for a command that is not mocked
+- a mock declared for the wrong number of arguments
+- a mock answering a type the function does not return
+- an argument for a parameter the subject does not take
+- an expectation before the act, or a test with no act at all
+
+**How it knows any of this without knowing the vocabulary.** A statement declares what it does with
+annotations the framework defines — `@NamesTarget`, `@DeclaresMock`, `@SuppliesVariable`,
+`@NamesParameter`, `@MatchesArguments`, `@SuppliesResult`, `@Act`, `@Expectation` — each naming a
+*placeholder* rather than carrying a value. The checker reads the constant sitting at that
+placeholder in the core tree. So it learns that `"LOAD_ORDER" RETURNS 1` is about `LOAD_ORDER`
+because the class said the name is in the placeholder called `name`, never because anything in the
+framework knows the word `RETURNS`.
+
+Those placeholders must be `{literal/STRING:…}`. The check runs before the test does, so a computed
+name would not be there to read, and the checker says so rather than skipping the statement.
+
+The merge rule needed one case that is not obvious: **a command mocked in only one branch keeps
+that branch's supplies** rather than intersecting to nothing. Mocking conditionally with a matching
+conditional supply is correct — on the other path the real handler runs and does its own writing —
+so intersecting blindly would reject a legitimate test.
 
 This is the same argument that kept `NULL` out of the language. A value that might not be there
 turns every use into a question, and the answer is to prove it is there rather than to check at
@@ -281,10 +322,13 @@ Prerequisites, not details:
 1. ~~`BubasLanguage` cannot enumerate its vocabulary.~~ **Done.** `functions()` and
    `opaqueTypes()` list it in registration order.
 2. ~~A dispatch seam in the runtime.~~ **Done.** `BubasCallInterceptor`, above.
-3. **Signature access for typing tokens.** Already available: `FunctionSignature` carries the
-   declared return type, which is what types a token.
+3. ~~Signature access for typing tokens.~~ **Done.** `FunctionSignature` carries the declared
+   return type, and `Token.named(expected, given)` is the single rule both the checker and the
+   recorder use, so the two cannot disagree about what counts as a token name.
 4. ~~A name for each command.~~ **Done.** `StatementPattern.skeleton()`, `CommandDefinition.name()`
    and `@BubasCommandName`.
+5. ~~`requires bubas.lexer` was not transitive in the analyser.~~ **Done.** Its public API returns
+   `LogicalLine`, so nothing could walk a core tree without redeclaring the dependency.
 
 ## Open questions
 
@@ -294,19 +338,60 @@ Prerequisites, not details:
    signature before dispatch, so this is decidable rather than magic, and reportable when it
    surprises someone. A token in an `ANY` position stays ambiguous and is rejected, with a
    diagnostic saying to mock a concrete signature instead.
-2. **Arity ceiling.** How many `WITH` arities to ship, and what the diagnostic says when a function
-   exceeds it.
-3. **Ordering assertions.** Whether call order is assertable, and with what syntax.
-4. **Unmocked calls.** Does calling an unmocked function fail the test, run for real, or return a
-   default? Failing is the strict answer and matches the language's temperament.
-5. **Mock verification.** Whether a declared mock that is never called fails the test, as an unused
+2. **Arity ceiling — resolved in principle, not yet built.** Mocks take 0, 1 or 2 arguments today
+   and one pattern per arity is a ceiling, not a design. The answer is not more arities: register an
+   opaque `Arguments` type and a variadic `ARGS(parts ANY...) -> Arguments`, then write the pattern
+   as `{literal/STRING:name} WITH {expression/Arguments:args} RETURNS {expression:value}`. One
+   pattern, any number of arguments, and the *type checker* enforces the form because the only way
+   to make an `Arguments` is to call `ARGS`.
+
+   The alternative considered and rejected was a marker function whose call the handler inspects for
+   shape. It cannot work as stated — `ExpressionArg` offers only `evaluate()`, so a handler cannot
+   see the shape of what it was given — and making it work would mean exposing the AST to embedder
+   code, which invites every DSL author to pattern-match on expressions. It would also require a
+   function that must never be called, a hole in the language's own rules. Expression-shape
+   inspection is the thing to avoid, not the tool to reach for.
+3. **Argument matchers.** Comparing by value is all an expectation can do today. The same shape
+   answers it: matcher functions returning an opaque `Matcher` — `ANYTHING()`, `GREATER_THAN(100)`,
+   `EXACTLY("EU")` — which `ARGS` accepts alongside plain values because it takes `ANY...`.
+   Comparison then asks whether an element is a `Matcher` and applies it, or compares by value.
+   Extensible with no new syntax, which is how Mockito and Hamcrest solved it.
+4. **Ordering assertions.** Whether call order is assertable, and with what syntax.
+5. **Unmocked calls.** Does calling an unmocked function fail the test, run for real, or return a
+   default? Failing is the strict answer and matches the language's temperament. Today it runs for
+   real, and a token reaching a real handler fails as a Java type mismatch.
+6. **Mock verification.** Whether a declared mock that is never called fails the test, as an unused
    variable does.
+7. **A `.bu` corpus for BUNIT.** The language has 67 whole-program scripts in `bubas-test`; BUNIT
+   has none, and its tests are Java text blocks.
 
 ## Modules
 
-`bubas-bunit` depends on api, analyser and runtime. It is a framework, not a function library, so
-the rule that keeps `bubas-support` on the API alone does not apply.
+Three, and the direction between them is the design rather than an accident of packaging.
+
+| module | is | depends on |
+|---|---|---|
+| `bubas-bunit` | the mocking framework — recorder, interceptor, consistency checker, `TestResult` | api, analyser, runtime |
+| `bubas-bunit-commands` | one DSL over it | api, **bunit** |
+| `bubas-bunit-standard` | the assembly an application depends on | both, plus analyser and support |
+
+**The framework must not depend on the DSL.** It would be a framework in name only: swapping the
+vocabulary would mean changing the thing the vocabulary is supposed to be independent of. So
+`MockRecorder` lives in the framework and the statements call it, never the reverse, and nothing in
+`bubas-bunit` names a statement — a class says what it does through annotations, and the framework
+reads those.
+
+The cost is that neither module can assemble a language: the framework must not see the DSL, and
+the DSL must not see the analyser. `bubas-bunit-standard` exists to do exactly that, and an embedder
+wanting a different vocabulary skips it and writes the three lines itself.
+
+One consequence worth knowing: `bubas-bunit`'s own tests cannot use `bubas-bunit-commands`, because
+Maven forbids reactor cycles at any scope. That is a feature — the framework has to be tested
+against a throwaway vocabulary, which is the only real proof that it is vocabulary-agnostic.
+
+
 
 `bubas-mcp` should **not** be built yet. MCP, REST and CLI are all thin adapters over `TestResult`;
 committing to an MCP SDK before that record has settled would shape the API around one transport.
-Get the runner and its result type right, and each adapter is a short file.
+Get the runner and its result type right, and each adapter is a short file. `TestResult` and
+`BunitSuite.report` are that shape now, which is the argument for having waited.

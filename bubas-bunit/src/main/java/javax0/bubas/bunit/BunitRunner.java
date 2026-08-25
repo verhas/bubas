@@ -4,6 +4,8 @@ import javax0.bubas.analyser.BubasLanguage;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.runtime.Interpreter;
 
+import java.util.List;
+
 /**
  * Runs one BUBAS unit test.
  * <p>
@@ -44,12 +46,21 @@ public final class BunitRunner {
     /**
      * Compiles and runs one test against the subject.
      * <p>
+     * The test is compiled, then checked by {@link MockConsistency} before anything runs — a mock
+     * that would leave a variable unwritten is caught there rather than surfacing as a puzzling
+     * failure inside the subject.
+     * <p>
      * A failed expectation is an ordinary {@link BubasException} raised by the statement that
      * failed, so it arrives carrying the line of that expectation. It becomes a failed result
      * rather than propagating: a test that fails is an outcome, not an error.
      */
     public TestResult run(String testSource) {
         final var program = testLanguage.compile(testSource);
+        try {
+            MockConsistency.check(program, subject, language);
+        } catch (BubasException e) {
+            return TestResult.failed(program.name(), e.getDiagnostic(), List.of(), List.of());
+        }
         final var recorder = new Recorder(language, subject);
         try {
             Interpreter.of(program)

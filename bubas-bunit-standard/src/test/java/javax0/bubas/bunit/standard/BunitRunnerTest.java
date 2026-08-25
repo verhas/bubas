@@ -1,4 +1,4 @@
-package javax0.bubas.bunit.commands;
+package javax0.bubas.bunit.standard;
 
 import javax0.bubas.analyser.BubasLanguage;
 import javax0.bubas.bunit.BunitRunner;
@@ -82,7 +82,7 @@ class BunitRunnerTest {
             """;
 
     private static TestResult run(String test) {
-        return BunitRunner.of(BunitLanguageTest.language(), LANGUAGE, SUBJECT).run(test);
+        return BunitRunner.of(BunitLanguage.get(), LANGUAGE, SUBJECT).run(test);
     }
 
     @Test
@@ -210,7 +210,7 @@ class BunitRunnerTest {
                     RETURN total
                 END.
                 """;
-        final var result = BunitRunner.of(BunitLanguageTest.language(), LANGUAGE, subject).run("""
+        final var result = BunitRunner.of(BunitLanguage.get(), LANGUAGE, subject).run("""
                 PROGRAM SuppliedWrite
                     "COUNT ORDERS INTO _ FOR _" IS MOCKED
                     "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
@@ -221,19 +221,16 @@ class BunitRunnerTest {
         assertThat(result.passed()).as("%s", result.diagnostic()).isTrue();
     }
 
-    /**
-     * Without the supply the slot is never written, which is exactly the hazard the consistency
-     * checker exists to catch before a test ever runs.
-     */
+    /** The hazard the checker exists for: caught before the subject runs, not as a puzzle inside it. */
     @Test
-    void without_the_supply_the_variable_is_never_written() {
+    void a_missing_supply_is_refused_before_the_subject_runs() {
         final var subject = """
                 PROGRAM CountThem RETURNS INTEGER
                     COUNT ORDERS INTO total FOR "EU"
                     RETURN total
                 END.
                 """;
-        final var result = BunitRunner.of(BunitLanguageTest.language(), LANGUAGE, subject).run("""
+        final var result = BunitRunner.of(BunitLanguage.get(), LANGUAGE, subject).run("""
                 PROGRAM MissingWrite
                     "COUNT ORDERS INTO _ FOR _" IS MOCKED
                     RUN
@@ -241,6 +238,11 @@ class BunitRunnerTest {
                 END.
                 """);
         assertThat(result.passed()).isFalse();
+        assertThat(result.diagnostic())
+                .contains("is mocked, so its handler will not write 'total'")
+                .contains("nothing supplies it on every path")
+                .contains("SETS \"total\" TO");
+        assertThat(result.calls()).as("the subject never ran").isEmpty();
     }
 
     @Test
@@ -252,6 +254,9 @@ class BunitRunnerTest {
                 END.
                 """);
         assertThat(result.passed()).isFalse();
-        assertThat(result.diagnostic()).contains("the subject has not been run yet");
+        // Caught by the consistency checker before anything runs, not by the statement itself.
+        assertThat(result.diagnostic())
+                .contains("expects something of a run that has not happened yet")
+                .contains("The act has to come first, on every path");
     }
 }

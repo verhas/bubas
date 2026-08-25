@@ -1355,6 +1355,42 @@ for (long id : orderIds) {
 
 `run()` may be called once per `Interpreter`; a second call throws.
 
+#### Interception
+
+An interpreter may be given a `BubasCallInterceptor`, which answers for a function or a command in
+place of its implementation:
+
+```java
+Value result = Interpreter.of(prog).intercept(recorder).run();
+```
+
+```java
+public interface BubasCallInterceptor {
+    boolean interceptsFunction(String name);
+    Value   onFunction(String name, List<Value> arguments);
+    boolean interceptsCommand(String pattern);
+    void    onCommand(String pattern, StatementContext context, Map<String, Object> arguments);
+}
+```
+
+This exists for a test framework and for nothing else. It bypasses the implementations a language
+was sealed with, which is exactly what a mock needs and exactly what production code must not do.
+
+Four methods rather than a nullable result, because "not intercepted" and "intercepted, returns
+nothing" are different answers and `VOID` functions are real. A function's arguments arrive
+evaluated, boxed with their static types, and **spread rather than packed** for a variadic call: a
+mock matches on what the script wrote, not on how the Java method receives it. A command receives
+**the handler's own argument objects**, keyed by placeholder name, so an interceptor can write what
+the real command would have written — a command whose pattern declares a variable otherwise leaves
+the script reading an unassigned slot, with definite assignment already satisfied at compile time
+and nothing to warn.
+
+Interception is installed on an interpreter and never on a language, so a sealed language knows
+nothing about testing and the same checked program runs either way. Not installing one runs the real
+implementations, which is what makes an integration mode free rather than a second code path.
+
+[`BUNIT.md`](BUNIT.md) describes the framework built on it.
+
 ### 10.5 Extensions and discovery
 
 **Planned, not implemented.** Nothing in this section exists yet: not `BubasExtension`,

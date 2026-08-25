@@ -26,10 +26,5 @@
             <artifactId>bubas-runtime</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.javax0.bubas</groupId>
-            <artifactId>bubas-support</artifactId>
-            <version>${project.version}</version>
-        </dependency>
     </dependencies>
 </project>

@@ -1,5 +1,6 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.SuppliesResult;
 import javax0.bubas.bunit.DeclaresMock;
 import javax0.bubas.bunit.NamesTarget;
 import javax0.bubas.bunit.MockRecorder;
@@ -16,6 +17,7 @@ import java.util.List;
  */
 @NamesTarget("name")
 @DeclaresMock
+@SuppliesResult("value")
 public final class Mock {
 
     public static final String PATTERN = "{literal/STRING:name} RETURNS {expression:value}";
