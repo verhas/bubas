@@ -1,0 +1,17 @@
+'FAIL
+' A failed expectation names what was wanted and what happened.
+' SUBJECT: approve-order.bu
+' ERROR: expected the result to be true, but it was false
+PROGRAM WrongResult
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 5000.00
+    "LOG _, _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "orderId" IS 1
+    ARGUMENT "limit"   IS 100.00
+
+    RUN
+
+    RESULT IS TRUE
+END.

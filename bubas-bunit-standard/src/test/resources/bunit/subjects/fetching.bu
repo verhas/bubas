@@ -1,0 +1,5 @@
+' A command that writes an opaque value, which the framework fills with a token.
+PROGRAM Fetching(orderId INTEGER) RETURNS DECIMAL
+    FETCH purchase BY orderId
+    RETURN ORDER_TOTAL(purchase)
+END.

@@ -1,0 +1,5 @@
+' A command that writes an INTEGER, which no token can stand in for.
+PROGRAM Counting(region STRING) RETURNS INTEGER
+    COUNT ORDERS INTO total FOR region
+    RETURN total
+END.

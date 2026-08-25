@@ -1,0 +1,16 @@
+'PASS
+' LOG is left unmocked, so its real implementation runs. Only what a test names is replaced.
+' SUBJECT: approve-order.bu
+PROGRAM PartialMocking
+    "LOAD_ORDER"  WITH ARGS(1)    RETURNS "o1"
+    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 5000.00
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "orderId" IS 1
+    ARGUMENT "limit"   IS 100.00
+
+    RUN
+
+    RESULT IS FALSE
+    "LOG _, _" WAS NOT CALLED
+END.

@@ -1,0 +1,17 @@
+'PASS
+' A test is a BUBAS program, so it can work out the arguments it supplies.
+' SUBJECT: approve-order.bu
+PROGRAM Computed
+    DECLARE base DECIMAL FINAL = 500.00
+
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 900.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 1
+    ARGUMENT "limit"   IS base * 2
+
+    RUN
+
+    RESULT IS TRUE
+END.

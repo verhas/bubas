@@ -1,0 +1,9 @@
+'REJECT
+' An expectation before RUN can only ever be about nothing.
+' SUBJECT: approve-order.bu
+' ERROR: a run that has not happened yet
+PROGRAM ExpectationTooEarly
+    "LOAD_ORDER" RETURNS "o1"
+    RESULT IS TRUE
+    RUN
+END.

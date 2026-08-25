@@ -1,0 +1,9 @@
+'REJECT
+' Supplying for a command that is not mocked: its own handler writes it, so this would be ignored.
+' SUBJECT: counting.bu
+' ERROR: is not mocked here, so its own handler writes 'total'
+PROGRAM SupplyWithoutMock
+    "COUNT ORDERS INTO _ FOR _" SETS "total" TO 1
+    RUN
+    RESULT IS 1
+END.

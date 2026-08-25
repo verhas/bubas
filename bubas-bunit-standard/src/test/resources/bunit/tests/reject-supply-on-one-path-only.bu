@@ -1,0 +1,17 @@
+'REJECT
+' The reason the check is flow-sensitive: a supply inside one arm of an IF is not a supply.
+' A test written this way passes on some runs and fails on others.
+' SUBJECT: counting.bu
+' ERROR: nothing supplies it on every path
+PROGRAM SuppliedOnOnePath
+    DECLARE big BOOLEAN FINAL = TRUE
+
+    "COUNT ORDERS INTO _ FOR _" IS MOCKED
+    IF big THEN
+        "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
+    END IF
+
+    ARGUMENT "region" IS "EU"
+    RUN
+    RESULT IS 42
+END.

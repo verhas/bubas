@@ -1,0 +1,16 @@
+'FAIL
+' Expecting a failure that did not happen.
+' SUBJECT: approve-order.bu
+' ERROR: but it ran to the end
+PROGRAM NoFailure
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 10.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 1
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+
+    FAILED WITH "something"
+END.

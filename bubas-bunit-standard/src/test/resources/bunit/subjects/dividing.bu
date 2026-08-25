@@ -1,0 +1,9 @@
+' Fails at run time when the total is zero, so a test can expect a failure.
+PROGRAM Dividing(orderId INTEGER) RETURNS DECIMAL
+    DECLARE purchase Order
+    DECLARE total DECIMAL
+
+    purchase = LOAD_ORDER(orderId)
+    total = ORDER_TOTAL(purchase)
+    RETURN 100.00 / total
+END.

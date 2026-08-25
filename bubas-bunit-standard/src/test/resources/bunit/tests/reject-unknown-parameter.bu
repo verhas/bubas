@@ -1,0 +1,10 @@
+'REJECT
+' An argument for a parameter the subject does not take.
+' SUBJECT: approve-order.bu
+' ERROR: the subject has no parameter called 'orderid'
+PROGRAM UnknownParameter
+    "LOAD_ORDER" RETURNS "o1"
+    ARGUMENT "orderid" IS 42
+    RUN
+    RESULT IS TRUE
+END.

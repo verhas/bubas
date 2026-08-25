@@ -1,0 +1,18 @@
+'PASS
+' An expectation says what matters about a call and leaves the rest alone.
+' SUBJECT: approve-order.bu
+PROGRAM MatcherContains
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 5000.00
+    "LOG _, _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "orderId" IS 1
+    ARGUMENT "limit"   IS 100.00
+
+    RUN
+
+    RESULT IS FALSE
+    "LOG _, _" WAS CALLED WITH ARGS("INFO", CONTAINS("over limit"))
+    "REJECT _, _" WAS CALLED WITH ARGS(ANYTHING(), STARTS_WITH("over"))
+END.

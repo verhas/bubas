@@ -1,0 +1,10 @@
+'REJECT
+' A mock declared for more arguments than the function takes matches nothing, and would read
+' at run time as a mock that simply never fired.
+' SUBJECT: approve-order.bu
+' ERROR: LOAD_ORDER takes 1 argument(s) but was given 2
+PROGRAM WrongArity
+    "LOAD_ORDER" WITH ARGS(1, 2) RETURNS "o1"
+    RUN
+    RESULT IS TRUE
+END.

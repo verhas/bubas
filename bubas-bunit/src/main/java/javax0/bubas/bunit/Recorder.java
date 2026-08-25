@@ -42,9 +42,13 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
     private final Map<String, List<List<Value>>> calls = new LinkedHashMap<>();
     private final List<String> transcript = new ArrayList<>();
     private final List<String> log = new ArrayList<>();
+    /** Token names a mock answered with, so a failure can say one escaped into real code. */
+    private final Set<String> tokens = new LinkedHashSet<>();
     /** Pattern source to the name a test calls it by, so the interceptor can look one up. */
     private final Map<String, String> commandNames = new LinkedHashMap<>();
     private int tokensMade;
+    /** The last function the interpreter asked about and we declined. See {@link #explain}. */
+    private String lastUnmocked;
     private boolean hasRun;
     private Value result;
     private String failure;
@@ -98,8 +102,29 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
         try {
             result = interpreter.run();
         } catch (BubasException e) {
-            failure = e.getDiagnostic();
+            failure = e.getDiagnostic() + explain(e);
         }
+    }
+
+    /**
+     * The sentence a diagnostic cannot say for itself.
+     * <p>
+     * The commonest mistake in a BUNIT test is mocking a function that yields an opaque value and
+     * leaving the ones that consume it real. The token then reaches a handler expecting the domain
+     * class, and the interpreter reports an argument mismatch — true, and no help at all, because
+     * nothing in it says where the strange value came from. Opacity is total, so mocking has to be
+     * too: that is the thing to say.
+     */
+    private String explain(BubasException failure) {
+        if (tokensMade == 0 && tokens.isEmpty()) {
+            return "";
+        }
+        if (lastUnmocked == null || !failure.getMessage().contains("could not be called")) {
+            return "";
+        }
+        return "\n\n'" + lastUnmocked + "' is not mocked, and it was given a token — the stand-in a"
+                + " mock uses for a value BUBAS cannot construct. A token can only reach a mocked"
+                + " function, so every function taking that opaque type has to be mocked as well.";
     }
 
     @Override
@@ -126,7 +151,13 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
 
     @Override
     public boolean interceptsFunction(String name) {
-        return functions.containsKey(canonical(name));
+        final var mocked = functions.containsKey(canonical(name));
+        if (!mocked) {
+            // Asked before every call, so the last one declined is the one about to run for real —
+            // and if it fails, the one worth naming.
+            lastUnmocked = name;
+        }
+        return mocked;
     }
 
     @Override
@@ -211,6 +242,7 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
      */
     private Value token(Value given, BubasType expected) {
         if (given != null && Token.named(expected, given.type())) {
+            tokens.add(given.asString());
             return new Boxed(expected, new Token(given.asString()));
         }
         return given;

@@ -1,0 +1,8 @@
+'REJECT
+' A test that never runs the subject.
+' SUBJECT: approve-order.bu
+' ERROR: never runs the subject
+PROGRAM NoAct
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 10.00
+END.

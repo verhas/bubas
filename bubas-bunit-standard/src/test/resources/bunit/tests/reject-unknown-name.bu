@@ -1,0 +1,9 @@
+'REJECT
+' A name the subject's language does not have.
+' SUBJECT: approve-order.bu
+' ERROR: no function or command called 'NO_SUCH_THING'
+PROGRAM UnknownName
+    "NO_SUCH_THING" RETURNS 1
+    RUN
+    RESULT IS TRUE
+END.

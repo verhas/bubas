@@ -1,0 +1,18 @@
+'PASS
+' A post-tested loop runs at least once, so a supply inside it is guaranteed — unlike a pre-tested
+' one, which may run no times at all.
+' SUBJECT: counting.bu
+PROGRAM SuppliedInAPostTestedLoop
+    DECLARE done BOOLEAN
+
+    "COUNT ORDERS INTO _ FOR _" IS MOCKED
+    done = FALSE
+    DO
+        "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
+        done = TRUE
+    END DO UNTIL done
+
+    ARGUMENT "region" IS "EU"
+    RUN
+    RESULT IS 42
+END.

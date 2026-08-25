@@ -1,0 +1,13 @@
+'PASS
+' COUNT ORDERS writes an INTEGER, which no token can stand in for, so the mock says what it is.
+' SUBJECT: counting.bu
+PROGRAM SuppliedWrite
+    "COUNT ORDERS INTO _ FOR _" IS MOCKED
+    "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
+
+    ARGUMENT "region" IS "EU"
+
+    RUN
+
+    RESULT IS 42
+END.

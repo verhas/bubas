@@ -1,0 +1,15 @@
+'PASS
+' A mock with no WITH answers whatever it is given, which is the ordinary stub.
+' SUBJECT: approve-order.bu
+PROGRAM AnyArguments
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 10.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 99
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+
+    RESULT IS TRUE
+END.

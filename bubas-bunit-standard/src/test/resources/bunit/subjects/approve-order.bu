@@ -1,0 +1,17 @@
+' The flagship subject: load an order, total it, approve or reject against a limit.
+PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE purchase Order
+    DECLARE total DECIMAL
+
+    purchase = LOAD_ORDER(orderId)
+    total = ORDER_TOTAL(purchase)
+
+    IF total > limit THEN
+        LOG "INFO", "over limit: " + total
+        REJECT purchase, "over limit"
+        RETURN FALSE
+    END IF
+
+    APPROVE purchase
+    RETURN TRUE
+END.

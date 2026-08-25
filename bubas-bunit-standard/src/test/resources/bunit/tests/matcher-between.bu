@@ -1,0 +1,15 @@
+'PASS
+' A matcher stands in for an argument when the exact value is not what the test is about.
+' SUBJECT: approve-order.bu
+PROGRAM MatcherBetween
+    "LOAD_ORDER"  WITH ARGS(BETWEEN(1, 100)) RETURNS "o1"
+    "ORDER_TOTAL" WITH ARGS(ANYTHING())      RETURNS 10.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 42
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+
+    RESULT IS TRUE
+END.

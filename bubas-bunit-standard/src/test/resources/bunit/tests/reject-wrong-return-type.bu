@@ -1,0 +1,9 @@
+'REJECT
+' A mock answering a type the function does not return.
+' SUBJECT: approve-order.bu
+' ERROR: 'ORDER_TOTAL' returns DECIMAL, but this answers with STRING
+PROGRAM WrongReturnType
+    "ORDER_TOTAL" RETURNS "not a number"
+    RUN
+    RESULT IS TRUE
+END.

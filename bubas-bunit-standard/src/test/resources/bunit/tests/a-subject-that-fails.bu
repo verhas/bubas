@@ -1,0 +1,13 @@
+'PASS
+' A test may expect the subject to fail, and say what the failure has to mention.
+' SUBJECT: dividing.bu
+PROGRAM DivisionFails
+    "LOAD_ORDER"  WITH ARGS(1)    RETURNS "o1"
+    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 0.00
+
+    ARGUMENT "orderId" IS 1
+
+    RUN
+
+    FAILED WITH "division by zero"
+END.

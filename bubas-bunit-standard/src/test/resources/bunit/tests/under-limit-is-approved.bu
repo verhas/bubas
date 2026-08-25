@@ -1,0 +1,17 @@
+'PASS
+' Under the limit the order is approved, and nothing is rejected.
+' SUBJECT: approve-order.bu
+PROGRAM UnderLimitIsApproved
+    "LOAD_ORDER"  WITH ARGS(42)   RETURNS "o1"
+    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 10.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 42
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+
+    RESULT IS TRUE
+    "APPROVE _" WAS CALLED
+    "REJECT _, _" WAS NOT CALLED
+END.

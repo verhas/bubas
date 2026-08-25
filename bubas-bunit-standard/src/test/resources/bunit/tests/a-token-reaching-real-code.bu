@@ -1,0 +1,16 @@
+'FAIL
+' The commonest mistake: mocking the function that yields an opaque value and leaving the ones
+' that consume it real. The diagnostic has to say so, not just report a type mismatch.
+' SUBJECT: approve-order.bu
+' ERROR: is not mocked, and it was given a token
+PROGRAM HalfMocked
+    "LOAD_ORDER" WITH ARGS(42) RETURNS "o1"
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 42
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+
+    RESULT IS TRUE
+END.

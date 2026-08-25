@@ -1,0 +1,14 @@
+'PASS
+' FETCH declares an Order, so mocking it is enough: the framework writes a token, because
+' nothing else could go there and the test cannot construct one either.
+' SUBJECT: fetching.bu
+PROGRAM OpaqueWrite
+    "FETCH _ BY _" IS MOCKED
+    "ORDER_TOTAL" RETURNS 9.00
+
+    ARGUMENT "orderId" IS 1
+
+    RUN
+
+    RESULT IS 9.00
+END.

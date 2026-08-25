@@ -1,0 +1,16 @@
+'PASS
+' Two acts in one test. Whatever this means, it should not mean something surprising.
+' SUBJECT: approve-order.bu
+PROGRAM TwoRuns
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 10.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 1
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+    RESULT IS TRUE
+    RUN
+    RESULT IS TRUE
+END.

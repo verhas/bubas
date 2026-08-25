@@ -1,0 +1,17 @@
+'FAIL
+' When a call does not match, the diagnostic describes the matcher rather than printing nothing.
+' SUBJECT: approve-order.bu
+' ERROR: containing "no such text"
+PROGRAM WrongArguments
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 5000.00
+    "LOG _, _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "orderId" IS 1
+    ARGUMENT "limit"   IS 100.00
+
+    RUN
+
+    "LOG _, _" WAS CALLED WITH ARGS("INFO", CONTAINS("no such text"))
+END.

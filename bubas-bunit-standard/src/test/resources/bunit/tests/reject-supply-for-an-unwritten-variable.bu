@@ -1,0 +1,10 @@
+'REJECT
+' Supplying a variable the command does not write.
+' SUBJECT: counting.bu
+' ERROR: has no variable called 'region'
+PROGRAM UnwrittenVariable
+    "COUNT ORDERS INTO _ FOR _" IS MOCKED
+    "COUNT ORDERS INTO _ FOR _" SETS "region" TO "EU"
+    RUN
+    RESULT IS 1
+END.

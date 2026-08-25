@@ -1,0 +1,10 @@
+'REJECT
+' A mocked command whose handler will not write the INTEGER its pattern declares.
+' SUBJECT: counting.bu
+' ERROR: nothing supplies it on every path
+PROGRAM MissingSupply
+    "COUNT ORDERS INTO _ FOR _" IS MOCKED
+    ARGUMENT "region" IS "EU"
+    RUN
+    RESULT IS 1
+END.

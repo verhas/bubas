@@ -171,7 +171,8 @@ final class Machine implements StatementContext {
                 parameters.add(parameter(command.arguments().get(placeholders.get(i).name()),
                         declared[i + 1]));
             }
-            call(implementation.instance(), implementation.method(), this, parameters);
+            call(command.definition().name(), implementation.instance(),
+                    implementation.method(), this, parameters);
         } finally {
             arguments = previous;
         }
@@ -324,8 +325,8 @@ final class Machine implements StatementContext {
         if (signature.varargs()) {
             parameters.add(variadic(signature, given, fixed));
         }
-        return call(signature.implementation().instance(), signature.implementation().method(),
-                this, parameters);
+        return call(signature.name(), signature.implementation().instance(),
+                signature.implementation().method(), this, parameters);
     }
 
     /**
@@ -390,7 +391,7 @@ final class Machine implements StatementContext {
      * Anything the embedder's code throws is wrapped with the line of the statement that called it,
      * so a failure inside a handler still points at the script.
      */
-    private Object call(Object instance, java.lang.reflect.Method method,
+    private Object call(String what, Object instance, java.lang.reflect.Method method,
                         javax0.bubas.api.Context context, List<Object> parameters) {
         final var arguments = new Object[parameters.size() + 1];
         arguments[0] = context;
@@ -404,10 +405,28 @@ final class Machine implements StatementContext {
         } catch (ReflectiveOperationException | IllegalArgumentException e) {
             // An argument mismatch is an IllegalArgumentException, which is neither a
             // ReflectiveOperationException nor thrown by the handler — so without this it would
-            // reach the embedder as a raw Java exception naming no line.
-            throw new BubasException(method.getName() + " could not be called: " + e.getMessage(),
+            // reach the embedder as a raw Java exception naming no line. It names what BUBAS calls
+            // the thing rather than the Java method, which is always "call" and says nothing, and
+            // it shows what actually arrived: a mismatch nobody can see is a mismatch nobody can
+            // fix.
+            throw new BubasException(what + " could not be called: it takes ("
+                    + declared(method) + ") but was given (" + supplied(parameters) + ")",
                     current.line(), current.source(), e);
         }
+    }
+
+    private static String declared(java.lang.reflect.Method method) {
+        final var types = method.getParameterTypes();
+        return java.util.stream.IntStream.range(1, types.length)
+                .mapToObj(i -> types[i].getSimpleName())
+                .reduce((a, b) -> a + ", " + b).orElse("");
+    }
+
+    private static String supplied(List<Object> parameters) {
+        return parameters.stream()
+                .map(parameter -> parameter == null ? "nothing"
+                        : parameter.getClass().getSimpleName())
+                .reduce((a, b) -> a + ", " + b).orElse("");
     }
 
     private static BubasType element(BubasType arrayType) {

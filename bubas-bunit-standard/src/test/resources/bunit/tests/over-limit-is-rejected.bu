@@ -1,0 +1,18 @@
+'PASS
+' The flagship case: over the limit, the order is rejected and never approved.
+' SUBJECT: approve-order.bu
+PROGRAM OverLimitIsRejected
+    "LOAD_ORDER"  WITH ARGS(42)   RETURNS "o1"
+    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 1500.00
+    "REJECT _, _" IS MOCKED
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 42
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+
+    RESULT IS FALSE
+    "REJECT _, _" WAS CALLED
+    "APPROVE _" WAS NOT CALLED
+END.

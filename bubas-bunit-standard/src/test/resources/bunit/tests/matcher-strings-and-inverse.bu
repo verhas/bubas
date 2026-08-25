@@ -1,0 +1,17 @@
+'PASS
+' The string matchers, and inverting one.
+' SUBJECT: approve-order.bu
+PROGRAM MatcherStrings
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 5000.00
+    "LOG _, _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "orderId" IS 1
+    ARGUMENT "limit"   IS 100.00
+
+    RUN
+
+    "LOG _, _" WAS CALLED WITH ARGS(ENDS_WITH("FO"), MATCHES("over limit: .*"))
+    "REJECT _, _" WAS CALLED WITH ARGS(ANYTHING(), ANYTHING_BUT(CONTAINS("under")))
+END.

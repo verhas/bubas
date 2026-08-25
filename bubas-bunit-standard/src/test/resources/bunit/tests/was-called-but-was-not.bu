@@ -1,0 +1,18 @@
+'FAIL
+' Expecting a call that never happened.
+' SUBJECT: approve-order.bu
+' ERROR: expected APPROVE _ to be called, but it never was
+PROGRAM NeverCalled
+    "LOAD_ORDER" RETURNS "o1"
+    "ORDER_TOTAL" RETURNS 5000.00
+    "LOG _, _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 1
+    ARGUMENT "limit"   IS 100.00
+
+    RUN
+
+    "APPROVE _" WAS CALLED
+END.

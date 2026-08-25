@@ -1,0 +1,9 @@
+' Nested calls: an order yields a customer, a customer yields a risk band.
+PROGRAM RiskCheck(orderId INTEGER) RETURNS STRING
+    DECLARE purchase Order
+    DECLARE buyer Customer
+
+    purchase = LOAD_ORDER(orderId)
+    buyer = CUSTOMER_OF(purchase)
+    RETURN RISK_OF(buyer)
+END.

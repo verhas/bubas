@@ -245,6 +245,49 @@ class BunitRunnerTest {
         assertThat(result.calls()).as("the subject never ran").isEmpty();
     }
 
+    /**
+     * The commonest mistake in a BUNIT test, and until now it produced "call could not be called:
+     * argument type mismatch", which named neither the function nor the reason.
+     */
+    @Test
+    void a_token_reaching_an_unmocked_function_says_what_went_wrong() {
+        final var result = run("""
+                PROGRAM HalfMocked
+                    "LOAD_ORDER" WITH ARGS(42) RETURNS "o1"
+                    "APPROVE _" IS MOCKED
+                    ARGUMENT "orderId" IS 42
+                    ARGUMENT "limit" IS 1000.00
+                    RUN
+                    RESULT IS TRUE
+                END.
+                """);
+        assertThat(result.passed()).isFalse();
+        assertThat(result.diagnostic())
+                .contains("ORDER_TOTAL could not be called")
+                .contains("it takes (Order) but was given (Token)")
+                .contains("'ORDER_TOTAL' is not mocked, and it was given a token")
+                .contains("every function taking that opaque type has to be mocked as well");
+    }
+
+    @Test
+    void an_ordinary_failure_is_not_dressed_up_as_a_token_problem() {
+        final var result = run("""
+                PROGRAM Fine
+                    "LOAD_ORDER" WITH ARGS(42) RETURNS "o1"
+                    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 1500.00
+                    "APPROVE _" IS MOCKED
+                    ARGUMENT "orderId" IS 42
+                    ARGUMENT "limit" IS 1000.00
+                    RUN
+                    RESULT IS TRUE
+                END.
+                """);
+        assertThat(result.passed()).isFalse();
+        assertThat(result.diagnostic())
+                .contains("expected the result to be true")
+                .doesNotContain("is not mocked");
+    }
+
     @Test
     void an_expectation_before_RUN_is_refused() {
         final var result = run("""

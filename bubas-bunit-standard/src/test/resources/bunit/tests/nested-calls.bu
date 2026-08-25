@@ -1,0 +1,14 @@
+'PASS
+' Each mock feeds the next: an order, then its customer, then that customer's risk band.
+' SUBJECT: risk-check.bu
+PROGRAM NestedCalls
+    "LOAD_ORDER"  WITH ARGS(3)      RETURNS "o1"
+    "CUSTOMER_OF" WITH ARGS("o1")   RETURNS "buyer"
+    "RISK_OF"     WITH ARGS("buyer") RETURNS "HIGH"
+
+    ARGUMENT "orderId" IS 3
+
+    RUN
+
+    RESULT IS "HIGH"
+END.

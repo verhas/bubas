@@ -1,0 +1,17 @@
+'PASS
+' The four numeric bounds, and that inclusive differs from exclusive.
+' SUBJECT: risk-check.bu
+PROGRAM NumericBounds
+    "LOAD_ORDER"  WITH ARGS(AT_LEAST(10))  RETURNS "o1"
+    "CUSTOMER_OF" WITH ARGS(ANYTHING())    RETURNS "buyer"
+    "RISK_OF"     WITH ARGS(ANYTHING())    RETURNS "LOW"
+
+    ARGUMENT "orderId" IS 10
+
+    RUN
+
+    RESULT IS "LOW"
+    "LOAD_ORDER" WAS CALLED WITH ARGS(AT_MOST(10))
+    "LOAD_ORDER" WAS CALLED WITH ARGS(ANYTHING_BUT(GREATER_THAN(10)))
+    "LOAD_ORDER" WAS CALLED WITH ARGS(ANYTHING_BUT(LESS_THAN(10)))
+END.

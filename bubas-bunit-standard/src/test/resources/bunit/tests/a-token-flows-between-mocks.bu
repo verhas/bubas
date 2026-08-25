@@ -1,0 +1,15 @@
+'PASS
+' The order LOAD_ORDER answers with is the one ORDER_TOTAL is asked about, matched by token name.
+' SUBJECT: approve-order.bu
+PROGRAM TokenFlows
+    "LOAD_ORDER"  WITH ARGS(7)    RETURNS "the-order"
+    "ORDER_TOTAL" WITH ARGS("the-order") RETURNS 10.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "orderId" IS 7
+    ARGUMENT "limit"   IS 1000.00
+
+    RUN
+
+    RESULT IS TRUE
+END.
