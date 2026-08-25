@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -37,6 +38,7 @@ final class Machine implements StatementContext {
     private final CoreProgram program;
     private final Object[] slots;
     private final Map<Key, Object> services;
+    private final javax0.bubas.api.BubasCallInterceptor interceptor;
     private final MathContext mathContext;
     private final BiConsumer<String, String> logger;
 
@@ -50,11 +52,13 @@ final class Machine implements StatementContext {
     private Map<String, CoreArgument> arguments = Map.of();
 
     Machine(CoreProgram program, Object[] slots, Map<Class<?>, Map<String, Object>> services,
-            MathContext mathContext, BiConsumer<String, String> logger) {
+            MathContext mathContext, BiConsumer<String, String> logger,
+            javax0.bubas.api.BubasCallInterceptor interceptor) {
         this.program = program;
         this.slots = slots;
         this.mathContext = mathContext;
         this.logger = logger;
+        this.interceptor = interceptor;
         this.services = new HashMap<>();
         services.forEach((type, byQualifier) -> byQualifier.forEach(
                 (qualifier, service) -> this.services.put(new Key(type, qualifier), service)));
@@ -151,6 +155,17 @@ final class Machine implements StatementContext {
             final var implementation = command.definition().implementation();
             final var declared = implementation.method().getParameterTypes();
             final var placeholders = command.definition().pattern().placeholders();
+            final var source = command.definition().pattern().source();
+            if (interceptor != null && interceptor.interceptsCommand(source)) {
+                final var byName = new LinkedHashMap<String, Object>();
+                for (int i = 0; i < placeholders.size(); i++) {
+                    byName.put(placeholders.get(i).name(),
+                            parameter(command.arguments().get(placeholders.get(i).name()),
+                                    declared[i + 1]));
+                }
+                interceptor.onCommand(source, this, byName);
+                return;
+            }
             final var parameters = new ArrayList<>();
             for (int i = 0; i < placeholders.size(); i++) {
                 parameters.add(parameter(command.arguments().get(placeholders.get(i).name()),
@@ -298,6 +313,9 @@ final class Machine implements StatementContext {
 
     private Object invoke(javax0.bubas.analyser.FunctionSignature signature,
                           List<CoreExpression> given) {
+        if (interceptor != null && interceptor.interceptsFunction(signature.name())) {
+            return intercepted(signature, given);
+        }
         final var parameters = new ArrayList<>();
         final int fixed = signature.varargs() ? signature.required() : given.size();
         for (int i = 0; i < fixed; i++) {
@@ -308,6 +326,28 @@ final class Machine implements StatementContext {
         }
         return call(signature.implementation().instance(), signature.implementation().method(),
                 this, parameters);
+    }
+
+    /**
+     * Hands a function call to the interceptor instead of its implementation. Every argument is
+     * boxed with its static type, spread rather than packed, because a mock matches on what the
+     * script wrote rather than on how the Java method happens to receive it.
+     */
+    private Object intercepted(javax0.bubas.analyser.FunctionSignature signature,
+                               List<CoreExpression> given) {
+        final var values = new ArrayList<Value>();
+        for (final var node : given) {
+            values.add(new RuntimeValue(node.type(), evaluate(node)));
+        }
+        final var result = interceptor.onFunction(signature.name(), List.copyOf(values));
+        if (result == null) {
+            if (signature.returnType() != BubasType.VOID) {
+                throw fail(signature.name() + " returns " + signature.returnType()
+                        + ", but the interceptor supplied no value");
+            }
+            return null;
+        }
+        return result.as(Object.class);
     }
 
     /**

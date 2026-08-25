@@ -3,6 +3,7 @@ package javax0.bubas.analyser;
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasArray;
 import javax0.bubas.api.BubasType;
+import javax0.bubas.support.Standard;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.Registrar;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
@@ -79,6 +81,149 @@ class BubasLanguageTest {
 
     private static String rejection(BubasLanguage.Builder builder) {
         return catchThrowableOfType(BubasDefinitionException.class, builder::seal).getMessage();
+    }
+
+    @Nested
+    @DisplayName("naming a command")
+    class Naming {
+
+        public static final class Approve {
+            public void call(StatementContext ctx, ExpressionArg target) {
+            }
+        }
+
+        @javax0.bubas.api.BubasCommandName("LoanValidation")
+        public static final class NamedValidate {
+            public void call(StatementContext ctx, VariableArg item, ExpressionArg rules) {
+            }
+        }
+
+        @javax0.bubas.api.BubasCommandName("loanvalidation")
+        public static final class Lookalike {
+            public void call(StatementContext ctx, ExpressionArg target) {
+            }
+        }
+
+        @javax0.bubas.api.BubasCommandName("")
+        public static final class Blank {
+            public void call(StatementContext ctx, ExpressionArg target) {
+            }
+        }
+
+        @javax0.bubas.api.BubasCommandName("Loan Validation")
+        public static final class Spaced {
+            public void call(StatementContext ctx, ExpressionArg target) {
+            }
+        }
+
+        private static CommandDefinition only(BubasLanguage language, String keyword) {
+            return language.commands().stream()
+                    .filter(c -> c.pattern().keyword().filter(keyword::equals).isPresent())
+                    .findFirst().orElseThrow();
+        }
+
+        @Test
+        void an_unnamed_command_is_its_pattern_skeleton() {
+            final var language = base()
+                    .defineStatement("VALIDATE {initialized > var:item} AGAINST {expression:rules}",
+                            Validate.class)
+                    .seal();
+            assertThat(only(language, "VALIDATE").name()).isEqualTo("VALIDATE _ AGAINST _");
+            assertThat(only(language, "VALIDATE").isNamed()).isFalse();
+        }
+
+        @Test
+        void punctuation_keeps_its_place_in_a_skeleton() {
+            final var language = BubasLanguage.builder().install(Standard::register).seal();
+            assertThat(language.commands()).extracting(CommandDefinition::name)
+                    .contains("DECLARE _ _", "DECLARE _ _ = _", "DECLARE _ _ FINAL = _",
+                            "DECLARE _[_] _", "_ = _");
+        }
+
+        @Test
+        void an_annotation_replaces_the_skeleton() {
+            final var language = base()
+                    .defineStatement("VALIDATE {initialized > var:item} AGAINST {expression:rules}",
+                            NamedValidate.class)
+                    .seal();
+            assertThat(only(language, "VALIDATE").name()).isEqualTo("LoanValidation");
+            assertThat(only(language, "VALIDATE").isNamed()).isTrue();
+        }
+
+        @Test
+        void two_named_commands_may_not_differ_only_in_case() {
+            assertThat(rejection(base()
+                    .defineStatement("VALIDATE {initialized > var:item} AGAINST {expression:rules}",
+                            NamedValidate.class)
+                    .defineStatement("CHECK {expression:target}", Lookalike.class)))
+                    .contains("two commands are named 'LoanValidation' and 'loanvalidation'")
+                    .contains("names are unique ignoring case");
+        }
+
+        @Test
+        void a_blank_name_is_rejected() {
+            assertThat(rejection(base().defineStatement("CHECK {expression:target}", Blank.class)))
+                    .contains("@BubasCommandName is blank");
+        }
+
+        @Test
+        void a_name_may_not_contain_whitespace() {
+            assertThat(rejection(base().defineStatement("CHECK {expression:target}", Spaced.class)))
+                    .contains("contains whitespace")
+                    .contains("never be confused with a pattern skeleton");
+        }
+
+        /** Unnamed commands are not checked against each other: an app that never mocks pays nothing. */
+        @Test
+        void two_unnamed_commands_sharing_a_skeleton_are_not_rejected() {
+            assertThatCode(() -> base()
+                    .defineStatement("PAY {expression:x} VIA CARD", Approve.class)
+                    .defineStatement("PAY {expression:x} FROM BANK", Approve.class)
+                    .seal()).doesNotThrowAnyException();
+        }
+    }
+
+    @Nested
+    @DisplayName("enumerating the vocabulary")
+    class Enumeration {
+
+        @Test
+        void every_function_is_listed_in_registration_order() {
+            final var language = base()
+                    .defineFunction("ORDER_TOTAL", OrderTotal.class)
+                    .defineFunction("LOG_EVENT", LogEvent.class)
+                    .seal();
+            assertThat(language.functions()).extracting(FunctionSignature::name)
+                    .containsExactly("LOAD_ORDER", "ORDER_TOTAL", "LOG_EVENT");
+        }
+
+        @Test
+        void every_opaque_type_is_listed_in_registration_order() {
+            final var language = base().defineOpaqueType("Customer", Customer.class).seal();
+            assertThat(language.opaqueTypes()).extracting(BubasType.Opaque::name)
+                    .containsExactly("Order", "Customer");
+        }
+
+        @Test
+        void a_listed_function_carries_its_whole_signature() {
+            assertThat(base().seal().functions()).singleElement()
+                    .hasToString("LOAD_ORDER(orderId INTEGER) -> Order");
+        }
+
+        @Test
+        void a_language_with_no_functions_lists_none() {
+            assertThat(BubasLanguage.builder().seal().functions()).isEmpty();
+            assertThat(BubasLanguage.builder().seal().opaqueTypes()).isEmpty();
+        }
+
+        @Test
+        void the_listings_are_immutable() {
+            final var language = base().seal();
+            assertThatThrownBy(() -> language.functions().clear())
+                    .isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() -> language.opaqueTypes().clear())
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
     }
 
     @Nested

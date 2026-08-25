@@ -1,2 +1,5 @@
 /**/target/
 .idea
+.mcp.json
+.github
+.claude

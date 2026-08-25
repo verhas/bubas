@@ -47,6 +47,33 @@ public record StatementPattern(String source, List<PatternElement> elements) {
         return placeholders().stream().anyMatch(Placeholder::creates);
     }
 
+    /**
+     * The pattern with every placeholder written {@code _} — {@code VALIDATE _ AGAINST _}.
+     * <p>
+     * This is how a command is named when nothing named it: derived, so it cannot drift from the
+     * pattern, and injective in practice, because two patterns sharing a skeleton differ only in
+     * placeholder kind and would have to survive overlap analysis first. Literals keep their own
+     * spacing so {@code DECLARE _[_] _} still looks like the statement it matches; runs of
+     * whitespace collapse so that an embedder's stray double space cannot change the name.
+     */
+    public String skeleton() {
+        final var out = new StringBuilder();
+        int depth = 0;
+        for (int i = 0; i < source.length(); i++) {
+            final var c = source.charAt(i);
+            if (c == '{') {
+                if (depth++ == 0) {
+                    out.append('_');
+                }
+            } else if (c == '}') {
+                depth--;
+            } else if (depth == 0) {
+                out.append(c);
+            }
+        }
+        return out.toString().replaceAll("\\s+", " ").trim();
+    }
+
     public List<Placeholder> placeholders() {
         return elements.stream()
                 .filter(Placeholder.class::isInstance)

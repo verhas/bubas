@@ -1097,6 +1097,36 @@ embedder's objects the way a lambda could. Every dependency arrives through `ctx
 which makes the service registry the only path from a shared, sealed language to per-run state —
 enforced by construction rather than by convention.
 
+#### Naming a command
+
+A function is named where it is registered. A command is not — its pattern is its syntax — so it
+gets a name derived from that pattern: the **skeleton**, every literal verbatim and every
+placeholder written `_`.
+
+```
+VALIDATE {initialized > var/Order:item} AGAINST {expression:rules}   →   VALIDATE _ AGAINST _
+LOG_EVENT {literal/STRING:level}, {expression:message}               →   LOG_EVENT _, _
+DECLARE {new > identifier/ARRAY/T:name}[{expression:size}] {type:T}  →   DECLARE _[_] _
+{mutable:declared > var:name > initialized} = {expression:value}     →   _ = _
+```
+
+The skeleton is derived, so it cannot drift from the pattern, and it is injective in practice: two
+patterns sharing a skeleton differ only in placeholder kind and would have to survive overlap
+analysis first. Runs of whitespace collapse, so an embedder's stray double space cannot change a
+name.
+
+`@BubasCommandName("LoanValidation")` on the implementation class replaces it. This is for a team
+that prefers a domain name to a skeleton, and it is the escape route when two patterns really do
+share one. The name **replaces** the skeleton rather than adding an alias — once a command is named,
+its skeleton no longer refers to it, because two ways to name one thing is how two halves of a test
+suite end up written in different dialects.
+
+A declared name is non-blank and contains no whitespace, which is also what keeps it from ever
+looking like a skeleton. Two declared names in one language may not differ only in case, and
+`seal()` says so naming both patterns. Undeclared names are not checked against each other: an
+application that never mocks anything should not be made to invent names for commands nobody will
+refer to.
+
 ### 10.2 Signatures are derived from Java
 
 A BUBAS signature is read off the Java method. The first parameter is always the context; the

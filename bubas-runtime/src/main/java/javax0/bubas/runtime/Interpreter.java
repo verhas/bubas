@@ -31,6 +31,7 @@ public final class Interpreter {
     private MathContext mathContext = MathContext.DECIMAL128;
     private BiConsumer<String, String> logger = (level, message) ->
             System.out.println(level + ": " + message);
+    private javax0.bubas.api.BubasCallInterceptor interceptor;
     private boolean spent;
 
     private Interpreter(BubasProgram program) {
@@ -80,6 +81,15 @@ public final class Interpreter {
         return this;
     }
 
+    /**
+     * Substitutes behaviour for functions and commands, for a test framework and nothing else.
+     * Installed per run, so the same program runs against real implementations when none is given.
+     */
+    public Interpreter intercept(javax0.bubas.api.BubasCallInterceptor interceptor) {
+        this.interceptor = interceptor;
+        return this;
+    }
+
     /** The rounding policy for {@code DECIMAL} division. Defaults to {@code DECIMAL128}. */
     public Interpreter mathContext(MathContext mathContext) {
         this.mathContext = mathContext;
@@ -110,7 +120,8 @@ public final class Interpreter {
                         0, "");
             }
         }
-        final var result = new Machine(program.core(), slots, services, mathContext, logger).run();
+        final var result = new Machine(program.core(), slots, services, mathContext, logger,
+                interceptor).run();
         return program.returns() == null ? null : new RuntimeValue(program.returns(), result);
     }
 

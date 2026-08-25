@@ -65,9 +65,29 @@ is exactly the backend-divergence failure the core tree exists to prevent.
 which requires an instance of the declaring class. Implementation classes are `final`.
 
 Interception keeps the artifact under test identical to the artifact that ships, needs no
-enumeration of the vocabulary to build a shadow language, and duplicates no signatures. Its cost is
-a seam in the runtime, which must stay narrow and honestly named — an interceptor consulted at
-`Machine`'s two call sites, not a general plugin point.
+enumeration of the vocabulary to build a shadow language, and duplicates no signatures.
+
+**Built.** `BubasCallInterceptor` in `bubas-api`, installed per run with
+`Interpreter.of(program).intercept(recorder)`. It carries the `Bubas` prefix because it is part of
+the interpreter's API even though nothing outside a test framework should reach for it. Four
+methods, two predicates and two calls, so there is no tri-state to encode: a `VOID` function and an
+unmocked one are different answers, not one nullable one.
+
+```java
+boolean interceptsFunction(String name);
+Value   onFunction(String name, List<Value> arguments);
+boolean interceptsCommand(String pattern);
+void    onCommand(String pattern, StatementContext context, Map<String, Object> arguments);
+```
+
+A function's arguments arrive evaluated, boxed with their static types, and **spread rather than
+packed** for a variadic call — a mock matches on what the script wrote, not on how the Java method
+receives it. A command receives **the handler's own argument objects**, keyed by placeholder name,
+which is what lets an interceptor write what the real command would have written.
+
+Installed on the interpreter and never on the language, so a sealed language knows nothing about
+testing; not installing one runs the real implementations, which is what makes an integration mode
+free.
 
 ### Two interpreters, joined by services
 
@@ -126,12 +146,59 @@ Patterns need at least one literal but need not begin with a keyword, so
 `{literal/STRING:name} WAS NOT CALLED` is legal and overlap analysis accepts it alongside
 `{literal/STRING:name} WITH …`.
 
+**Because names are strings, the BUNIT language is embedder-independent.** It needs none of the
+subject's vocabulary — no opaque types, no functions, no patterns — so it is a constant: sealed
+once, shared across every embedder and every test. Only the *runner* needs the subject's language,
+to validate mock targets and to run the subject. Avoiding reserved-word collisions was the first
+reason for strings; this is the second, and it removes the whole two-language merge problem.
+
+### Naming what you mock
+
+A function is named as registered — `"LOAD_ORDER"`. A command is named by its **skeleton**, the
+pattern with every placeholder written `_` ([SPEC §10.1](SPEC.md#101-one-class-one-thing)):
+
+```
+"VALIDATE _ AGAINST _" WAS CALLED
+"LOG_EVENT _, _" WAS CALLED WITH "INFO", "over limit: 1500.00"
+```
+
+Naming by keyword alone was considered and rejected: keywords are not unique — `DECLARE` names four
+patterns — and a keyword-only name is *lossy*, so `PAY {var}` and `PAY {var} = {e}` both reduce to
+`"PAY"` and no rule can say which was meant without inventing a marker to mean "and nothing more".
+The skeleton is total, so the question never arises.
+
+Dropping `_` when a shorter form would be unambiguous was considered and rejected for a sharper
+reason: uniqueness depends on the whole language, so extending the vocabulary would silently
+invalidate tests written earlier. A name must not stop meaning what it meant.
+
+JNI has the same defect and is the cautionary precedent. A native method binds to the short
+decorated name `Java_com_example_Foo_bar` only while it is not overloaded; add `bar(String)` beside
+`bar(int)` and both must use the long form carrying the argument signature, so the C function that
+worked yesterday resolves to nothing and the failure arrives as an `UnsatisfiedLinkError` at the
+first call. Nobody touched the working binding — somebody else's addition invalidated it. A short
+name that is unique *for now* is a lossy encoding, and lossiness only bites once the set it is drawn
+from grows.
+
+`@BubasCommandName("LoanValidation")` replaces the skeleton for teams that prefer a domain name.
+Once a command is named, **its skeleton no longer refers to it** — a mock naming the skeleton of a
+named command is an error, not a fallback.
+
 There is no `GIVEN`/`WHEN`/`THEN` prefix. Gherkin's phase keywords earn their place when steps are
 free text; here every statement is typed and its verb already says which phase it belongs to, so
 the prefix costs a word per line and carries no information. Phase ordering — setup before `RUN`,
 assertions after — is checked by the runner before execution rather than encoded in syntax.
 
 ### Consequences to design around
+
+**A mocked command must supply what its pattern writes.** A pattern with a `new` precondition or
+an `initialized` postcondition on a `var` placeholder assigns a variable. If a mock merely records
+the call, the script reads an unassigned slot at run time — and definite-assignment analysis passed
+at compile time, so nothing warned.
+
+The rule: **an opaque target is written automatically by the framework** — a token, which is the
+only thing that could go there, since BUBAS cannot construct an opaque value and so neither can the
+test. **Everything else the command writes must be set by the mock**, and a mock that fails to set
+it is an error at mock-assembly time, not a surprise at run time.
 
 **Statement patterns have no variadic form.** This is about patterns, not calls: a function call
 `PAIR("a", "b")` is parsed by the expression parser and multi-argument calls are fine. But inside a
@@ -144,7 +211,39 @@ functions themselves gain varargs.
 cannot introduce a `TEST … END TEST` block. One file is one test case, exactly as the `.bu` corpus
 in `bubas-test` already works.
 
+## The mock consistency checker
+
+A test is a BUBAS program, so the language compiles it: syntax, types, definite assignment. That is
+compile time, and it is not enough. Mock declarations are *statements*, so what a mock sets is a
+flow-sensitive property — a mock declared inside one arm of an `IF` and not the other would leave a
+test that passes on some runs and fails on others, for reasons the author never sees.
+
+So after compilation, and before execution, the test program's core tree gets a second pass: a mock
+consistency check. It walks the same shape the flow analyser walks, tracking for each mocked call
+what the mock supplies, and merging at joins the way definite assignment merges — the guarantee is
+what holds on *every* path, not what some path happened to set.
+
+What it must catch:
+
+- a mocked command that does not set a non-opaque variable its pattern writes
+- a mock that supplies a value on one path and not on another
+- a mocked name that no longer exists in the subject's language, or the wrong argument count
+- a mock whose supplied value does not match the declared return type
+
+This is the same argument that kept `NULL` out of the language. A value that might not be there
+turns every use into a question, and the answer is to prove it is there rather than to check at
+each use. A mock that might not be configured is the same defect one level up.
+
 ## Assertions
+
+**Settled: fail fast.** A test file is one test case, so the first failed expectation ends it, which
+is what `ctx.error(...)` does naturally. `TestResult` still carries a list, so collecting every
+failure later would not change its shape.
+
+**The subject's log is captured but not assertable.** A mocked handler never logs and an unmocked
+one is Java, which is outside BUNIT's remit; a script that logs deliberately is asserted through the
+call record instead. The runner installs a capturing logger only because the default one prints to
+standard output, and keeps the text in `TestResult` as a transcript for a failed test.
 
 Only effects are observable, which is the right constraint regardless — asserting on a program's
 internals is how suites become change detectors. A test may assert on:
@@ -179,21 +278,22 @@ gap from an unfixable limit into a second mode over the same test file.
 
 Prerequisites, not details:
 
-1. **`BubasLanguage` cannot enumerate its vocabulary.** It looks up a function or opaque type by
-   name and lists `commands()`. BUNIT needs `functions()` and `opaqueTypes()` to validate mock
-   targets and to type tokens.
-2. **A dispatch seam in the runtime.** Narrow, named for what it is, consulted at `Machine`'s
-   function-call and command-invocation sites.
-3. **Signature access for typing tokens.** A mock returning a token for `LOAD_ORDER` gets the
-   token's type from the function's declared return type; `FunctionSignature` already carries it.
+1. ~~`BubasLanguage` cannot enumerate its vocabulary.~~ **Done.** `functions()` and
+   `opaqueTypes()` list it in registration order.
+2. ~~A dispatch seam in the runtime.~~ **Done.** `BubasCallInterceptor`, above.
+3. **Signature access for typing tokens.** Already available: `FunctionSignature` carries the
+   declared return type, which is what types a token.
+4. ~~A name for each command.~~ **Done.** `StatementPattern.skeleton()`, `CommandDefinition.name()`
+   and `@BubasCommandName`.
 
 ## Open questions
 
-1. **Telling a token from a string.** `WITH "o1"` is ambiguous: the STRING `"o1"`, or the token
-   named `o1`? Resolving it from the mocked function's signature — a string literal in an
-   opaque-typed position is a token — is concise but implicit, and this codebase dislikes implicit.
-   Distinct syntax (`WITH TOKEN "o1"`) is explicit but multiplies patterns combinatorially once
-   arguments mix tokens and values. **This is the sharpest unresolved question in the design.**
+1. **Telling a token from a string — resolved.** A token stands in only for an *opaque* value,
+   because those are the only values BUBAS cannot construct. So a STRING literal in an opaque-typed
+   parameter position names a token, and anywhere else it is a string. The runner knows the
+   signature before dispatch, so this is decidable rather than magic, and reportable when it
+   surprises someone. A token in an `ANY` position stays ambiguous and is rejected, with a
+   diagnostic saying to mock a concrete signature instead.
 2. **Arity ceiling.** How many `WITH` arities to ship, and what the diagnostic says when a function
    exceeds it.
 3. **Ordering assertions.** Whether call order is assertable, and with what syntax.

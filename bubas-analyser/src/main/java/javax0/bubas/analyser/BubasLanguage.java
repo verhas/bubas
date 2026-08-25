@@ -43,8 +43,10 @@ public final class BubasLanguage {
                           Map<Class<?>, Map<String, Object>> services) {
         this.vocabulary = vocabulary;
         this.constraints = constraints;
-        this.opaqueTypes = Map.copyOf(opaqueTypes);
-        this.functions = Map.copyOf(functions);
+        // Ordered rather than Map.copyOf: registration order is what enumeration reports, and a
+        // vocabulary listing is far easier to read in the order the embedder wrote it.
+        this.opaqueTypes = Collections.unmodifiableMap(new LinkedHashMap<>(opaqueTypes));
+        this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.commands = List.copyOf(commands);
         final var frozen = new LinkedHashMap<Class<?>, Map<String, Object>>();
         services.forEach((type, byQualifier) -> frozen.put(type, Map.copyOf(byQualifier)));
@@ -83,6 +85,21 @@ public final class BubasLanguage {
 
     public Optional<FunctionSignature> function(String name) {
         return Optional.ofNullable(functions.get(Keywords.canonical(name)));
+    }
+
+    /**
+     * Every registered function, in registration order.
+     * <p>
+     * Lookup by name answers "is this word a function"; this answers "what is in this language",
+     * which is what a test framework, a vocabulary export or a prompt generator needs.
+     */
+    public List<FunctionSignature> functions() {
+        return List.copyOf(functions.values());
+    }
+
+    /** Every registered opaque type, in registration order. */
+    public List<BubasType.Opaque> opaqueTypes() {
+        return List.copyOf(opaqueTypes.values());
     }
 
     public List<CommandDefinition> commands() {
@@ -206,6 +223,8 @@ public final class BubasLanguage {
                         Implementation.of(statements.get(pattern.source()), where), constraints));
             }
 
+            checkDeclaredNamesAreDistinct(definitions);
+
             final var vocabulary = Vocabulary.builder()
                     .function(functions.keySet().toArray(String[]::new))
                     .opaqueType(opaqueTypes.keySet().toArray(String[]::new))
@@ -216,6 +235,30 @@ public final class BubasLanguage {
             }
             return new BubasLanguage(vocabulary, constraints, types, signatures, definitions,
                     services);
+        }
+
+        /**
+         * Two commands may not carry names differing only in case, for the reason two variables may
+         * not: a reader cannot tell them apart, and whoever wrote the second meant the first.
+         * <p>
+         * Only annotated names are checked. Skeletons are not: an application that never mocks
+         * anything should not be made to invent names for commands nobody will ever refer to.
+         */
+        private static void checkDeclaredNamesAreDistinct(List<CommandDefinition> definitions) {
+            final var byCanonical = new LinkedHashMap<String, CommandDefinition>();
+            for (final var definition : definitions) {
+                if (!definition.isNamed()) {
+                    continue;
+                }
+                final var previous = byCanonical.put(
+                        Keywords.canonical(definition.name()), definition);
+                if (previous != null) {
+                    throw new BubasDefinitionException("two commands are named '"
+                            + previous.name() + "' and '" + definition.name()
+                            + "'; names are unique ignoring case:\n        " + previous.pattern()
+                            + "\n        " + definition.pattern());
+                }
+            }
         }
 
         /**

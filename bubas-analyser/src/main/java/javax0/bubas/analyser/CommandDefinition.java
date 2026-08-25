@@ -17,6 +17,26 @@ import javax0.bubas.api.VariableArg;
  */
 public record CommandDefinition(StatementPattern pattern, Implementation implementation) {
 
+    /**
+     * How this command is referred to outside its own source: the name its
+     * {@link javax0.bubas.api.BubasCommandName} gives it, or the pattern's skeleton when nothing
+     * named it. One or the other, never both — a named command's skeleton does not refer to it.
+     */
+    public String name() {
+        final var declared = declaredName(implementation.owner());
+        return declared == null ? pattern.skeleton() : declared;
+    }
+
+    /** True when the name came from an annotation rather than from the pattern. */
+    public boolean isNamed() {
+        return declaredName(implementation.owner()) != null;
+    }
+
+    static String declaredName(Class<?> owner) {
+        final var annotation = owner.getAnnotation(javax0.bubas.api.BubasCommandName.class);
+        return annotation == null ? null : annotation.value();
+    }
+
     static CommandDefinition of(StatementPattern pattern, Implementation implementation,
                                 ConstraintResolver constraints) {
         final var where = "command \"" + pattern + "\"";
@@ -26,6 +46,17 @@ public record CommandDefinition(StatementPattern pattern, Implementation impleme
                 || !StatementContext.class.isAssignableFrom(javaParameters[0])) {
             throw new BubasDefinitionException(where + ": " + method.getName()
                     + " must take a StatementContext as its first parameter");
+        }
+        final var declared = declaredName(implementation.owner());
+        if (declared != null) {
+            if (declared.isEmpty()) {
+                throw new BubasDefinitionException(where + ": @BubasCommandName is blank");
+            }
+            if (declared.codePoints().anyMatch(Character::isWhitespace)) {
+                throw new BubasDefinitionException(where + ": @BubasCommandName \"" + declared
+                        + "\" contains whitespace. A command name is one word, so that it can never"
+                        + " be confused with a pattern skeleton.");
+            }
         }
         if (method.isVarArgs()) {
             throw new BubasDefinitionException(where + ": " + method.getName() + " is variadic, but"
