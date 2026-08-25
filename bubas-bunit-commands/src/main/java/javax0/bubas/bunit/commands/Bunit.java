@@ -49,6 +49,7 @@ public final class Bunit {
         map.put(MockWith.PATTERN, MockWith.class);
         map.put(MockWith2.PATTERN, MockWith2.class);
         map.put(MockCommand.PATTERN, MockCommand.class);
+        map.put(Sets.PATTERN, Sets.class);
         map.put(Argument.PATTERN, Argument.class);
         map.put(Run.PATTERN, Run.class);
         map.put(ExpectResult.PATTERN, ExpectResult.class);

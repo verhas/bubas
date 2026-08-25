@@ -1,8 +1,12 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.NamesTarget;
+import javax0.bubas.bunit.Expectation;
 import javax0.bubas.api.StatementContext;
 
 /** {@code "APPROVE _" WAS CALLED} — at least once, with any arguments. */
+@Expectation
+@NamesTarget("name")
 public final class ExpectCalled {
 
     public static final String PATTERN = "{literal/STRING:name} WAS CALLED";

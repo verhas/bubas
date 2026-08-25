@@ -16,5 +16,28 @@
             <groupId>com.javax0.bubas</groupId>
             <artifactId>bubas-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.javax0.bubas</groupId>
+            <artifactId>bubas-bunit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.javax0.bubas</groupId>
+            <artifactId>bubas-analyser</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.javax0.bubas</groupId>
+            <artifactId>bubas-runtime</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.javax0.bubas</groupId>
+            <artifactId>bubas-support</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

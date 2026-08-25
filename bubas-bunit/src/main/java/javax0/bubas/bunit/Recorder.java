@@ -9,7 +9,6 @@ import javax0.bubas.api.BubasType;
 import javax0.bubas.api.StatementContext;
 import javax0.bubas.api.Value;
 import javax0.bubas.api.VariableArg;
-import javax0.bubas.bunit.commands.MockRecorder;
 import javax0.bubas.runtime.Interpreter;
 
 import java.math.BigDecimal;
@@ -39,6 +38,8 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
     private final BubasProgram subject;
     private final Map<String, List<Stub>> functions = new LinkedHashMap<>();
     private final Set<String> mockedCommands = new LinkedHashSet<>();
+    /** Command, then the placeholder it writes, to what the mock says goes there. */
+    private final Map<String, Map<String, Value>> supplied = new LinkedHashMap<>();
     private final Map<String, Value> arguments = new LinkedHashMap<>();
     private final Map<String, List<List<Value>>> calls = new LinkedHashMap<>();
     private final List<String> transcript = new ArrayList<>();
@@ -76,6 +77,12 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
     @Override
     public void mockCommand(String name) {
         mockedCommands.add(canonical(name));
+    }
+
+    @Override
+    public void supplyVariable(String command, String placeholder, Value value) {
+        supplied.computeIfAbsent(canonical(command), ignored -> new LinkedHashMap<>())
+                .put(placeholder, value);
     }
 
     @Override
@@ -145,9 +152,11 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
         final var name = commandNames.get(pattern);
         final var recorded = new ArrayList<Value>();
         // In placeholder order, so that WAS CALLED WITH lines up with what the statement reads.
-        for (final var argument : given.values()) {
+        final var writes = supplied.getOrDefault(canonical(name), Map.of());
+        for (final var entry : given.entrySet()) {
+            final var argument = entry.getValue();
             recorded.add(switch (argument) {
-                case VariableArg variable -> written(variable);
+                case VariableArg variable -> written(variable, writes.get(entry.getKey()));
                 case ExpressionArg expression -> expression.evaluate();
                 case Value value -> value;
                 case null -> null;
@@ -180,7 +189,11 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
      * command declares must be supplied by the mock, which the consistency checker will enforce;
      * until it does, an unwritten slot reads as nothing rather than failing here.
      */
-    private Value written(VariableArg variable) {
+    private Value written(VariableArg variable, Value supplied) {
+        if (supplied != null) {
+            variable.set(supplied.as(Object.class));
+            return supplied;
+        }
         if (variable.type() instanceof BubasType.Opaque) {
             final var token = new Boxed(variable.type(), new Token("#" + ++tokensMade));
             variable.set(token.raw());

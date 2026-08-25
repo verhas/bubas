@@ -10,16 +10,11 @@
     </parent>
     <artifactId>bubas-bunit</artifactId>
     <name>BUBAS BUnit</name>
-    <description>Runs a BUBAS unit test: compiles it, checks its mocks, executes the subject</description>
+    <description>The mocking framework: records mocks, intercepts calls, runs the subject</description>
     <dependencies>
         <dependency>
             <groupId>com.javax0.bubas</groupId>
             <artifactId>bubas-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.javax0.bubas</groupId>
-            <artifactId>bubas-bunit-commands</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.javax0.bubas</groupId>

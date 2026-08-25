@@ -1,5 +1,7 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.DeclaresMock;
+import javax0.bubas.bunit.NamesTarget;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
 
@@ -11,6 +13,8 @@ import java.util.List;
  * One pattern per arity: an expression stops at a comma, so a single placeholder cannot absorb an
  * argument list.
  */
+@NamesTarget("name")
+@DeclaresMock
 public final class MockWith2 {
 
     public static final String PATTERN =

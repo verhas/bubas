@@ -1,4 +1,4 @@
-package javax0.bubas.bunit.commands;
+package javax0.bubas.bunit;
 
 import javax0.bubas.api.Value;
 
@@ -18,6 +18,10 @@ import java.util.Optional;
  * {@link javax0.bubas.api.Context#service(Class)}, which is the ordinary way a handler reaches
  * anything the embedder supplied.
  * <p>
+ * It lives in the framework, not with the statements that call it. BUNIT is the mocking machinery;
+ * the statements are one DSL over it, and another set could replace them without the framework
+ * noticing. A framework that depended on its own DSL would be a framework in name only.
+ * <p>
  * Reporting a failed expectation is deliberately <em>not</em> here: a statement raises it through
  * its own {@link javax0.bubas.api.StatementContext#error(String)}, so the diagnostic carries the
  * line of the expectation that failed rather than a line inside the framework.
@@ -34,6 +38,15 @@ public interface MockRecorder {
 
     /** Declares that a command is mocked: recorded, and its handler never runs. */
     void mockCommand(String name);
+
+    /**
+     * Supplies a variable that a mocked command's pattern writes but its handler no longer will.
+     *
+     * @param command     the mocked command
+     * @param placeholder the pattern placeholder naming the variable, so the framework can match it
+     *                    to the argument the statement was given
+     */
+    void supplyVariable(String command, String placeholder, Value value);
 
     /** Supplies one of the subject's parameters. */
     void argument(String name, Value value);

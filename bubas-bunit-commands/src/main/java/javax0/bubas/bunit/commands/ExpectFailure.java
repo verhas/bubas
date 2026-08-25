@@ -1,8 +1,10 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.Expectation;
 import javax0.bubas.api.StatementContext;
 
 /** {@code FAILED WITH "division by zero"} — the subject was supposed to fail. */
+@Expectation
 public final class ExpectFailure {
 
     public static final String PATTERN = "FAILED WITH {literal/STRING:message}";

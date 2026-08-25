@@ -1,11 +1,15 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.NamesTarget;
+import javax0.bubas.bunit.Expectation;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
 
 import java.util.List;
 
 /** {@code "LOG_EVENT _, _" WAS CALLED WITH "INFO", "over limit"} */
+@Expectation
+@NamesTarget("name")
 public final class ExpectCalledWith2 {
 
     public static final String PATTERN =
