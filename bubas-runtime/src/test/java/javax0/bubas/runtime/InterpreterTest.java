@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 class InterpreterTest {
@@ -308,6 +309,90 @@ class InterpreterTest {
                     () -> Interpreter.of(program).argument("orderId", 1L).run());
             assertThat(thrown.getMessage()).contains("no Orders service is registered");
             assertThat(thrown.getLine()).isEqualTo(3);
+        }
+    }
+
+    @Nested
+    @DisplayName("services registered on the language")
+    class LanguageServices {
+
+        private static BubasLanguage languageServing(Orders orders) {
+            return BubasLanguage.builder()
+                    .install(Standard::register)
+                    .defineOpaqueType("Order", Order.class)
+                    .defineFunction("LOAD_ORDER", LoadOrder.class)
+                    .defineFunction("ORDER_TOTAL", OrderTotal.class)
+                    .registerService(Orders.class, orders)
+                    .seal();
+        }
+
+        private static final String BODY = """
+                PROGRAM P RETURNS DECIMAL
+                    DECLARE purchase Order
+                    purchase = LOAD_ORDER(7)
+                    RETURN ORDER_TOTAL(purchase)
+                END.
+                """;
+
+        @Test
+        void a_language_service_reaches_a_run_that_registered_nothing() {
+            final var program = languageServing(id -> new Order(BigDecimal.TEN)).compile(BODY);
+            assertThat(Interpreter.of(program).run().asDecimal())
+                    .isEqualByComparingTo(BigDecimal.TEN);
+        }
+
+        @Test
+        void every_interpreter_of_one_language_shares_it() {
+            final var program = languageServing(id -> new Order(BigDecimal.TEN)).compile(BODY);
+            assertThat(Interpreter.of(program).run().asDecimal())
+                    .isEqualByComparingTo(BigDecimal.TEN);
+            assertThat(Interpreter.of(program).run().asDecimal())
+                    .isEqualByComparingTo(BigDecimal.TEN);
+        }
+
+        /**
+         * The interpreter seeds from the language, and the language's maps are immutable — so this
+         * is also the test that the seeding copies rather than aliases them.
+         */
+        @Test
+        void a_run_may_override_the_language_service() {
+            final var program = languageServing(id -> new Order(BigDecimal.TEN)).compile(BODY);
+            assertThat(Interpreter.of(program)
+                    .registerService(Orders.class, id -> new Order(BigDecimal.ONE))
+                    .run().asDecimal())
+                    .isEqualByComparingTo(BigDecimal.ONE);
+        }
+
+        @Test
+        void an_override_lasts_only_for_the_run_that_made_it() {
+            final var program = languageServing(id -> new Order(BigDecimal.TEN)).compile(BODY);
+            Interpreter.of(program)
+                    .registerService(Orders.class, id -> new Order(BigDecimal.ONE))
+                    .run();
+            assertThat(Interpreter.of(program).run().asDecimal())
+                    .isEqualByComparingTo(BigDecimal.TEN);
+        }
+
+        @Test
+        void a_qualifier_separates_two_services_of_one_type() {
+            final var language = BubasLanguage.builder()
+                    .install(Standard::register)
+                    .defineOpaqueType("Order", Order.class)
+                    .defineFunction("LOAD_ORDER", LoadOrder.class)
+                    .defineFunction("ORDER_TOTAL", OrderTotal.class)
+                    .registerService(Orders.class, "read", id -> new Order(BigDecimal.ONE))
+                    .registerService(Orders.class, id -> new Order(BigDecimal.TEN))
+                    .seal();
+            assertThat(language.services().get(Orders.class)).containsOnlyKeys("", "read");
+            assertThat(Interpreter.of(language.compile(BODY)).run().asDecimal())
+                    .isEqualByComparingTo(BigDecimal.TEN);
+        }
+
+        @Test
+        void the_exposed_map_is_immutable() {
+            final var language = languageServing(id -> new Order(BigDecimal.TEN));
+            assertThatThrownBy(() -> language.services().get(Orders.class).put("x", null))
+                    .isInstanceOf(UnsupportedOperationException.class);
         }
     }
 

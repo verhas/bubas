@@ -35,15 +35,31 @@ public final class BubasLanguage {
     private final Map<String, BubasType.Opaque> opaqueTypes;
     private final Map<String, FunctionSignature> functions;
     private final List<CommandDefinition> commands;
+    private final Map<Class<?>, Map<String, Object>> services;
 
     private BubasLanguage(Vocabulary vocabulary, ConstraintResolver constraints,
                           Map<String, BubasType.Opaque> opaqueTypes,
-                          Map<String, FunctionSignature> functions, List<CommandDefinition> commands) {
+                          Map<String, FunctionSignature> functions, List<CommandDefinition> commands,
+                          Map<Class<?>, Map<String, Object>> services) {
         this.vocabulary = vocabulary;
         this.constraints = constraints;
         this.opaqueTypes = Map.copyOf(opaqueTypes);
         this.functions = Map.copyOf(functions);
         this.commands = List.copyOf(commands);
+        final var frozen = new LinkedHashMap<Class<?>, Map<String, Object>>();
+        services.forEach((type, byQualifier) -> frozen.put(type, Map.copyOf(byQualifier)));
+        this.services = Map.copyOf(frozen);
+    }
+
+    /**
+     * Services every interpreter of this language starts with, keyed by type and then qualifier.
+     * <p>
+     * A language is sealed once and shared, so anything registered here is one object serving every
+     * run — including runs on different threads at the same time. It must be thread-safe. Anything
+     * that varies per run, or that is not safe to share, belongs on the interpreter instead.
+     */
+    public Map<Class<?>, Map<String, Object>> services() {
+        return services;
     }
 
     public static Builder builder() {
@@ -93,6 +109,7 @@ public final class BubasLanguage {
         private final Map<String, Class<?>> opaqueTypes = new LinkedHashMap<>();
         private final Map<String, Class<?>> functions = new LinkedHashMap<>();
         private final Map<String, Class<?>> statements = new LinkedHashMap<>();
+        private final Map<Class<?>, Map<String, Object>> services = new LinkedHashMap<>();
         private boolean skipOverlapAnalysis;
 
         private Builder() {
@@ -141,6 +158,24 @@ public final class BubasLanguage {
         }
 
         /**
+         * Registers a service shared by every interpreter this language produces, which is what
+         * makes a singleton a singleton rather than something each run has to be handed again.
+         * <p>
+         * One object serves every run, concurrent runs included, so it must be thread-safe. An
+         * interpreter may register its own service of the same type and qualifier, and that one
+         * wins for that run.
+         */
+        public <T> Builder registerService(Class<T> type, T service) {
+            return registerService(type, "", service);
+        }
+
+        /** For the rare case of two services of one type: a read replica and a primary, say. */
+        public <T> Builder registerService(Class<T> type, String qualifier, T service) {
+            services.computeIfAbsent(type, ignored -> new LinkedHashMap<>()).put(qualifier, service);
+            return this;
+        }
+
+        /**
          * Overlap analysis is conservative, so it can reject a pair that would never collide. Skip
          * it for startup cost in production, or for a grammar whose author knows better — not
          * because it complained once.
@@ -179,7 +214,8 @@ public final class BubasLanguage {
             if (!skipOverlapAnalysis) {
                 new OverlapAnalysis(vocabulary).check(patterns);
             }
-            return new BubasLanguage(vocabulary, constraints, types, signatures, definitions);
+            return new BubasLanguage(vocabulary, constraints, types, signatures, definitions,
+                    services);
         }
 
         /**

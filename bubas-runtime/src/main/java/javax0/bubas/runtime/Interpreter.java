@@ -36,6 +36,9 @@ public final class Interpreter {
     private Interpreter(BubasProgram program) {
         this.program = program;
         this.slots = new Object[program.variables().size()];
+        // A mutable copy: the language's own maps are immutable, and registerService writes here.
+        program.language().services().forEach((type, byQualifier) ->
+                services.put(type, new HashMap<>(byQualifier)));
         for (int i = 0; i < program.parameterCount(); i++) {
             parameters.put(program.variables().get(i).name(), i);
         }

@@ -173,6 +173,11 @@ Three objects, three lifetimes. A **Language** is sealed once and shared by ever
 **Program** is compiled once and reused. An **Interpreter** is cheap, single-use, and carries
 whatever varies per run — arguments, services, `MathContext`, logger.
 
+Services follow that split. Register one on the builder and every interpreter of that language
+shares it, which is what a singleton collaborator wants; register one on the interpreter and it
+belongs to that run, and overrides the language's for the same type. A shared one is used by
+concurrent runs, so it has to be thread-safe; anything per-request belongs on the run.
+
 One class is one function or one command. That is what lets the signature be derived rather than
 declared, and it means compiled output can call the implementation directly instead of dispatching
 by string key through a registry that would have to be rebuilt first. The runtime constructs the

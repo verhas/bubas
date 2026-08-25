@@ -1186,6 +1186,23 @@ BubasLanguage lang = BubasLanguage.builder()
 Every definition is one call returning the builder. There is no nested builder and no terminal
 method, because the class carries everything a nested builder used to declare.
 
+#### Services on the language and on the run
+
+A service registered on the builder is shared by every interpreter that language produces, which is
+what makes a singleton a singleton instead of something each run has to be handed again. A service
+registered on the interpreter ([§10.4](#104-compiling-and-running)) belongs to that run alone. When
+both register the same type and qualifier, the run wins.
+
+Two consequences follow from a language being sealed once and shared. A language-level service is
+one object serving every run, including runs on different threads at the same time, so it must be
+thread-safe; and anything that varies per run — a transaction, a request, a user — belongs on the
+interpreter, which is single-use and single-threaded. Neither is enforced: the split is a contract
+between the embedder and itself.
+
+Services are not part of [`Registrar`](#103-building-a-language). A bundle defines vocabulary; a
+service is a live object, and a library that supplied one would be choosing the collaborator for
+every embedder that installs it. The embedder registers services, on the builder or on the run.
+
 Each `define` call has a plural form taking a map, for a vocabulary assembled elsewhere:
 
 ```java
