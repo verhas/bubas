@@ -1186,6 +1186,61 @@ BubasLanguage lang = BubasLanguage.builder()
 Every definition is one call returning the builder. There is no nested builder and no terminal
 method, because the class carries everything a nested builder used to declare.
 
+Each `define` call has a plural form taking a map, for a vocabulary assembled elsewhere:
+
+```java
+.defineOpaqueTypes(Map.of("Order", Order.class, "Customer", Customer.class))
+.defineFunctions(orderFunctions)
+.defineStatements(orderStatements)
+```
+
+A map preserves nothing the language depends on: two patterns that match one line are an error
+rather than something resolved by registration order ([§9.1](#91-matching)), so a plain `HashMap`
+is as correct as a `LinkedHashMap`. Order affects only the sequence diagnostics are reported in.
+
+#### Bundles
+
+A vocabulary that several embedders share is packaged as a method taking a `Registrar` and applied
+with `install`:
+
+```java
+BubasLanguage lang = BubasLanguage.builder()
+    .install(Standard::register)
+    .install(OrderVocabulary::register)
+    .defineOpaqueType("Order", Order.class)
+    .seal();
+```
+
+```java
+public final class OrderVocabulary {
+    public static void register(Registrar registrar) {
+        registrar.defineFunction("LOAD_ORDER", LoadOrder.class)
+                 .defineStatements(STATEMENTS);
+    }
+}
+```
+
+`Registrar` is the registration half of the builder: the six `define` calls, plus `install` itself
+so that a bundle may delegate to further bundles. It omits `seal()` and `skipOverlapAnalysis()`
+deliberately — those are the embedder's decisions, and a library that made them on the embedder's
+behalf would be making them for every other library in the same chain. The narrowing is static: a
+determined caller can cast back to the builder. It exists to keep an honest bundle inside its
+remit, not to contain a hostile one.
+
+`Registrar` is declared in `bubas-api` rather than beside the builder, because the libraries it
+exists for depend on the API alone. A bundle-authoring interface that dragged in the analyser would
+defeat its own purpose.
+
+Every method of `Registrar` returns `Registrar`, so definitions chain inside a bundle. The builder
+overrides each one with a covariant `Builder` return, which is what lets an embedder's chain run
+through `install` and still end in `seal()`.
+
+Installing a bundle is not the same as discovering an extension ([§10.5](#105-extensions-and-discovery)).
+A bundle is a method the embedder names explicitly; discovery finds candidates on the classpath.
+Both end at the same `define` calls, and both are opt-in, but only one of them is a name the
+embedder wrote down. The `extensions()` selector in the example above is planned and
+not implemented; [§10.5](#105-extensions-and-discovery) records why it may stay that way.
+
 ### 10.4 Compiling and running
 
 ```java
@@ -1206,6 +1261,38 @@ for (long id : orderIds) {
 `run()` may be called once per `Interpreter`; a second call throws.
 
 ### 10.5 Extensions and discovery
+
+**Planned, not implemented.** Nothing in this section exists yet: not `BubasExtension`,
+`BubasFunction`, `BubasCommand`, the abstract bases, the `@BubasFunction` and `@BubasCommand`
+annotations, nor the `extensions()` selector in [§10.3](#103-building-a-language). Registration
+today is explicit — one `defineFunction`, `defineStatement` or `install` call at a time. The
+`provider()` static factory that [§10.1](#101-one-class-one-thing) accepts is real, and it is
+deliberately the contract `ServiceLoader` uses, so a class written for discovery already works
+through explicit registration. There is no annotation for services, discoverable or otherwise;
+services are registered imperatively and only ever per run.
+
+> **Rationale (not normative).** Discovery is contemplated rather than committed, and the reason is
+> the philosophy the rest of this document is built on: a BUBAS program can name nothing it was not
+> given. The builder API states the vocabulary at the point of registration, so an embedder reads
+> the entire capability surface of a language off one chain in their own source. Discovery inverts
+> that. What a language contains becomes a function of what is on the classpath, which is decided by
+> the build — often transitively, by dependencies the embedder never chose and does not read.
+>
+> A filter narrows the damage without repairing the property. A predicate over discovered
+> candidates is a denial-list: it asks the embedder to anticipate what might appear rather than to
+> state what should. An embedder who writes no filter has a vocabulary they cannot enumerate from
+> their own code, and every reserved word in it is a word a script may no longer use as a variable.
+>
+> Nothing here is a soundness argument. Registration stays opt-in, so discovery could never widen a
+> language silently, and [§10.3](#103-building-a-language) keeps that guarantee. The cost is
+> legibility and review — which is exactly the thing this design is least willing to spend, because
+> "the script can only do what you handed it" is worth much less when what you handed it takes a
+> classpath dump to establish.
+>
+> Bundles have also removed most of the ergonomic pressure that motivated discovery. A library
+> ships one `register(Registrar)` method, the embedder writes one `install(Acme::register)` line,
+> and the vocabulary is both packaged and named. That is nearly all of the convenience at none of
+> the cost, which is why discovery may end up not being worth building at all.
 
 A function or command may instead be self-describing and discoverable by `ServiceLoader`. This is
 how the optional prelude packages and third-party libraries are delivered.
@@ -1521,6 +1608,15 @@ TO_DECIMAL(s STRING) -> DECIMAL
 LENGTH(a ANY_ARRAY)  -> INTEGER
 ```
 
+The whole module installs as a bundle:
+
+```java
+BubasLanguage.builder().install(Standard::register).seal();
+```
+
+Nothing here is privileged. These are ordinary patterns with ordinary implementations, and an
+embedder that wants a different declaration or assignment syntax simply does not install them.
+
 There is no `TO_STRING`: `"" + x` already converts, and a second way to do one thing invites
 inconsistency. There is no null test, because there is no null in the language.
 
@@ -1719,6 +1815,10 @@ Deliberately unresolved; each needs a decision before the affected component is 
    as well as line.
 5. **Prompt export format.** Phase 4 exports the function and statement vocabulary for LLM
    consumption; the schema is undecided.
+6. **Whether extension discovery is built at all.** [§10.5](#105-extensions-and-discovery) is
+   specified but unimplemented, and the rationale there argues that bundles ([§10.3](#103-building-a-language))
+   deliver its convenience without moving the vocabulary out of the embedder's own source. The
+   decision is to build it, drop it, or keep the annotations and abandon only classpath scanning.
 
 ---
 

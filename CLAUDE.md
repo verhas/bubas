@@ -85,10 +85,22 @@ mistaken for oversights:
   and a tie-break rule nobody remembers. A blank or comment-only line is a zero-token logical line
   owning its own trivia, which is why there is no file-level trivia slot and why the parser must
   skip lines with no tokens.
-- **Extension registration is opt-in, discovery is not.** `ServiceLoader` finds whatever is on
-  the classpath; the builder decides what gets registered. Registering automatically would let an
-  unrelated jar reserve a word an existing script uses as a variable, breaking it with no change
-  to the script or the embedding code.
+- **`Registrar` lives in `bubas-api`, not beside the builder it narrows.** It is the interface a
+  bundle of definitions is handed — the `define` calls and `install`, never `seal()` or
+  `skipOverlapAnalysis()`, which are the embedder's decisions rather than a library's. Putting it
+  in the analyser would mean every third-party function library had to depend on the interpreter
+  front end to publish a bundle, which is the exact coupling splitting the API out was meant to
+  prevent. `bubas-support` is the proof: it registers the whole standard module through
+  `Standard::register` while still requiring `bubas.api` alone. The narrowing is static and a
+  caller can cast back to `Builder`; it keeps an honest bundle in its remit and is not a sandbox.
+- **Extension registration is opt-in, discovery is not** — and discovery is planned, not built.
+  `ServiceLoader` finds whatever is on the classpath; the builder decides what gets registered.
+  Registering automatically would let an unrelated jar reserve a word an existing script uses as a
+  variable, breaking it with no change to the script or the embedding code. Nothing in SPEC §10.5
+  exists yet, and the rationale there argues it may never need to: a bundle installed with
+  `install(Acme::register)` gives a library the same packaging while keeping the vocabulary a name
+  the embedder wrote down. Do not implement discovery as a tidy-up; it is a design decision that is
+  still open.
 
 ## Build and layout
 
@@ -97,7 +109,7 @@ works for embedders on the module path and on the classpath alike.
 
 | Module | Contents | Depends on |
 |--------|----------|-----------|
-| `bubas-api` | `BubasType`, `Value`, `Context` interfaces, `VariableArg`, `ExpressionArg`, `LiteralArg`, `BubasArray`, `BubasException`, the extension SPI | — |
+| `bubas-api` | `BubasType`, `Value`, `Context` interfaces, `VariableArg`, `ExpressionArg`, `LiteralArg`, `BubasArray`, `BubasException`, `Registrar`, the extension SPI | — |
 | `bubas-lexer` | Tokens, logical-line assembly, continuation and comment handling | api |
 | `bubas-analyser` | `BubasLanguage`, `BubasProgram`, pattern matcher and overlap analysis, parser, type checker, definite assignment | api, lexer |
 | `bubas-runtime` | `Interpreter`, dispatcher, variable store | api, analyser |

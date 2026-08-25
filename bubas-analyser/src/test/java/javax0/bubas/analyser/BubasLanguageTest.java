@@ -4,6 +4,7 @@ import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
+import javax0.bubas.api.Registrar;
 import javax0.bubas.api.StatementContext;
 import javax0.bubas.api.VariableArg;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,12 @@ class BubasLanguageTest {
         }
     }
 
+    public static final class ValidateOrder {
+        public boolean call(Context ctx, Order order) {
+            return true;
+        }
+    }
+
     public static final class LogEvent {
         public void call(Context ctx, String level, String message) {
         }
@@ -70,6 +77,62 @@ class BubasLanguageTest {
 
     private static String rejection(BubasLanguage.Builder builder) {
         return catchThrowableOfType(BubasDefinitionException.class, builder::seal).getMessage();
+    }
+
+    @Nested
+    @DisplayName("bundles installed through a Registrar")
+    class Bundles {
+
+        /** A bundle: it sees a {@link Registrar}, never the builder. */
+        private static void orderVocabulary(Registrar registrar) {
+            registrar.defineOpaqueType("Customer", Customer.class)
+                    .defineFunction("ORDER_TOTAL", OrderTotal.class)
+                    .defineFunction("LOG_EVENT", LogEvent.class);
+        }
+
+        @Test
+        void a_bundle_contributes_its_definitions() {
+            final var language = base().install(Bundles::orderVocabulary).seal();
+            assertThat(language.opaqueType("Customer"))
+                    .contains(BubasType.opaque("Customer", Customer.class));
+            assertThat(language.function("ORDER_TOTAL")).isPresent();
+            assertThat(language.function("LOG_EVENT")).isPresent();
+        }
+
+        @Test
+        void install_returns_the_builder_so_the_embedder_chain_continues() {
+            final var language = base()
+                    .install(Bundles::orderVocabulary)
+                    .defineStatement("VALIDATE {initialized > var:item} AGAINST {expression:rules}",
+                            Validate.class)
+                    .seal();
+            assertThat(language.commands()).hasSize(1);
+            assertThat(language.function("ORDER_TOTAL")).isPresent();
+        }
+
+        @Test
+        void a_bundle_may_install_another_bundle() {
+            final var language = base()
+                    .install(outer -> outer.install(Bundles::orderVocabulary)
+                            .defineFunction("VALIDATE_ORDER", ValidateOrder.class))
+                    .seal();
+            assertThat(language.function("ORDER_TOTAL")).isPresent();
+            assertThat(language.function("VALIDATE_ORDER")).isPresent();
+        }
+
+        /**
+         * The point of the narrowing. A bundle must not be able to seal the language or switch
+         * overlap analysis off on the embedder's behalf, and the only thing keeping those off the
+         * interface is that nobody adds them — so assert their absence rather than trust it.
+         */
+        @Test
+        void a_registrar_exposes_definition_methods_and_nothing_else() {
+            assertThat(Registrar.class.getMethods())
+                    .extracting(java.lang.reflect.Method::getName)
+                    .containsExactlyInAnyOrder("defineOpaqueType", "defineFunction",
+                            "defineStatement", "defineOpaqueTypes", "defineFunctions",
+                            "defineStatements", "install");
+        }
     }
 
     @Nested

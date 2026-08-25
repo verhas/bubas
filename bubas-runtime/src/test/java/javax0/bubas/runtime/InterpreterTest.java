@@ -53,11 +53,11 @@ class InterpreterTest {
 
     private static BubasLanguage language() {
         final var builder = BubasLanguage.builder()
+                .install(Standard::register)
                 .defineOpaqueType("Order", Order.class)
                 .defineFunction("LOAD_ORDER", LoadOrder.class)
                 .defineFunction("ORDER_TOTAL", OrderTotal.class)
                 .defineFunction("LOG_EVENT", LogEvent.class);
-        Standard.STATEMENTS.forEach(builder::defineStatement);
         return builder.seal();
     }
 

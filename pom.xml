@@ -12,6 +12,13 @@
     <name>BUBAS</name>
     <description>An orchestration language for subject matter experts</description>
 
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
     <modules>
         <module>bubas-api</module>
         <module>bubas-lexer</module>

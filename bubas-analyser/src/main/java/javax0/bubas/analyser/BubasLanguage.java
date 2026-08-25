@@ -1,23 +1,20 @@
 package javax0.bubas.analyser;
 
+import javax0.bubas.analyser.core.Lowering;
+import javax0.bubas.analyser.flow.FlowAnalyser;
 import javax0.bubas.analyser.match.OverlapAnalysis;
 import javax0.bubas.analyser.match.Vocabulary;
-import javax0.bubas.analyser.flow.FlowAnalyser;
 import javax0.bubas.analyser.pattern.ConstraintResolver;
 import javax0.bubas.analyser.pattern.PatternParser;
 import javax0.bubas.analyser.pattern.StatementPattern;
-import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.analyser.statement.StatementParser;
-import javax0.bubas.analyser.core.Lowering;
+import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasType;
+import javax0.bubas.api.Registrar;
 import javax0.bubas.lexer.Lexer;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * A sealed vocabulary: the opaque types, functions and statements a script may use.
@@ -57,7 +54,9 @@ public final class BubasLanguage {
         return vocabulary;
     }
 
-    /** Resolves a pattern constraint against the types this language registered. */
+    /**
+     * Resolves a pattern constraint against the types this language registered.
+     */
     public ConstraintResolver constraints() {
         return constraints;
     }
@@ -89,7 +88,7 @@ public final class BubasLanguage {
         return new BubasProgram(this, Lowering.lower(program, this, symbols));
     }
 
-    public static final class Builder {
+    public static final class Builder implements Registrar {
 
         private final Map<String, Class<?>> opaqueTypes = new LinkedHashMap<>();
         private final Map<String, Class<?>> functions = new LinkedHashMap<>();
@@ -99,18 +98,45 @@ public final class BubasLanguage {
         private Builder() {
         }
 
+        @Override
         public Builder defineOpaqueType(String name, Class<?> javaType) {
             opaqueTypes.put(name, javaType);
             return this;
         }
 
+        @Override
         public Builder defineFunction(String name, Class<?> implementation) {
             functions.put(name, implementation);
             return this;
         }
 
+        @Override
         public Builder defineStatement(String pattern, Class<?> implementation) {
             statements.put(pattern, implementation);
+            return this;
+        }
+
+        @Override
+        public Builder defineOpaqueTypes(Map<String, Class<?>> javaTypes) {
+            javaTypes.forEach(this::defineOpaqueType);
+            return this;
+        }
+
+        @Override
+        public Builder defineFunctions(Map<String, Class<?>> implementations) {
+            implementations.forEach(this::defineFunction);
+            return this;
+        }
+
+        @Override
+        public Builder defineStatements(Map<String, Class<?>> implementations) {
+            implementations.forEach(this::defineStatement);
+            return this;
+        }
+
+        @Override
+        public Builder install(Consumer<Registrar> installer) {
+            installer.accept(this);
             return this;
         }
 
@@ -156,7 +182,9 @@ public final class BubasLanguage {
             return new BubasLanguage(vocabulary, constraints, types, signatures, definitions);
         }
 
-        /** Registered types, keyed canonically. The class-to-type mapping must stay one-to-one. */
+        /**
+         * Registered types, keyed canonically. The class-to-type mapping must stay one-to-one.
+         */
         private Map<String, BubasType.Opaque> opaqueTypes() {
             final var byName = new LinkedHashMap<String, BubasType.Opaque>();
             final var claimedBy = new HashMap<Class<?>, String>();

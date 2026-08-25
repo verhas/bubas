@@ -1,5 +1,7 @@
 package javax0.bubas.support;
 
+import javax0.bubas.api.Registrar;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -38,5 +40,15 @@ public final class Standard {
         map.put(DeclareArray.PATTERN, DeclareArray.class);
         map.put(Assign.PATTERN, Assign.class);
         return java.util.Collections.unmodifiableMap(map);
+    }
+
+    /**
+     * Installs everything in this module, which is what an embedder wants in the ordinary case:
+     * {@code builder.install(Standard::register)}. An embedder that wants a different declaration
+     * or assignment syntax simply does not install these and registers its own.
+     */
+    public static void register(Registrar registrar) {
+        registrar.defineStatements(STATEMENTS)
+                .defineFunctions(FUNCTIONS);
     }
 }

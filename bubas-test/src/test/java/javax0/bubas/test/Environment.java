@@ -72,9 +72,8 @@ final class Environment {
                 .defineFunction("WRAP", Wrap.class)
                 .defineFunction("CONTENTS", Contents.class)
                 .defineFunction("PRINT", Print.class)
-                .defineStatement(ASSERT_PATTERN, Assert.class);
-        Standard.STATEMENTS.forEach(builder::defineStatement);
-        Standard.FUNCTIONS.forEach(builder::defineFunction);
+                .defineStatement(ASSERT_PATTERN, Assert.class)
+                .install(Standard::register);
         return builder.seal();
     }
 }

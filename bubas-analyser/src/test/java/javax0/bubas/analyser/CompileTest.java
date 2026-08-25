@@ -5,6 +5,8 @@ import javax0.bubas.support.Standard;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Context;
+import javax0.bubas.api.ExpressionArg;
+import javax0.bubas.api.StatementContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -43,10 +45,34 @@ class CompileTest {
         }
     }
 
+    public static final class Claim {
+    }
+
+    public static final class LoadClaim {
+        public Claim call(Context ctx, long claimId) {
+            return new Claim();
+        }
+    }
+
+    public static final class CalculateExposure {
+        public BigDecimal call(Context ctx, Claim claim) {
+            return BigDecimal.ONE;
+        }
+    }
+
+    public static final class RequestDocuments {
+        public void call(StatementContext ctx, ExpressionArg subject, ExpressionArg what) {
+        }
+    }
+
+    public static final class ApproveClaim {
+        public void call(StatementContext ctx, ExpressionArg subject) {
+        }
+    }
+
     /** A builder with the standard declaration and assignment statements already installed. */
     private static BubasLanguage.Builder standard() {
-        final var builder = BubasLanguage.builder();
-        Standard.STATEMENTS.forEach(builder::defineStatement);
+        final var builder = BubasLanguage.builder().install(Standard::register);
         return builder;
     }
 
@@ -86,6 +112,38 @@ class CompileTest {
             END.
             """;
 
+    /**
+     * The insurance vocabulary the second {@code README.md} example is written against — a
+     * different domain over the same language, which is the claim that section makes.
+     */
+    private static final BubasLanguage INSURANCE = standard()
+            .defineOpaqueType("Claim", Claim.class)
+            .defineFunction("LOAD_CLAIM", LoadClaim.class)
+            .defineFunction("CALCULATE_EXPOSURE", CalculateExposure.class)
+            .defineStatement("REQUEST_DOCUMENTS {expression/Claim:subject}, {expression/STRING:what}",
+                    RequestDocuments.class)
+            .defineStatement("APPROVE_CLAIM {expression/Claim:subject}", ApproveClaim.class)
+            .seal();
+
+    /** The second example from {@code README.md}, verbatim. Kept in sync by hand. */
+    private static final String ROUTE_CLAIM = """
+            PROGRAM RouteClaim(claimId INTEGER) RETURNS BOOLEAN
+                DECLARE filing Claim
+                DECLARE exposure DECIMAL
+
+                filing = LOAD_CLAIM(claimId)
+                exposure = CALCULATE_EXPOSURE(filing)
+
+                IF exposure > 50000.0 THEN
+                    REQUEST_DOCUMENTS filing, "loss adjuster report"
+                    RETURN FALSE
+                END IF
+
+                APPROVE_CLAIM filing
+                RETURN TRUE
+            END.
+            """;
+
     private static String rejection(String source) {
         return catchThrowableOfType(BubasException.class, () -> LANGUAGE.compile(source))
                 .getMessage();
@@ -103,6 +161,13 @@ class CompileTest {
             assertThat(program.parameterCount()).isEqualTo(2);
             assertThat(program.variables().subList(0, program.parameterCount()))
                     .extracting(CoreProgram.Slot::name).containsExactly("orderId", "limit");
+        }
+
+        @Test
+        void the_second_readme_example_compiles_against_its_own_vocabulary() {
+            final var program = INSURANCE.compile(ROUTE_CLAIM);
+            assertThat(program.name()).isEqualTo("RouteClaim");
+            assertThat(program.returns()).isEqualTo(BubasType.BOOLEAN);
         }
 
         @Test

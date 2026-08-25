@@ -32,8 +32,7 @@ class FlowAnalyserTest {
 
     /** A builder with the standard declaration and assignment statements already installed. */
     private static BubasLanguage.Builder standard() {
-        final var builder = BubasLanguage.builder();
-        Standard.STATEMENTS.forEach(builder::defineStatement);
+        final var builder = BubasLanguage.builder().install(Standard::register);
         return builder;
     }
 
