@@ -299,14 +299,51 @@ final class Machine implements StatementContext {
     private Object invoke(javax0.bubas.analyser.FunctionSignature signature,
                           List<CoreExpression> given) {
         final var parameters = new ArrayList<>();
-        for (int i = 0; i < given.size(); i++) {
-            final var value = evaluate(given.get(i));
-            parameters.add(signature.parameters().get(i).type() == BubasType.ANY_ARRAY
-                    ? new RuntimeArray(value, element(given.get(i).type()))
-                    : value);
+        final int fixed = signature.varargs() ? signature.required() : given.size();
+        for (int i = 0; i < fixed; i++) {
+            parameters.add(argument(signature.typeOf(i), given.get(i)));
+        }
+        if (signature.varargs()) {
+            parameters.add(variadic(signature, given, fixed));
         }
         return call(signature.implementation().instance(), signature.implementation().method(),
                 this, parameters);
+    }
+
+    /**
+     * Evaluates one argument and boxes it the way its declared parameter asks for.
+     * <p>
+     * A wildcard parameter is the only reason boxing exists: the handler declared no concrete type,
+     * so it is handed something that carries the type along with the value.
+     */
+    private Object argument(BubasType expected, CoreExpression node) {
+        final var value = evaluate(node);
+        if (expected == BubasType.ANY_ARRAY) {
+            return new RuntimeArray(value, element(node.type()));
+        }
+        if (expected == BubasType.ANY) {
+            return new RuntimeValue(node.type(), value);
+        }
+        return value;
+    }
+
+    /**
+     * Packs the trailing arguments into the array the variadic parameter declares.
+     * <p>
+     * Reflection does not do this: {@code Method.invoke} on a variadic method wants the array
+     * already built, and of the exact component type, so the component comes off the Java method
+     * rather than from the BUBAS element type.
+     */
+    private Object variadic(javax0.bubas.analyser.FunctionSignature signature,
+                            List<CoreExpression> given, int fixed) {
+        final var method = signature.implementation().method();
+        final var component = method.getParameterTypes()[method.getParameterCount() - 1]
+                .getComponentType();
+        final var array = java.lang.reflect.Array.newInstance(component, given.size() - fixed);
+        for (int i = fixed; i < given.size(); i++) {
+            java.lang.reflect.Array.set(array, i - fixed, argument(signature.typeOf(i), given.get(i)));
+        }
+        return array;
     }
 
     /**

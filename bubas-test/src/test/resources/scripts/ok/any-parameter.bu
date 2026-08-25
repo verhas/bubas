@@ -1,0 +1,20 @@
+'OK
+' A function may declare a parameter that takes any type at all. The value arrives carrying its
+' own type, so the handler is told what it was given rather than having to guess.
+PROGRAM P
+    DECLARE s STRING
+    DECLARE p Parcel
+    s = SHOW(42)
+    ASSERT "an INTEGER keeps its type", s = "INTEGER=42"
+    s = SHOW("text")
+    ASSERT "a STRING", s = "STRING=text"
+    s = SHOW(TRUE)
+    ASSERT "a BOOLEAN", s = "BOOLEAN=true"
+    s = SHOW(1.50)
+    ASSERT "a DECIMAL keeps its scale", s = "DECIMAL=1.50"
+    p = WRAP(7)
+    s = SHOW(p)
+    ASSERT "an opaque value reports its registered type", s <> ""
+    s = SHOW(2 + 3 * 4)
+    ASSERT "the argument is an ordinary expression", s = "INTEGER=14"
+END.

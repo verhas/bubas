@@ -1,11 +1,13 @@
 package javax0.bubas.analyser;
 
 import javax0.bubas.api.BubasDefinitionException;
+import javax0.bubas.api.BubasArray;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.Registrar;
 import javax0.bubas.api.StatementContext;
+import javax0.bubas.api.Value;
 import javax0.bubas.api.VariableArg;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -77,6 +79,159 @@ class BubasLanguageTest {
 
     private static String rejection(BubasLanguage.Builder builder) {
         return catchThrowableOfType(BubasDefinitionException.class, builder::seal).getMessage();
+    }
+
+    @Nested
+    @DisplayName("the ANY wildcard parameter")
+    class AnyParameter {
+
+        public static final class Describe {
+            public String call(Context ctx, Value value) {
+                return value.type() + ":" + value.asString();
+            }
+        }
+
+        public static final class ConcatAny {
+            public String call(Context ctx, Value... parts) {
+                return "";
+            }
+        }
+
+        public static final class Mixed {
+            public String call(Context ctx, String label, Value value) {
+                return label;
+            }
+        }
+
+        public static final class ReturnsAny {
+            public Value call(Context ctx, long n) {
+                return null;
+            }
+        }
+
+        public static final class ReturnsAnyArray {
+            public BubasArray call(Context ctx, long n) {
+                return null;
+            }
+        }
+
+        @Test
+        void a_Value_parameter_reads_as_ANY() {
+            assertThat(base().defineFunction("DESCRIBE", Describe.class).seal()
+                    .function("DESCRIBE").orElseThrow())
+                    .hasToString("DESCRIBE(value ANY) -> STRING");
+        }
+
+        @Test
+        void ANY_combines_with_varargs() {
+            assertThat(base().defineFunction("CONCAT", ConcatAny.class).seal()
+                    .function("CONCAT").orElseThrow())
+                    .hasToString("CONCAT(parts ANY...) -> STRING");
+        }
+
+        @Test
+        void ANY_mixes_with_concrete_parameters() {
+            assertThat(base().defineFunction("MIXED", Mixed.class).seal()
+                    .function("MIXED").orElseThrow())
+                    .hasToString("MIXED(label STRING, value ANY) -> STRING");
+        }
+
+        @Test
+        void ANY_accepts_every_type_but_VOID() {
+            assertThat(BubasType.ANY.accepts(BubasType.INTEGER)).isTrue();
+            assertThat(BubasType.ANY.accepts(BubasType.STRING)).isTrue();
+            assertThat(BubasType.ANY.accepts(BubasType.BOOLEAN)).isTrue();
+            assertThat(BubasType.ANY.accepts(BubasType.arrayOf(BubasType.INTEGER))).isTrue();
+            assertThat(BubasType.ANY.accepts(BubasType.opaque("Order", Order.class))).isTrue();
+            assertThat(BubasType.ANY.accepts(BubasType.VOID)).isFalse();
+        }
+
+        @Test
+        void nothing_accepts_ANY_so_it_cannot_spread() {
+            assertThat(BubasType.STRING.accepts(BubasType.ANY)).isFalse();
+            assertThat(BubasType.ANY_ARRAY.accepts(BubasType.ANY)).isFalse();
+            assertThat(BubasType.arrayOf(BubasType.STRING).accepts(BubasType.ANY)).isFalse();
+        }
+
+        /** No untyped value may enter the script: a wildcard is a parameter and nothing else. */
+        @Test
+        void a_wildcard_return_type_is_rejected() {
+            assertThat(rejection(base().defineFunction("BAD", ReturnsAny.class)))
+                    .contains("returns ANY")
+                    .contains("a wildcard may only be a parameter")
+                    .contains("return the concrete type instead");
+            assertThat(rejection(base().defineFunction("BAD", ReturnsAnyArray.class)))
+                    .contains("returns ARRAY")
+                    .contains("a wildcard may only be a parameter");
+        }
+    }
+
+    @Nested
+    @DisplayName("variadic functions")
+    class Varargs {
+
+        public static final class Join {
+            public String call(Context ctx, String... parts) {
+                return String.join("", parts);
+            }
+        }
+
+        public static final class Labelled {
+            public String call(Context ctx, String label, long... numbers) {
+                return label + numbers.length;
+            }
+        }
+
+        public static final class Gather {
+            public void call(StatementContext ctx, ExpressionArg... arguments) {
+            }
+        }
+
+        @Test
+        void a_variadic_parameter_reports_its_element_type_not_the_array() {
+            assertThat(base().defineFunction("JOIN", Join.class).seal()
+                    .function("JOIN").orElseThrow())
+                    .hasToString("JOIN(parts STRING...) -> STRING");
+        }
+
+        @Test
+        void fixed_parameters_come_before_the_variadic_one() {
+            final var signature = base().defineFunction("LABELLED", Labelled.class).seal()
+                    .function("LABELLED").orElseThrow();
+            assertThat(signature).hasToString("LABELLED(label STRING, numbers INTEGER...) -> STRING");
+            assertThat(signature.required()).isEqualTo(1);
+            assertThat(signature.varargs()).isTrue();
+        }
+
+        @Test
+        void a_variadic_function_accepts_any_count_from_its_required_number_up() {
+            final var signature = base().defineFunction("LABELLED", Labelled.class).seal()
+                    .function("LABELLED").orElseThrow();
+            assertThat(signature.accepts(0)).isFalse();
+            assertThat(signature.accepts(1)).isTrue();
+            assertThat(signature.accepts(7)).isTrue();
+        }
+
+        @Test
+        void a_fixed_function_still_accepts_exactly_its_own_count() {
+            final var signature = base().seal().function("LOAD_ORDER").orElseThrow();
+            assertThat(signature.varargs()).isFalse();
+            assertThat(signature.accepts(1)).isTrue();
+            assertThat(signature.accepts(0)).isFalse();
+            assertThat(signature.accepts(2)).isFalse();
+        }
+
+        /**
+         * A command's parameters match its pattern's placeholders, which are fixed in number, so a
+         * variadic handler could never be filled. Rejected at registration rather than mis-derived.
+         */
+        @Test
+        void a_variadic_command_is_rejected() {
+            assertThat(rejection(base().defineStatement("GATHER {expression:a}", Gather.class)))
+                    .contains("is variadic")
+                    .contains("fixed in number")
+                    .contains("Only a function may be variadic");
+        }
     }
 
     @Nested

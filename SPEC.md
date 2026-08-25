@@ -1158,6 +1158,54 @@ and `@Param("orderId")` overrides them. Names are documentation only, since BUBA
 positional, so a class compiled without the flag degrades to `arg0` rather than failing and
 `seal()` reports it as a diagnostic.
 
+#### The `ANY` parameter
+
+A function parameter declared as `Value` accepts any BUBAS value:
+
+```java
+public String call(Context ctx, Value value)      // SHOW(value ANY) -> STRING
+public String call(Context ctx, Value... parts)   // CONCAT(parts ANY...) -> STRING
+```
+
+`ANY` accepts every type but `VOID`, and **nothing accepts `ANY`**. That asymmetry is the whole
+design: a wildcard may be a parameter and may never be a return type, because a returned value
+enters the script, where its type has to be known for anything downstream to be checked. A function
+declaring `Value` or `BubasArray` as its return type is rejected at `seal()`.
+
+The value arrives boxed, carrying its own [`type()`](#108-values-and-arguments) alongside the data,
+so the handler is told what it was given rather than having to guess. The conversions are not
+lenient — `asString()` on an INTEGER is a diagnostic, not a coercion — so a handler either switches
+on `type()` or takes the raw form with `as(Object.class)`. An array reaching an `ANY` parameter
+arrives as its raw Java array; a handler that wants element-agnostic array access declares
+`BubasArray` and gets `ANY_ARRAY` instead.
+
+`ANY` cannot be written in BUBAS source, held by a variable, or named in a pattern constraint. It
+exists only in a signature, derived from a Java parameter, which is what keeps the script's static
+typing whole. It is the scalar sibling of `ANY_ARRAY`, which has always existed for the same reason:
+`LENGTH` is element-agnostic, and some operations are value-agnostic.
+
+#### Variadic functions
+
+A variadic Java method is a variadic BUBAS function. The signature records the *element* type, so
+
+```java
+public String call(Context ctx, String label, long... numbers)
+```
+
+reads as `LABELLED(label STRING, numbers INTEGER...) -> STRING`. A call must supply the fixed
+parameters and may then supply any number of further arguments, each checked against the element
+type. Too few reports how many are needed: *"takes at least 1 argument(s) but was given 0"*.
+
+**Only the spread form is accepted.** Java allows a variadic method to be called either way —
+`join(array)` or `join("a", "b")` — and BUBAS allows only the second. Arrays here are invariant,
+first-class values, and admitting both forms would revive exactly the overload ambiguity the single
+form avoids; a second way to do one thing invites inconsistency. An embedder who wants to receive
+an array declares an array parameter, which is a different and equally available signature.
+
+**A command may not be variadic.** A command's parameters match the placeholders of its pattern,
+which are fixed in number, so a variadic handler could never be filled. It is rejected at `seal()`
+rather than silently derived as an array parameter.
+
 ### 10.3 Building a language
 
 ```java

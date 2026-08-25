@@ -1,0 +1,11 @@
+'NO-COMPILE
+' Spread only: an array is not accepted where a variadic function expects its elements. An embedder
+' who wants to pass an array declares an array parameter instead.
+' ERROR: CONCAT takes STRING for 'parts', but was given STRING[]
+' LINE: 9
+PROGRAM P
+    DECLARE parts[2] STRING
+    DECLARE s STRING
+    s = CONCAT(parts)
+    ASSERT "unreachable", s = ""
+END.

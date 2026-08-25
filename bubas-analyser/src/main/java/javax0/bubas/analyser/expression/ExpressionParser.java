@@ -205,9 +205,8 @@ public final class ExpressionParser {
                 break;
             }
         }
-        if (arguments.size() != signature.parameters().size()) {
-            throw error(token, signature.name() + " takes " + signature.parameters().size()
-                    + " argument(s) but was given " + arguments.size() + ": " + signature);
+        if (!signature.accepts(arguments.size())) {
+            throw error(token, signature.arityComplaint(arguments.size()));
         }
         return new Expression.Call(token, signature, List.copyOf(arguments));
     }

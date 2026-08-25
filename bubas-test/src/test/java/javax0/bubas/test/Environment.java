@@ -4,6 +4,7 @@ import javax0.bubas.analyser.BubasLanguage;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
+import javax0.bubas.api.Value;
 import javax0.bubas.support.Standard;
 
 /**
@@ -43,6 +44,23 @@ final class Environment {
         }
     }
 
+    /** Variadic: BUBAS sees CONCAT(parts STRING...) -> STRING and calls it with a spread list. */
+    public static final class Concat {
+        public String call(Context ctx, String... parts) {
+            return String.join("", parts);
+        }
+    }
+
+    /**
+     * A wildcard parameter: BUBAS sees SHOW(value ANY) -> STRING and accepts any type. The handler
+     * asks the value what it is rather than being told by its own signature.
+     */
+    public static final class Show {
+        public String call(Context ctx, Value value) {
+            return value.type() + "=" + String.valueOf(value.as(Object.class));
+        }
+    }
+
     public static final class Print {
         public void call(Context ctx, String message) {
             ctx.log("INFO", message);
@@ -71,6 +89,8 @@ final class Environment {
                 .defineOpaqueType("Parcel", Parcel.class)
                 .defineFunction("WRAP", Wrap.class)
                 .defineFunction("CONTENTS", Contents.class)
+                .defineFunction("CONCAT", Concat.class)
+                .defineFunction("SHOW", Show.class)
                 .defineFunction("PRINT", Print.class)
                 .defineStatement(ASSERT_PATTERN, Assert.class)
                 .install(Standard::register);

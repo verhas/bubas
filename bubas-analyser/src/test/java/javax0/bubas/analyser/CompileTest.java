@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 /** The whole front end, end to end: source in, checked program out. */
@@ -67,6 +68,18 @@ class CompileTest {
 
     public static final class ApproveClaim {
         public void call(StatementContext ctx, ExpressionArg subject) {
+        }
+    }
+
+    public static final class Join {
+        public String call(Context ctx, String... parts) {
+            return String.join("", parts);
+        }
+    }
+
+    public static final class Labelled {
+        public String call(Context ctx, String label, long... numbers) {
+            return label + numbers.length;
         }
     }
 
@@ -144,9 +157,81 @@ class CompileTest {
             END.
             """;
 
+    private static final BubasLanguage VARIADIC = standard()
+            .defineFunction("JOIN", Join.class)
+            .seal();
+
+    /** RETURN consumes the value, so no variable is declared and the unused-variable rule stays out. */
+    private static String variadic(String expression) {
+        return "PROGRAM T RETURNS STRING\n    RETURN " + expression + "\nEND.\n";
+    }
+
+    private static String variadicRejection(String expression) {
+        return catchThrowableOfType(BubasException.class,
+                () -> VARIADIC.compile(variadic(expression))).getMessage();
+    }
+
     private static String rejection(String source) {
         return catchThrowableOfType(BubasException.class, () -> LANGUAGE.compile(source))
                 .getMessage();
+    }
+
+    @Nested
+    @DisplayName("variadic calls")
+    class Variadic {
+
+        @Test
+        void any_number_of_arguments_from_zero_up_compiles() {
+            assertThatCode(() -> {
+                VARIADIC.compile(variadic("JOIN()"));
+                VARIADIC.compile(variadic("JOIN(\"a\")"));
+                VARIADIC.compile(variadic("JOIN(\"a\", \"b\", \"c\")"));
+            }).doesNotThrowAnyException();
+        }
+
+        @Test
+        void every_variadic_argument_is_type_checked_against_the_element_type() {
+            assertThat(variadicRejection("JOIN(\"a\", 42)"))
+                    .contains("JOIN takes STRING for 'parts', but was given INTEGER");
+        }
+
+        /**
+         * Spread only. Java would accept the array form as well; allowing both would revive the
+         * overload ambiguity, so an embedder wanting an array declares an array parameter.
+         */
+        @Test
+        void an_array_is_not_accepted_in_place_of_spread_arguments() {
+            final var source = """
+                    PROGRAM T RETURNS STRING
+                        DECLARE parts[2] STRING
+                        RETURN JOIN(parts)
+                    END.
+                    """;
+            assertThat(catchThrowableOfType(BubasException.class,
+                    () -> VARIADIC.compile(source)).getMessage())
+                    .contains("JOIN takes STRING for 'parts', but was given STRING[]");
+        }
+
+        @Test
+        void too_few_arguments_says_at_least() {
+            final var language = standard().defineFunction("LABELLED", Labelled.class).seal();
+            assertThat(catchThrowableOfType(BubasException.class,
+                    () -> language.compile("PROGRAM T RETURNS STRING\n    RETURN LABELLED()\nEND.\n"))
+                    .getMessage())
+                    .contains("LABELLED takes at least 1 argument(s) but was given 0")
+                    .contains("LABELLED(label STRING, numbers INTEGER...) -> STRING");
+        }
+
+        @Test
+        void a_fixed_function_still_reports_an_exact_count() {
+            assertThat(rejection("""
+                    PROGRAM T
+                        DECLARE purchase Order
+                        purchase = LOAD_ORDER(1, 2)
+                        LOG_EVENT "INFO", "x"
+                    END.
+                    """)).contains("LOAD_ORDER takes 1 argument(s) but was given 2");
+        }
     }
 
     @Nested

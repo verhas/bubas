@@ -2,7 +2,9 @@ package javax0.bubas.runtime;
 
 import javax0.bubas.analyser.BubasLanguage;
 import javax0.bubas.api.BubasException;
+import javax0.bubas.api.BubasArray;
 import javax0.bubas.api.Context;
+import javax0.bubas.api.Value;
 import javax0.bubas.support.Standard;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -309,6 +311,201 @@ class InterpreterTest {
                     () -> Interpreter.of(program).argument("orderId", 1L).run());
             assertThat(thrown.getMessage()).contains("no Orders service is registered");
             assertThat(thrown.getLine()).isEqualTo(3);
+        }
+    }
+
+    @Nested
+    @DisplayName("the ANY wildcard parameter")
+    class AnyParameter {
+
+        /**
+         * The idiom for a wildcard parameter: ask the value what it is, then read it accordingly.
+         * {@code as(Object.class)} is the shortcut when any rendering will do.
+         */
+        public static final class Describe {
+            public String call(Context ctx, Value value) {
+                return value.type() + "=" + String.valueOf(value.as(Object.class));
+            }
+        }
+
+        /** Variadic and wildcard together: every element arrives boxed with its own type. */
+        public static final class Render {
+            public String call(Context ctx, Value... parts) {
+                final var out = new StringBuilder();
+                for (final var part : parts) {
+                    out.append(part.type()).append(':')
+                            .append(String.valueOf(part.as(Object.class))).append(';');
+                }
+                return out.toString();
+            }
+        }
+
+        public static final class Tagged {
+            public String call(Context ctx, String tag, Value value) {
+                return tag + "/" + value.type();
+            }
+        }
+
+        /** An array reaching a wildcard arrives as its raw Java array, not wrapped. */
+        public static final class SizeOf {
+            public long call(Context ctx, Value value) {
+                return value.as(long[].class).length;
+            }
+        }
+
+        private static final BubasLanguage LANG = BubasLanguage.builder()
+                .install(Standard::register)
+                .defineOpaqueType("Order", Order.class)
+                .defineFunction("LOAD_ORDER", LoadOrder.class)
+                .defineFunction("DESCRIBE", Describe.class)
+                .defineFunction("RENDER", Render.class)
+                .defineFunction("TAGGED", Tagged.class)
+                .registerService(Orders.class, id -> new Order(BigDecimal.ONE))
+                .seal();
+
+        private static String run(String expression) {
+            return Interpreter.of(LANG.compile(
+                    "PROGRAM T RETURNS STRING\n    RETURN " + expression + "\nEND.\n"))
+                    .run().asString();
+        }
+
+        @Test
+        void a_wildcard_parameter_carries_the_type_it_was_given() {
+            assertThat(run("DESCRIBE(42)")).isEqualTo("INTEGER=42");
+            assertThat(run("DESCRIBE(\"text\")")).isEqualTo("STRING=text");
+            assertThat(run("DESCRIBE(TRUE)")).isEqualTo("BOOLEAN=true");
+            assertThat(run("DESCRIBE(1.50)")).isEqualTo("DECIMAL=1.50");
+        }
+
+        @Test
+        void an_expression_is_evaluated_before_it_is_boxed() {
+            assertThat(run("DESCRIBE(2 + 3 * 4)")).isEqualTo("INTEGER=14");
+        }
+
+        @Test
+        void every_variadic_wildcard_element_keeps_its_own_type() {
+            assertThat(run("RENDER(1, \"two\", TRUE)"))
+                    .isEqualTo("INTEGER:1;STRING:two;BOOLEAN:true;");
+        }
+
+        @Test
+        void a_variadic_wildcard_takes_no_arguments_too() {
+            assertThat(run("RENDER()")).isEmpty();
+        }
+
+        @Test
+        void a_wildcard_follows_concrete_parameters() {
+            assertThat(run("TAGGED(\"t\", 9)")).isEqualTo("t/INTEGER");
+        }
+
+        @Test
+        void an_opaque_value_reaches_a_wildcard_parameter_with_its_registered_type() {
+            assertThat(run("DESCRIBE(LOAD_ORDER(1))")).startsWith("Order=");
+        }
+
+        @Test
+        void an_array_reaches_a_wildcard_parameter_as_its_raw_java_array() {
+            final var language = BubasLanguage.builder()
+                    .install(Standard::register)
+                    .defineFunction("SIZE_OF", SizeOf.class)
+                    .seal();
+            final var source = """
+                    PROGRAM T RETURNS INTEGER
+                        DECLARE numbers[3] INTEGER
+                        RETURN SIZE_OF(numbers)
+                    END.
+                    """;
+            assertThat(Interpreter.of(language.compile(source)).run().asLong()).isEqualTo(3L);
+        }
+    }
+
+    @Nested
+    @DisplayName("variadic functions")
+    class Varargs {
+
+        public static final class Join {
+            public String call(Context ctx, String... parts) {
+                return String.join("-", parts);
+            }
+        }
+
+        public static final class SumOf {
+            public long call(Context ctx, long... numbers) {
+                long total = 0;
+                for (final var n : numbers) {
+                    total += n;
+                }
+                return total;
+            }
+        }
+
+        public static final class Tagged {
+            public String call(Context ctx, String tag, long... numbers) {
+                return tag + ":" + numbers.length;
+            }
+        }
+
+        public static final class CountOrders {
+            public long call(Context ctx, Order... orders) {
+                return orders.length;
+            }
+        }
+
+        private static final BubasLanguage LANG = BubasLanguage.builder()
+                .install(Standard::register)
+                .defineOpaqueType("Order", Order.class)
+                .defineFunction("LOAD_ORDER", LoadOrder.class)
+                .defineFunction("JOIN", Join.class)
+                .defineFunction("SUM_OF", SumOf.class)
+                .defineFunction("TAGGED", Tagged.class)
+                .defineFunction("COUNT_ORDERS", CountOrders.class)
+                .registerService(Orders.class, id -> new Order(BigDecimal.ONE))
+                .seal();
+
+        private static Value run(String returns, String expression) {
+            return Interpreter.of(LANG.compile(
+                    "PROGRAM T RETURNS " + returns + "\n    RETURN " + expression + "\nEND.\n"))
+                    .run();
+        }
+
+        @Test
+        void several_arguments_are_packed_into_the_array() {
+            assertThat(run("STRING", "JOIN(\"a\", \"b\", \"c\")").asString()).isEqualTo("a-b-c");
+        }
+
+        @Test
+        void one_argument() {
+            assertThat(run("STRING", "JOIN(\"only\")").asString()).isEqualTo("only");
+        }
+
+        @Test
+        void no_arguments_gives_an_empty_array_rather_than_null() {
+            assertThat(run("STRING", "JOIN()").asString()).isEmpty();
+        }
+
+        /** A primitive component type: the packed array must be long[], not Long[]. */
+        @Test
+        void a_primitive_element_type_is_unboxed_into_its_own_array() {
+            assertThat(run("INTEGER", "SUM_OF(1, 2, 3, 4)").asLong()).isEqualTo(10L);
+            assertThat(run("INTEGER", "SUM_OF()").asLong()).isZero();
+        }
+
+        @Test
+        void fixed_arguments_are_passed_before_the_packed_ones() {
+            assertThat(run("STRING", "TAGGED(\"t\", 1, 2)").asString()).isEqualTo("t:2");
+            assertThat(run("STRING", "TAGGED(\"t\")").asString()).isEqualTo("t:0");
+        }
+
+        /** An opaque element type: the array's component is the registered Java class. */
+        @Test
+        void opaque_values_pack_into_an_array_of_their_java_type() {
+            assertThat(run("INTEGER", "COUNT_ORDERS(LOAD_ORDER(1), LOAD_ORDER(2))").asLong())
+                    .isEqualTo(2L);
+        }
+
+        @Test
+        void an_expression_argument_is_evaluated_before_packing() {
+            assertThat(run("INTEGER", "SUM_OF(1 + 1, 2 * 3)").asLong()).isEqualTo(8L);
         }
     }
 

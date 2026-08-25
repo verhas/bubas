@@ -323,11 +323,11 @@ public final class Lowering {
                                       List<Expression> given) {
         final var arguments = new ArrayList<CoreExpression>();
         for (int i = 0; i < given.size(); i++) {
-            final var expected = signature.parameters().get(i).type();
+            final var expected = signature.typeOf(i);
             final var actual = expression(line, given.get(i));
             if (!expected.accepts(actual.type())) {
                 throw error(line, signature.name() + " takes " + expected + " for '"
-                        + signature.parameters().get(i).name() + "', but was given " + actual.type());
+                        + signature.nameOf(i) + "', but was given " + actual.type());
             }
             arguments.add(coerce(actual, expected));
         }

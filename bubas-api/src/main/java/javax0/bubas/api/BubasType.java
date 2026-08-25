@@ -24,6 +24,9 @@ public sealed interface BubasType {
     /** An array of any element type. Legal in parameter position only. */
     BubasType ANY_ARRAY = Wildcard.ANY_ARRAY;
 
+    /** Any value; a function parameter only, never a return type. */
+    BubasType ANY = Wildcard.ANY;
+
     static BubasType opaque(String name, Class<?> javaType) {
         return new Opaque(name, javaType);
     }
@@ -108,22 +111,51 @@ public sealed interface BubasType {
         }
     }
 
+    /**
+     * Types that stand for a family rather than for one thing. Both exist only in a function
+     * signature, derived from a Java parameter: neither can be written in BUBAS source, held by a
+     * variable, or returned. A wildcard that could be returned would put a value of unknown type
+     * into the script, where nothing downstream could check it.
+     */
     enum Wildcard implements BubasType {
-        ANY_ARRAY;
+        /** Any array, whatever its element type. {@code LENGTH} is the reason it exists. */
+        ANY_ARRAY {
+            @Override
+            public Class<?> javaType() {
+                return BubasArray.class;
+            }
 
-        @Override
-        public Class<?> javaType() {
-            return BubasArray.class;
-        }
+            @Override
+            public boolean accepts(BubasType source) {
+                return source instanceof ArrayOf;
+            }
 
-        @Override
-        public boolean accepts(BubasType source) {
-            return source instanceof ArrayOf;
-        }
+            @Override
+            public String toString() {
+                return "ARRAY";
+            }
+        },
 
-        @Override
-        public String toString() {
-            return "ARRAY";
+        /**
+         * Any value at all. The parameter arrives as a {@link Value}, which carries its own
+         * {@link Value#type()} — so the handler is told what it was given rather than having to
+         * guess, and the script's static typing is untouched because nothing comes back out.
+         */
+        ANY {
+            @Override
+            public Class<?> javaType() {
+                return Value.class;
+            }
+
+            @Override
+            public boolean accepts(BubasType source) {
+                return source != Scalar.VOID;
+            }
+
+            @Override
+            public String toString() {
+                return "ANY";
+            }
         }
     }
 }

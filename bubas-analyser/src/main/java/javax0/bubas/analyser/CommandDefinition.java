@@ -27,6 +27,11 @@ public record CommandDefinition(StatementPattern pattern, Implementation impleme
             throw new BubasDefinitionException(where + ": " + method.getName()
                     + " must take a StatementContext as its first parameter");
         }
+        if (method.isVarArgs()) {
+            throw new BubasDefinitionException(where + ": " + method.getName() + " is variadic, but"
+                    + " a command's parameters match the placeholders of its pattern, which are"
+                    + " fixed in number. Only a function may be variadic.");
+        }
         final var placeholders = pattern.placeholders();
         if (javaParameters.length - 1 != placeholders.size()) {
             throw new BubasDefinitionException(where + ": the pattern has " + placeholders.size()

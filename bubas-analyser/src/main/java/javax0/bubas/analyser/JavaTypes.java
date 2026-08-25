@@ -3,6 +3,7 @@ package javax0.bubas.analyser;
 import javax0.bubas.api.BubasArray;
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasType;
+import javax0.bubas.api.Value;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -23,7 +24,8 @@ final class JavaTypes {
             String.class, BubasType.STRING,
             boolean.class, BubasType.BOOLEAN,
             void.class, BubasType.VOID,
-            BubasArray.class, BubasType.ANY_ARRAY);
+            BubasArray.class, BubasType.ANY_ARRAY,
+            Value.class, BubasType.ANY);
 
     private final Map<Class<?>, BubasType.Opaque> opaqueTypes;
 
@@ -45,7 +47,7 @@ final class JavaTypes {
         }
         throw new BubasDefinitionException(where + ": " + javaType.getTypeName()
                 + " is not a BUBAS type. Expected long, BigDecimal, String, boolean, "
-                + "an array of those, BubasArray, or a registered opaque type"
+                + "an array of those, BubasArray, Value, or a registered opaque type"
                 + (Integer.class == javaType || int.class == javaType
                 ? " — INTEGER is 64-bit, so use long" : ""));
     }

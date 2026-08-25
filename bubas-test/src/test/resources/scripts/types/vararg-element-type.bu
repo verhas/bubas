@@ -1,0 +1,9 @@
+'NO-COMPILE
+' Every argument past a variadic parameter is checked against its element type, not waved through.
+' ERROR: CONCAT takes STRING for 'parts', but was given INTEGER
+' LINE: 7
+PROGRAM P
+    DECLARE s STRING
+    s = CONCAT("a", 42)
+    ASSERT "unreachable", s = ""
+END.

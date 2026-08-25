@@ -1,0 +1,14 @@
+'OK
+' A variadic function takes any number of arguments from its required count up, and the call is
+' written as a spread list rather than as an array.
+PROGRAM P
+    DECLARE s STRING
+    s = CONCAT()
+    ASSERT "no arguments is an empty result, not an error", s = ""
+    s = CONCAT("only")
+    ASSERT "one argument", s = "only"
+    s = CONCAT("a", "b", "c")
+    ASSERT "several arguments", s = "abc"
+    s = CONCAT("n=", "" + 42)
+    ASSERT "arguments are ordinary expressions", s = "n=42"
+END.

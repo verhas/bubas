@@ -270,9 +270,8 @@ public final class StatementParser {
         for (final var span : split(arguments)) {
             parsed.add(expression(line, span));
         }
-        if (parsed.size() != signature.parameters().size()) {
-            throw error(line, signature.name() + " takes " + signature.parameters().size()
-                    + " argument(s) but was given " + parsed.size() + ": " + signature);
+        if (!signature.accepts(parsed.size())) {
+            throw error(line, signature.arityComplaint(parsed.size()));
         }
         return new Statement.Call(line, signature, List.copyOf(parsed));
     }
