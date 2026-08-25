@@ -4,6 +4,7 @@ import javax0.bubas.analyser.Keywords;
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.lexer.Lexer;
+import javax0.bubas.api.TypeNames;
 import javax0.bubas.lexer.LogicalLine;
 import javax0.bubas.lexer.Token;
 import javax0.bubas.lexer.TokenType;
@@ -195,7 +196,7 @@ public final class PatternParser {
             throw error("an empty constraint");
         }
         final var head = zone.getFirst();
-        if ( head.is("ARRAY")) {
+        if (head.is(TypeNames.ARRAY)) {
             if (zone.size() == 1) {
                 return new Constraint.ArrayOf(null);
             }

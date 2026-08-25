@@ -10,6 +10,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class BubasTypeTest {
 
+    /**
+     * The one coupling {@link TypeNames} cannot enforce for itself. A scalar takes its name from
+     * its enum constant rather than from the constants class, so renaming either half silently
+     * splits the language's spelling from the spelling its diagnostics and constraints use.
+     */
+    @Test
+    void the_type_names_agree_with_the_types_themselves() {
+        assertThat(BubasType.INTEGER).hasToString(TypeNames.INTEGER);
+        assertThat(BubasType.DECIMAL).hasToString(TypeNames.DECIMAL);
+        assertThat(BubasType.STRING).hasToString(TypeNames.STRING);
+        assertThat(BubasType.BOOLEAN).hasToString(TypeNames.BOOLEAN);
+        assertThat(BubasType.ANY_ARRAY).hasToString(TypeNames.ARRAY);
+        assertThat(BubasType.ANY).hasToString(TypeNames.ANY);
+    }
+
+    @Test
+    void every_declarable_scalar_is_listed() {
+        assertThat(TypeNames.SCALARS)
+                .containsExactlyInAnyOrder(TypeNames.INTEGER, TypeNames.DECIMAL,
+                        TypeNames.STRING, TypeNames.BOOLEAN)
+                .doesNotContain(BubasType.VOID.toString());
+    }
+
     interface Document {
     }
 

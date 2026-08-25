@@ -132,7 +132,7 @@ public sealed interface BubasType {
 
             @Override
             public String toString() {
-                return "ARRAY";
+                return TypeNames.ARRAY;
             }
         },
 
@@ -154,7 +154,7 @@ public sealed interface BubasType {
 
             @Override
             public String toString() {
-                return "ANY";
+                return TypeNames.ANY;
             }
         }
     }

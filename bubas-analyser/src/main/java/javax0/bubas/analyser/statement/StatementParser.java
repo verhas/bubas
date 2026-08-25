@@ -8,6 +8,7 @@ import javax0.bubas.analyser.match.Binding;
 import javax0.bubas.analyser.match.PatternMatcher;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.api.BubasType;
+import javax0.bubas.api.TypeNames;
 import javax0.bubas.lexer.LogicalLine;
 import javax0.bubas.lexer.Token;
 import javax0.bubas.lexer.TokenType;
@@ -319,10 +320,10 @@ public final class StatementParser {
 
     private BubasType type(LogicalLine line, Token token) {
         return switch (token.text().toUpperCase(java.util.Locale.ROOT)) {
-            case "INTEGER" -> BubasType.INTEGER;
-            case "DECIMAL" -> BubasType.DECIMAL;
-            case "STRING" -> BubasType.STRING;
-            case "BOOLEAN" -> BubasType.BOOLEAN;
+            case TypeNames.INTEGER -> BubasType.INTEGER;
+            case TypeNames.DECIMAL -> BubasType.DECIMAL;
+            case TypeNames.STRING -> BubasType.STRING;
+            case TypeNames.BOOLEAN -> BubasType.BOOLEAN;
             default -> language.opaqueType(token.text()).orElseThrow(() ->
                     error(line, "'" + token.text() + "' is not a type"));
         };

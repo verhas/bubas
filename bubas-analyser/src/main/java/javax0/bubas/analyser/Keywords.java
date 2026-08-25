@@ -1,4 +1,5 @@
 package javax0.bubas.analyser;
+import javax0.bubas.api.TypeNames;
 
 import java.util.HashSet;
 import java.util.Locale;
@@ -31,7 +32,7 @@ public final class Keywords {
     public static final Set<String> EXPRESSION = Set.of("AND", "OR", "NOT", "MOD", "TRUE", "FALSE");
 
     /** The built-in scalar type names. Opaque type names join them at registration. */
-    public static final Set<String> SCALAR_TYPES = Set.of("INTEGER", "DECIMAL", "STRING", "BOOLEAN");
+    public static final Set<String> SCALAR_TYPES = TypeNames.SCALARS;
 
     /** Words that appear in block syntax without driving it. */
     public static final Set<String> CLAUSE = Set.of("THEN", "TO", "STEP", "RETURNS");

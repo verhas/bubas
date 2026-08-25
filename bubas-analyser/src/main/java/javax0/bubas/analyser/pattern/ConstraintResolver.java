@@ -2,6 +2,7 @@ package javax0.bubas.analyser.pattern;
 
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasType;
+import javax0.bubas.api.TypeNames;
 
 import java.util.List;
 import java.util.Locale;
@@ -21,10 +22,10 @@ import java.util.Map;
 public final class ConstraintResolver {
 
     private static final Map<String, BubasType> SCALARS = Map.of(
-            "INTEGER", BubasType.INTEGER,
-            "DECIMAL", BubasType.DECIMAL,
-            "STRING", BubasType.STRING,
-            "BOOLEAN", BubasType.BOOLEAN);
+            TypeNames.INTEGER, BubasType.INTEGER,
+            TypeNames.DECIMAL, BubasType.DECIMAL,
+            TypeNames.STRING, BubasType.STRING,
+            TypeNames.BOOLEAN, BubasType.BOOLEAN);
 
     private final Map<String, BubasType.Opaque> opaqueTypes;
 
@@ -70,7 +71,7 @@ public final class ConstraintResolver {
             return new ResolvedConstraint.Reference(name, exact);
         }
         final var canonical = name.toUpperCase(Locale.ROOT);
-        if ("NUMBER".equals(canonical)) {
+        if (TypeNames.NUMBER.equals(canonical)) {
             if (exact) {
                 throw error(pattern, "'/=NUMBER' asks for an exact match against NUMBER, which is "
                         + "not a type but a choice between INTEGER and DECIMAL");

@@ -25,6 +25,8 @@
         <module>bubas-analyser</module>
         <module>bubas-support</module>
         <module>bubas-runtime</module>
+        <module>bubas-bunit-commands</module>
+        <module>bubas-bunit</module>
         <module>bubas-test</module>
     </modules>
 

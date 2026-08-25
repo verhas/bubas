@@ -12,6 +12,7 @@ import javax0.bubas.analyser.symbol.SymbolTable;
 import javax0.bubas.analyser.symbol.Variable;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.api.BubasType;
+import javax0.bubas.api.TypeNames;
 import javax0.bubas.lexer.LogicalLine;
 import javax0.bubas.lexer.Token;
 
@@ -267,7 +268,7 @@ public final class Lowering {
             case ResolvedConstraint.Array(var element) -> element == null
                     ? throwNoElement(command, "this constraint")
                     : BubasType.arrayOf(requiredType(command, element));
-            case ResolvedConstraint.Numeric ignored -> throwNoElement(command, "NUMBER");
+            case ResolvedConstraint.Numeric ignored -> throwNoElement(command, TypeNames.NUMBER);
         };
     }
 

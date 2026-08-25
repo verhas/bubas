@@ -5,6 +5,7 @@ import javax0.bubas.analyser.pattern.Literal;
 import javax0.bubas.analyser.pattern.Placeholder;
 import javax0.bubas.analyser.pattern.StatementPattern;
 import javax0.bubas.lexer.TokenType;
+import javax0.bubas.api.TypeNames;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -125,7 +126,7 @@ final class PatternAutomaton {
             return false;
         }
         return switch (named.name().toUpperCase(Locale.ROOT)) {
-            case "INTEGER", "DECIMAL", "NUMBER" -> true;
+            case TypeNames.INTEGER, TypeNames.DECIMAL, TypeNames.NUMBER -> true;
             default -> false;
         };
     }

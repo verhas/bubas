@@ -2,6 +2,7 @@ package javax0.bubas.analyser.match;
 
 import javax0.bubas.analyser.pattern.*;
 import javax0.bubas.api.BubasException;
+import javax0.bubas.api.TypeNames;
 import javax0.bubas.lexer.LogicalLine;
 import javax0.bubas.lexer.Token;
 import javax0.bubas.lexer.TokenType;
@@ -204,11 +205,11 @@ public final class PatternMatcher {
             return number || token.type() == TokenType.STRING || isBoolean(token);
         }
         return switch (named.name().toUpperCase(java.util.Locale.ROOT)) {
-            case "INTEGER" -> token.type() == TokenType.INTEGER;
-            case "DECIMAL" -> token.type() == TokenType.DECIMAL;
-            case "NUMBER" -> number;
-            case "STRING" -> token.type() == TokenType.STRING;
-            case "BOOLEAN" -> isBoolean(token);
+            case TypeNames.INTEGER -> token.type() == TokenType.INTEGER;
+            case TypeNames.DECIMAL -> token.type() == TokenType.DECIMAL;
+            case TypeNames.NUMBER -> number;
+            case TypeNames.STRING -> token.type() == TokenType.STRING;
+            case TypeNames.BOOLEAN -> isBoolean(token);
             default -> false;
         };
     }
