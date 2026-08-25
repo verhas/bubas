@@ -26,6 +26,7 @@
         <module>bubas-support</module>
         <module>bubas-runtime</module>
         <module>bubas-bunit</module>
+        <module>bubas-bunit-matchers</module>
         <module>bubas-bunit-commands</module>
         <module>bubas-bunit-standard</module>
         <module>bubas-test</module>

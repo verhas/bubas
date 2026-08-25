@@ -10,11 +10,13 @@ import javax0.bubas.api.Registrar;
 import javax0.bubas.api.StatementContext;
 import javax0.bubas.api.Value;
 import javax0.bubas.api.VariableArg;
+import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -180,6 +182,134 @@ class BubasLanguageTest {
                     .defineStatement("PAY {expression:x} VIA CARD", Approve.class)
                     .defineStatement("PAY {expression:x} FROM BANK", Approve.class)
                     .seal()).doesNotThrowAnyException();
+        }
+    }
+
+    @Nested
+    @DisplayName("defining and overriding")
+    class Overriding {
+
+        public static final class OtherLoad {
+            public Order call(Context ctx, long id, String region) {
+                return new Order();
+            }
+        }
+
+        /** These fail while the language is being described, not at seal, so the whole chain runs here. */
+        private static String error(ThrowableAssert.ThrowingCallable building) {
+            return catchThrowableOfType(BubasDefinitionException.class, building).getMessage();
+        }
+
+        private static Map<String, Class<?>> map(String name, Class<?> implementation) {
+            return Map.of(name, implementation);
+        }
+
+        @Test
+        void defining_the_same_name_twice_is_an_error() {
+            assertThat(error(() -> base().defineFunction("LOAD_ORDER", OtherLoad.class)))
+                    .contains("function 'LOAD_ORDER' is already defined")
+                    .contains("Say override() before it to replace it deliberately");
+        }
+
+        @Test
+        void a_name_differing_only_in_case_is_the_same_name() {
+            assertThat(error(() -> base().defineFunction("load_order", OtherLoad.class)))
+                    .contains("function 'load_order' is already defined as 'LOAD_ORDER'");
+        }
+
+        @Test
+        void an_opaque_type_defined_twice_is_an_error() {
+            assertThat(error(() -> base().defineOpaqueType("Order", Customer.class)))
+                    .contains("opaque type 'Order' is already defined");
+        }
+
+        @Test
+        void a_statement_defined_twice_is_an_error() {
+            final var pattern = "VALIDATE {initialized > var:item} AGAINST {expression:rules}";
+            assertThat(error(() -> base().defineStatement(pattern, Validate.class)
+                    .defineStatement(pattern, Validate.class)))
+                    .contains("statement '" + pattern + "' is already defined");
+        }
+
+        @Test
+        void override_replaces_what_is_there() {
+            final var language = base().override()
+                    .defineFunction("LOAD_ORDER", OtherLoad.class).seal();
+            assertThat(language.function("LOAD_ORDER").orElseThrow().parameters()).hasSize(2);
+            assertThat(language.functions()).hasSize(1);
+        }
+
+        @Test
+        void override_uses_the_new_spelling_of_the_name() {
+            final var language = base().override()
+                    .defineFunction("load_order", OtherLoad.class).seal();
+            assertThat(language.functions()).extracting(FunctionSignature::name)
+                    .containsExactly("load_order");
+        }
+
+        /** An override of nothing is a rename nobody finished, or a typo. */
+        @Test
+        void overriding_something_that_is_not_there_is_an_error() {
+            assertThat(error(() -> base().override().defineFunction("NO_SUCH", OtherLoad.class)))
+                    .contains("there is no function 'NO_SUCH' to override");
+        }
+
+        @Test
+        void the_flag_covers_exactly_one_definition() {
+            assertThat(error(() -> base()
+                    .override().defineFunction("LOAD_ORDER", OtherLoad.class)
+                    .defineFunction("LOAD_ORDER", OtherLoad.class)))
+                    .contains("is already defined");
+        }
+
+        @Test
+        void override_does_not_extend_to_a_map() {
+            assertThat(error(() -> base().override()
+                    .defineFunctions(map("LOAD_ORDER", OtherLoad.class))))
+                    .contains("override() is for one definition")
+                    .contains("overrideAll()");
+        }
+
+        @Test
+        void overrideAll_does_not_apply_to_a_single_definition() {
+            assertThat(error(() -> base().overrideAll()
+                    .defineFunction("LOAD_ORDER", OtherLoad.class)))
+                    .contains("overrideAll() is for a map of definitions")
+                    .contains("override()");
+        }
+
+        @Test
+        void overrideAll_replaces_every_name_in_the_map() {
+            final var language = base().overrideAll()
+                    .defineFunctions(map("LOAD_ORDER", OtherLoad.class)).seal();
+            assertThat(language.function("LOAD_ORDER").orElseThrow().parameters()).hasSize(2);
+        }
+
+        @Test
+        void overrideAll_fails_when_any_name_is_absent() {
+            assertThat(error(() -> base().overrideAll()
+                    .defineFunctions(map("NO_SUCH", OtherLoad.class))))
+                    .contains("there is no function 'NO_SUCH' to override");
+        }
+
+        /** A bundle decides its own definitions; an override has to name the one thing it replaces. */
+        @Test
+        void a_pending_override_may_not_be_carried_into_a_bundle() {
+            assertThat(error(() -> base().override()
+                    .install(registrar -> registrar.defineFunction("X", OtherLoad.class))))
+                    .contains("install() follows override()");
+        }
+
+        @Test
+        void two_flags_in_a_row_are_an_error() {
+            assertThat(error(() -> base().override().override()))
+                    .contains("override() follows override() with no definition between them");
+        }
+
+        @Test
+        void a_flag_left_dangling_at_seal_is_an_error() {
+            assertThat(rejection(base().override()))
+                    .contains("override() was called but nothing was defined after it");
         }
     }
 

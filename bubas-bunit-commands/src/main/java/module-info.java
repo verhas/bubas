@@ -13,5 +13,6 @@
 module bubas.bunit.commands {
     requires bubas.api;
     requires bubas.bunit;
+    requires bubas.bunit.matchers;
     exports javax0.bubas.bunit.commands;
 }

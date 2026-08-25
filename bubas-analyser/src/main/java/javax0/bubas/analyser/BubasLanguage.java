@@ -128,50 +128,160 @@ public final class BubasLanguage {
         private final Map<String, Class<?>> statements = new LinkedHashMap<>();
         private final Map<Class<?>, Map<String, Object>> services = new LinkedHashMap<>();
         private boolean skipOverlapAnalysis;
+        private Mode mode = Mode.DEFINE;
+
+        /** What the next definition is allowed to do to a name that already exists. */
+        private enum Mode {
+            /** Add. A name already present is an error. */
+            DEFINE,
+            /** Replace exactly one. A name not present is an error. */
+            OVERRIDE_ONE,
+            /** Replace a whole map. Any name not present is an error. */
+            OVERRIDE_ALL
+        }
 
         private Builder() {
         }
 
+        /**
+         * Makes the next single definition replace one that exists, and fail if none does.
+         * <p>
+         * Replacing is deliberate or it is a mistake, and until now it was neither: the second
+         * definition simply won. Two bundles both defining {@code LENGTH} would leave a language
+         * whose behaviour depended on installation order, with nothing said — the same hazard
+         * opt-in registration exists to prevent, arriving by a different door.
+         * <p>
+         * It fails when the name is absent because an override of nothing is a rename nobody
+         * finished, or a typo. Saying so is the point.
+         * <p>
+         * The flag covers exactly one definition and is then spent, so it cannot drift down a long
+         * chain and quietly authorise something further along.
+         */
+        public Builder override() {
+            return mode(Mode.OVERRIDE_ONE, "override()");
+        }
+
+        /**
+         * Makes the next map definition replace what it names, and fail if any name is absent.
+         * <p>
+         * {@link #override()} does not extend to a map: a bundle's whole vocabulary being replaced
+         * silently because one flag was still pending is exactly what the single-use rule is for.
+         */
+        public Builder overrideAll() {
+            return mode(Mode.OVERRIDE_ALL, "overrideAll()");
+        }
+
+        private Builder mode(Mode wanted, String called) {
+            if (mode != Mode.DEFINE) {
+                throw new BubasDefinitionException(called + " follows "
+                        + (mode == Mode.OVERRIDE_ONE ? "override()" : "overrideAll()")
+                        + " with no definition between them");
+            }
+            mode = wanted;
+            return this;
+        }
+
         @Override
         public Builder defineOpaqueType(String name, Class<?> javaType) {
-            opaqueTypes.put(name, javaType);
-            return this;
+            return one(opaqueTypes, "opaque type", name, javaType, true);
         }
 
         @Override
         public Builder defineFunction(String name, Class<?> implementation) {
-            functions.put(name, implementation);
-            return this;
+            return one(functions, "function", name, implementation, true);
         }
 
         @Override
         public Builder defineStatement(String pattern, Class<?> implementation) {
-            statements.put(pattern, implementation);
-            return this;
+            return one(statements, "statement", pattern, implementation, false);
         }
 
         @Override
         public Builder defineOpaqueTypes(Map<String, Class<?>> javaTypes) {
-            javaTypes.forEach(this::defineOpaqueType);
-            return this;
+            return many(opaqueTypes, "opaque type", javaTypes, true);
         }
 
         @Override
         public Builder defineFunctions(Map<String, Class<?>> implementations) {
-            implementations.forEach(this::defineFunction);
-            return this;
+            return many(functions, "function", implementations, true);
         }
 
         @Override
         public Builder defineStatements(Map<String, Class<?>> implementations) {
-            implementations.forEach(this::defineStatement);
-            return this;
+            return many(statements, "statement", implementations, false);
         }
 
         @Override
         public Builder install(Consumer<Registrar> installer) {
+            if (mode != Mode.DEFINE) {
+                throw new BubasDefinitionException("install() follows "
+                        + (mode == Mode.OVERRIDE_ONE ? "override()" : "overrideAll()")
+                        + "; a bundle decides its own definitions, and an override has to name"
+                        + " the one thing it replaces");
+            }
             installer.accept(this);
             return this;
+        }
+
+        private Builder one(Map<String, Class<?>> into, String kind, String name,
+                            Class<?> implementation, boolean ignoringCase) {
+            if (mode == Mode.OVERRIDE_ALL) {
+                throw new BubasDefinitionException("overrideAll() is for a map of definitions;"
+                        + " a single " + kind + " is overridden with override()");
+            }
+            put(into, kind, name, implementation, ignoringCase, mode == Mode.OVERRIDE_ONE);
+            mode = Mode.DEFINE;
+            return this;
+        }
+
+        private Builder many(Map<String, Class<?>> into, String kind,
+                             Map<String, Class<?>> entries, boolean ignoringCase) {
+            if (mode == Mode.OVERRIDE_ONE) {
+                throw new BubasDefinitionException("override() is for one definition;"
+                        + " a map of " + kind + "s is overridden with overrideAll()");
+            }
+            final var overriding = mode == Mode.OVERRIDE_ALL;
+            entries.forEach((name, implementation) ->
+                    put(into, kind, name, implementation, ignoringCase, overriding));
+            mode = Mode.DEFINE;
+            return this;
+        }
+
+        /**
+         * @param ignoringCase names are unique ignoring case, as everywhere else in the language.
+         *                     A statement is keyed by its pattern text instead, where case is
+         *                     immaterial anyway: two patterns differing only in a keyword's case
+         *                     match the same lines, and overlap analysis rejects that pair.
+         */
+        private void put(Map<String, Class<?>> into, String kind, String name,
+                         Class<?> implementation, boolean ignoringCase, boolean overriding) {
+            final var existing = key(into, name, ignoringCase);
+            if (overriding && existing == null) {
+                throw new BubasDefinitionException("there is no " + kind + " '" + name
+                        + "' to override");
+            }
+            if (!overriding && existing != null) {
+                throw new BubasDefinitionException(kind + " '" + name + "' is already defined"
+                        + (existing.equals(name) ? "" : " as '" + existing + "'")
+                        + ". Say override() before it to replace it deliberately.");
+            }
+            if (existing != null) {
+                into.remove(existing);
+            }
+            into.put(name, implementation);
+        }
+
+        /** The key this name would collide with, or {@code null}. */
+        private static String key(Map<String, Class<?>> into, String name, boolean ignoringCase) {
+            if (into.containsKey(name)) {
+                return name;
+            }
+            if (!ignoringCase) {
+                return null;
+            }
+            return into.keySet().stream()
+                    .filter(present -> Keywords.canonical(present).equals(Keywords.canonical(name)))
+                    .findFirst().orElse(null);
         }
 
         /**
@@ -203,6 +313,11 @@ public final class BubasLanguage {
         }
 
         public BubasLanguage seal() {
+            if (mode != Mode.DEFINE) {
+                throw new BubasDefinitionException(
+                        (mode == Mode.OVERRIDE_ONE ? "override()" : "overrideAll()")
+                                + " was called but nothing was defined after it");
+            }
             final var types = opaqueTypes();
             final var patterns = statements.keySet().stream().map(PatternParser::parse).toList();
             checkNamesAreDistinct(patterns);

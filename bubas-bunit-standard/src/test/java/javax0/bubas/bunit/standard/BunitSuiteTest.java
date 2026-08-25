@@ -36,7 +36,7 @@ class BunitSuiteTest {
 
     private static final String PASSES = """
             PROGRAM EuRate
-                "RATE" WITH "EU" RETURNS 0.10
+                "RATE" WITH ARGS("EU") RETURNS 0.10
                 ARGUMENT "amount" IS 100.00
                 ARGUMENT "region" IS "EU"
                 RUN
@@ -46,7 +46,7 @@ class BunitSuiteTest {
 
     private static final String FAILS = """
             PROGRAM WrongExpectation
-                "RATE" WITH "EU" RETURNS 0.10
+                "RATE" WITH ARGS("EU") RETURNS 0.10
                 ARGUMENT "amount" IS 100.00
                 ARGUMENT "region" IS "EU"
                 RUN

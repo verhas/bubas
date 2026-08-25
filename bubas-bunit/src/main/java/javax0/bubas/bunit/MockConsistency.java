@@ -5,6 +5,7 @@ import javax0.bubas.analyser.BubasProgram;
 import javax0.bubas.analyser.CommandDefinition;
 import javax0.bubas.analyser.FunctionSignature;
 import javax0.bubas.analyser.core.CoreArgument;
+import javax0.bubas.analyser.core.CoreExpression;
 import javax0.bubas.analyser.core.CoreStatement;
 import javax0.bubas.analyser.pattern.Placeholder;
 import javax0.bubas.analyser.pattern.Postcondition;
@@ -188,22 +189,54 @@ public final class MockConsistency {
     }
 
     /**
+     * How many arguments a statement declares, or {@code null} when it does not say.
+     * <p>
+     * Either it names its argument placeholders, or it names one placeholder holding a call whose
+     * own arguments are the count — {@code ARGS(1, 2)}. The second reads the shape of the
+     * expression, which is acceptable here because this is static analysis walking a tree, and
+     * because it reads the shape rather than the name: a vocabulary whose collector is not called
+     * {@code ARGS} works unchanged.
+     */
+    private static Integer argumentCount(CoreStatement.Invoke invoke, Class<?> owner,
+                                         LogicalLine line) {
+        final var named = owner.getAnnotation(MatchesArguments.class);
+        if (named != null) {
+            for (final var placeholder : named.value()) {
+                if (!invoke.arguments().containsKey(placeholder)) {
+                    throw error(line, "@MatchesArguments names the placeholder '" + placeholder
+                            + "', which this pattern does not have: "
+                            + invoke.definition().pattern());
+                }
+            }
+            return named.value().length;
+        }
+        final var counted = owner.getAnnotation(CountsArguments.class);
+        if (counted == null) {
+            return null;
+        }
+        final var argument = invoke.arguments().get(counted.value());
+        if (argument == null) {
+            throw error(line, "@CountsArguments names the placeholder '" + counted.value()
+                    + "', which this pattern does not have: " + invoke.definition().pattern());
+        }
+        // Only a direct call can be counted. A variable holding an argument list is legal BUBAS and
+        // simply not countable here, so the count is skipped rather than guessed at.
+        return argument instanceof CoreArgument.Lazy(var expression, var ignored)
+                && expression instanceof CoreExpression.Call call
+                ? call.arguments().size()
+                : null;
+    }
+
+    /**
      * A mock declared for the wrong number of arguments matches nothing, and reads at run time as a
      * mock that simply never fired. Counting here says which it is.
      */
     private void arguments(CoreStatement.Invoke invoke, Class<?> owner, String target,
                            LogicalLine line) {
-        final var declared = owner.getAnnotation(MatchesArguments.class);
-        if (declared == null) {
+        final Integer given = argumentCount(invoke, owner, line);
+        if (given == null) {
             return;
         }
-        for (final var placeholder : declared.value()) {
-            if (!invoke.arguments().containsKey(placeholder)) {
-                throw error(line, "@MatchesArguments names the placeholder '" + placeholder
-                        + "', which this pattern does not have: " + invoke.definition().pattern());
-            }
-        }
-        final var given = declared.value().length;
         final var signature = subject.function(target).orElse(null);
         if (signature != null) {
             if (!signature.accepts(given)) {

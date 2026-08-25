@@ -13,6 +13,7 @@ module bubas.bunit.standard {
     requires transitive bubas.api;
     requires transitive bubas.bunit;
     requires bubas.bunit.commands;
+    requires transitive bubas.bunit.matchers;
     requires bubas.analyser;
     requires bubas.support;
     exports javax0.bubas.bunit.standard;

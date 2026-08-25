@@ -89,8 +89,8 @@ class BunitRunnerTest {
     void a_passing_test_reports_what_the_subject_did() {
         final var result = run("""
                 PROGRAM OverLimitIsRejected
-                    "LOAD_ORDER"  WITH 42   RETURNS "o1"
-                    "ORDER_TOTAL" WITH "o1" RETURNS 1500.00
+                    "LOAD_ORDER"  WITH ARGS(42) RETURNS "o1"
+                    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 1500.00
                     "APPROVE _" IS MOCKED
 
                     ARGUMENT "orderId" IS 42
@@ -112,8 +112,8 @@ class BunitRunnerTest {
     void a_token_flows_from_one_mock_into_the_next() {
         final var result = run("""
                 PROGRAM UnderLimitIsApproved
-                    "LOAD_ORDER"  WITH 7    RETURNS "o1"
-                    "ORDER_TOTAL" WITH "o1" RETURNS 10.00
+                    "LOAD_ORDER"  WITH ARGS(7) RETURNS "o1"
+                    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 10.00
                     "APPROVE _" IS MOCKED
 
                     ARGUMENT "orderId" IS 7
@@ -132,8 +132,8 @@ class BunitRunnerTest {
     void a_failed_expectation_names_its_own_line() {
         final var result = run("""
                 PROGRAM WrongExpectation
-                    "LOAD_ORDER"  WITH 7    RETURNS "o1"
-                    "ORDER_TOTAL" WITH "o1" RETURNS 10.00
+                    "LOAD_ORDER"  WITH ARGS(7) RETURNS "o1"
+                    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 10.00
                     "APPROVE _" IS MOCKED
                     ARGUMENT "orderId" IS 7
                     ARGUMENT "limit"   IS 1000.00
@@ -175,7 +175,7 @@ class BunitRunnerTest {
                     ARGUMENT "limit" IS 10.00
                     RUN
                     RESULT IS FALSE
-                    "LOG_EVENT _, _" WAS CALLED WITH "INFO", "over limit"
+                    "LOG_EVENT _, _" WAS CALLED WITH ARGS("INFO", "over limit")
                 END.
                 """);
         assertThat(result.passed()).as("%s", result.diagnostic()).isTrue();
@@ -193,7 +193,7 @@ class BunitRunnerTest {
                     ARGUMENT "orderId" IS 1
                     ARGUMENT "limit" IS 10.00
                     RUN
-                    "LOG_EVENT _, _" WAS CALLED WITH "WARN", "over limit"
+                    "LOG_EVENT _, _" WAS CALLED WITH ARGS("WARN", "over limit")
                 END.
                 """);
         assertThat(result.passed()).isFalse();

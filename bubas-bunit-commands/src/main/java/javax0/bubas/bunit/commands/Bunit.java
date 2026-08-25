@@ -47,7 +47,6 @@ public final class Bunit {
         final var map = new LinkedHashMap<String, Class<?>>();
         map.put(Mock.PATTERN, Mock.class);
         map.put(MockWith.PATTERN, MockWith.class);
-        map.put(MockWith2.PATTERN, MockWith2.class);
         map.put(MockCommand.PATTERN, MockCommand.class);
         map.put(Sets.PATTERN, Sets.class);
         map.put(Argument.PATTERN, Argument.class);
@@ -57,7 +56,6 @@ public final class Bunit {
         map.put(ExpectCalled.PATTERN, ExpectCalled.class);
         map.put(ExpectNotCalled.PATTERN, ExpectNotCalled.class);
         map.put(ExpectCalledWith.PATTERN, ExpectCalledWith.class);
-        map.put(ExpectCalledWith2.PATTERN, ExpectCalledWith2.class);
         return Collections.unmodifiableMap(map);
     }
 

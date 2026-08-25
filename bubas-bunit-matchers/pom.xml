@@ -8,9 +8,9 @@
         <artifactId>bubas-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>bubas-bunit-commands</artifactId>
-    <name>BUBAS BUnit Commands</name>
-    <description>The statements a BUBAS unit test is written with, and the recorder they call</description>
+    <artifactId>bubas-bunit-matchers</artifactId>
+    <name>BUBAS BUnit Matchers</name>
+    <description>Argument lists and the matchers that judge them, usable by any BUNIT vocabulary</description>
     <dependencies>
         <dependency>
             <groupId>com.javax0.bubas</groupId>
@@ -19,11 +19,6 @@
         <dependency>
             <groupId>com.javax0.bubas</groupId>
             <artifactId>bubas-bunit</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.javax0.bubas</groupId>
-            <artifactId>bubas-bunit-matchers</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

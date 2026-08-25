@@ -1,5 +1,6 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.Matching;
 import javax0.bubas.bunit.Expectation;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
@@ -17,9 +18,9 @@ public final class ExpectResult {
                 ctx.error("the subject failed instead of returning a value: " + failure));
         final var expected = value.evaluate();
         final var actual = recorder.result().orElse(null);
-        if (!Values.same(expected, actual)) {
-            ctx.error("expected the result to be " + Values.show(expected)
-                    + ", but it was " + Values.show(actual));
+        if (!Matching.same(expected, actual)) {
+            ctx.error("expected the result to be " + Matching.show(expected)
+                    + ", but it was " + Matching.show(actual));
         }
     }
 }

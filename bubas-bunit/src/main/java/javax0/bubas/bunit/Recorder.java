@@ -11,13 +11,11 @@ import javax0.bubas.api.Value;
 import javax0.bubas.api.VariableArg;
 import javax0.bubas.runtime.Interpreter;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -135,7 +133,8 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
     public Value onFunction(String name, List<Value> arguments) {
         record(name, arguments);
         return functions.get(canonical(name)).stream()
-                .filter(stub -> stub.anyArguments() || same(stub.arguments(), arguments))
+                .filter(stub -> stub.anyArguments()
+                        || Matching.same(stub.arguments(), arguments))
                 .findFirst()
                 .map(Stub::result)
                 .orElse(null);
@@ -180,7 +179,7 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
         calls.computeIfAbsent(canonical(name), ignored -> new ArrayList<>())
                 .add(List.copyOf(arguments));
         transcript.add(name + "(" + arguments.stream()
-                .map(Recorder::show).reduce((a, b) -> a + ", " + b).orElse("") + ")");
+                .map(Matching::show).reduce((a, b) -> a + ", " + b).orElse("") + ")");
     }
 
     /**
@@ -215,29 +214,6 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
             return new Boxed(expected, new Token(given.asString()));
         }
         return given;
-    }
-
-    private static boolean same(List<Value> expected, List<Value> actual) {
-        if (expected.size() != actual.size()) {
-            return false;
-        }
-        for (int i = 0; i < expected.size(); i++) {
-            final var a = expected.get(i) == null ? null : expected.get(i).as(Object.class);
-            final var b = actual.get(i) == null ? null : actual.get(i).as(Object.class);
-            if (a instanceof BigDecimal one && b instanceof BigDecimal other) {
-                if (one.compareTo(other) != 0) {
-                    return false;
-                }
-            } else if (!Objects.equals(a, b)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static String show(Value value) {
-        final var raw = value == null ? null : value.as(Object.class);
-        return raw instanceof String text ? '"' + text + '"' : String.valueOf(raw);
     }
 
     private static String canonical(String name) {

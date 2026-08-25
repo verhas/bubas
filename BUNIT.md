@@ -6,8 +6,8 @@ the questions still open are gathered at the end.
 
 ```basic
 PROGRAM OverLimitIsRejected
-    "LOAD_ORDER"  WITH 42   RETURNS "o1"
-    "ORDER_TOTAL" WITH "o1" RETURNS 1500.00
+    "LOAD_ORDER"  WITH ARGS(42)   RETURNS "o1"
+    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 1500.00
     "APPROVE _" IS MOCKED
 
     ARGUMENT "orderId" IS 42
@@ -149,8 +149,8 @@ and works unchanged against any embedder's language.
 
 ```basic
 PROGRAM ApproveOrderOverLimit
-    "LOAD_ORDER"  WITH 42   RETURNS "o1"
-    "ORDER_TOTAL" WITH "o1" RETURNS 1500.00
+    "LOAD_ORDER"  WITH ARGS(42)   RETURNS "o1"
+    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 1500.00
 
     ARGUMENT "orderId" IS 42
     ARGUMENT "limit"   IS 1000.00
@@ -221,16 +221,61 @@ only thing that could go there, since BUBAS cannot construct an opaque value and
 test. **Everything else the command writes must be set by the mock**, and a mock that fails to set
 it is an error at mock-assembly time, not a surprise at run time.
 
-**Statement patterns have no variadic form.** This is about patterns, not calls: a function call
-`PAIR("a", "b")` is parsed by the expression parser and multi-argument calls are fine. But inside a
-*pattern* an expression stops at a comma, so one placeholder cannot absorb an argument list. BUNIT
-ships one pattern per arity — `WITH {e}`, `WITH {e}, {e}`, and so on to some N — which is a hard
-ceiling on how many arguments a mocked call may be written with, independent of whether BUBAS
-functions themselves gain varargs.
+**Statement patterns have no variadic form** — which is why an argument list is a *value*. This is
+about patterns, not calls: a function call `PAIR("a", "b")` is parsed by the expression parser and
+multi-argument calls are fine. But inside a *pattern* an expression stops at a comma, so one
+placeholder takes one argument and a pattern per arity is the only alternative — a ceiling rather
+than a design, and one that made a three-argument function unmockable.
+
+`ARGS(42, "EU")` collects them into an `Arguments` value instead, and the pattern reads
+`{literal/STRING:name} WITH {expression/Arguments:args} RETURNS {expression:value}`. One pattern,
+any count. Because `Arguments` is an opaque type the **type checker** enforces the form: nothing but
+a call to `ARGS` can produce one.
+
+The two forms cannot coexist. `{expression:a}` and `{expression/Arguments:a}` are the same shape in
+token classes, so overlap analysis rejects the pair — the collecting form replaces the fixed-arity
+ones rather than joining them.
 
 **No user-defined blocks.** `IF`, `DO` and `FOR` are structural, not pattern-defined, so BUNIT
 cannot introduce a `TEST … END TEST` block. One file is one test case, exactly as the `.bu` corpus
 in `bubas-test` already works.
+
+## Argument lists and matchers
+
+`ARGS` collects any number of arguments into a value, and any of them may be a **matcher** — an
+object that judges the argument instead of being compared to it.
+
+```basic
+"RATE" WITH ARGS("EU", BETWEEN(1, 5)) RETURNS 0.20
+"LOG _, _" WAS CALLED WITH ARGS("INFO", CONTAINS("rate for EU"))
+```
+
+`ARGS(parts ANY...) -> Arguments` is variadic and takes `ANY`, so values and matchers mix without
+anything being declared twice. `Matcher` has two methods: `matches(Value)` and `describe()` — the
+second so a failure reads *expected … containing "over limit"* rather than leaving the reader to
+guess what was wanted.
+
+**They are their own module.** `bubas-bunit-matchers` depends on the framework and not on the
+statements, so a vocabulary that replaces every statement still gets `ARGS` and the matchers
+unchanged. A matcher is an ordinary object judging an ordinary value, which is also why its tests
+need no language at all.
+
+Two ship: `BETWEEN(low, high)`, inclusive at both ends, taking either numeric type because its
+bounds are DECIMAL; and `CONTAINS(text)`, the commonest string expectation by a wide margin.
+
+Named but deliberately absent, each a few lines and none yet asked for: `ANYTHING()`,
+`GREATER_THAN`, `AT_LEAST`, `LESS_THAN`, `AT_MOST`, `NOT`, `STARTS_WITH`, `ENDS_WITH`, `MATCHES`.
+Present tense, not `-ING`: a matcher states what always holds of the argument, not what is happening
+to it, and the shorter form reads better. An embedder needing one writes it against `Matcher` and
+registers it alongside the standard set — nothing in the framework has to change, and the tests of
+the matchers module show exactly that being done.
+
+`MATCHES(regex)` is the one I would think hardest about: it embeds a second language inside a
+language whose whole claim is that a domain expert can read it.
+
+**A matcher judges whatever it is handed.** A `BETWEEN` given a STRING does not match; it does not
+fail. An expectation that a mismatched *type* should be an error is a different assertion, and
+conflating the two would make every matcher a type check as well.
 
 ## The mock consistency checker
 
@@ -250,7 +295,7 @@ What it catches, all before the subject runs:
 - a supply on one path and not on another
 - a name the subject's language does not have, as a function or a command
 - a supply for a variable the command does not write, or for a command that is not mocked
-- a mock declared for the wrong number of arguments
+- a mock declared for the wrong number of arguments, counted through `ARGS` as well
 - a mock answering a type the function does not return
 - an argument for a parameter the subject does not take
 - an expectation before the act, or a test with no act at all
@@ -262,6 +307,13 @@ annotations the framework defines — `@NamesTarget`, `@DeclaresMock`, `@Supplie
 placeholder in the core tree. So it learns that `"LOAD_ORDER" RETURNS 1` is about `LOAD_ORDER`
 because the class said the name is in the placeholder called `name`, never because anything in the
 framework knows the word `RETURNS`.
+
+Counting arguments is the one place the checker reads the *shape* of an expression rather than a
+constant: `@CountsArguments` says which placeholder holds a call whose own arguments are the count.
+That is acceptable here and nowhere else — it is static analysis, done once, by the component whose
+job is to walk the tree, and it reads the shape rather than the name, so a vocabulary whose
+collector is not called `ARGS` works unchanged. A *handler* doing the same at run time is the thing
+to avoid, and cannot be done anyway: `ExpressionArg` offers only evaluation.
 
 Those placeholders must be `{literal/STRING:…}`. The check runs before the test does, so a computed
 name would not be there to read, and the checker says so rather than skipping the statement.
@@ -338,24 +390,8 @@ Prerequisites, not details:
    signature before dispatch, so this is decidable rather than magic, and reportable when it
    surprises someone. A token in an `ANY` position stays ambiguous and is rejected, with a
    diagnostic saying to mock a concrete signature instead.
-2. **Arity ceiling — resolved in principle, not yet built.** Mocks take 0, 1 or 2 arguments today
-   and one pattern per arity is a ceiling, not a design. The answer is not more arities: register an
-   opaque `Arguments` type and a variadic `ARGS(parts ANY...) -> Arguments`, then write the pattern
-   as `{literal/STRING:name} WITH {expression/Arguments:args} RETURNS {expression:value}`. One
-   pattern, any number of arguments, and the *type checker* enforces the form because the only way
-   to make an `Arguments` is to call `ARGS`.
-
-   The alternative considered and rejected was a marker function whose call the handler inspects for
-   shape. It cannot work as stated — `ExpressionArg` offers only `evaluate()`, so a handler cannot
-   see the shape of what it was given — and making it work would mean exposing the AST to embedder
-   code, which invites every DSL author to pattern-match on expressions. It would also require a
-   function that must never be called, a hole in the language's own rules. Expression-shape
-   inspection is the thing to avoid, not the tool to reach for.
-3. **Argument matchers.** Comparing by value is all an expectation can do today. The same shape
-   answers it: matcher functions returning an opaque `Matcher` — `ANYTHING()`, `GREATER_THAN(100)`,
-   `EXACTLY("EU")` — which `ARGS` accepts alongside plain values because it takes `ANY...`.
-   Comparison then asks whether an element is a `Matcher` and applies it, or compares by value.
-   Extensible with no new syntax, which is how Mockito and Hamcrest solved it.
+2. ~~Arity ceiling.~~ **Gone.** `ARGS` collects an argument list into a value; see above.
+3. ~~Argument matchers.~~ **Built**, two of them. See below.
 4. **Ordering assertions.** Whether call order is assertable, and with what syntax.
 5. **Unmocked calls.** Does calling an unmocked function fail the test, run for real, or return a
    default? Failing is the strict answer and matches the language's temperament. Today it runs for
@@ -372,7 +408,8 @@ Three, and the direction between them is the design rather than an accident of p
 | module | is | depends on |
 |---|---|---|
 | `bubas-bunit` | the mocking framework — recorder, interceptor, consistency checker, `TestResult` | api, analyser, runtime |
-| `bubas-bunit-commands` | one DSL over it | api, **bunit** |
+| `bubas-bunit-matchers` | argument lists and matchers, for any vocabulary | api, bunit |
+| `bubas-bunit-commands` | one DSL over it | api, bunit, matchers |
 | `bubas-bunit-standard` | the assembly an application depends on | both, plus analyser and support |
 
 **The framework must not depend on the DSL.** It would be a framework in name only: swapping the

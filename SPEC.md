@@ -1264,6 +1264,29 @@ BubasLanguage lang = BubasLanguage.builder()
 Every definition is one call returning the builder. There is no nested builder and no terminal
 method, because the class carries everything a nested builder used to declare.
 
+#### Defining twice
+
+A name may be defined once. Defining it again — a function, an opaque type, or a statement with the
+same pattern — is an error naming both, because it used to be neither deliberate nor reported: the
+second definition simply won, and a language whose behaviour depended on the order two bundles were
+installed in said nothing about it.
+
+Replacing is available and has to be said:
+
+```java
+BubasLanguage.builder()
+    .install(Standard::register)
+    .override().defineFunction("LENGTH", CountingCharacters.class)
+    .seal();
+```
+
+`override()` covers exactly one definition and is then spent, so it cannot drift down a chain and
+authorise something further along. It fails when the name is *absent*, because an override of
+nothing is a rename nobody finished. A map of definitions is replaced with `overrideAll()` instead;
+neither form substitutes for the other, and neither may be left pending when `install()` or `seal()`
+is reached — a bundle decides its own definitions, and an override has to name the one thing it
+replaces.
+
 #### Services on the language and on the run
 
 A service registered on the builder is shared by every interpreter that language produces, which is

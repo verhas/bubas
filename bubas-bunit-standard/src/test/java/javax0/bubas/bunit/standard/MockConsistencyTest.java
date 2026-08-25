@@ -216,7 +216,7 @@ class MockConsistencyTest {
     void a_mock_declared_for_the_wrong_number_of_arguments_is_refused() {
         final var result = check("""
                 PROGRAM WrongArity
-                    "LOAD_ORDER" WITH 1, 2 RETURNS "o1"
+                    "LOAD_ORDER" WITH ARGS(1, 2) RETURNS "o1"
                     "COUNT ORDERS INTO _ FOR _" IS MOCKED
                     "COUNT ORDERS INTO _ FOR _" SETS "total" TO 1
                     RUN

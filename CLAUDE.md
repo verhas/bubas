@@ -114,6 +114,13 @@ mistaken for oversights:
   reads those. Adding a `switch` on a keyword there would make the vocabulary unswappable, which is
   the only thing the module split buys. It is the same rule as the language's own: `DECLARE` is an
   ordinary pattern, not a built-in.
+- **A name is defined once; replacing it must be said with `override()`.** Redefinition used to be
+  silently accepted, the later definition winning — so two bundles both defining `LENGTH` produced a
+  language whose behaviour depended on installation order, with no diagnostic. That is the hazard
+  opt-in registration exists to prevent, arriving by a different door. `override()` covers exactly
+  one definition and is then spent; it fails when the name is absent, because an override of nothing
+  is an unfinished rename. `overrideAll()` is its counterpart for a map, and a pending flag may not
+  cross `install()` or reach `seal()`.
 - **Extension registration is opt-in, discovery is not** — and discovery is planned, not built.
   `ServiceLoader` finds whatever is on the classpath; the builder decides what gets registered.
   Registering automatically would let an unrelated jar reserve a word an existing script uses as a
@@ -137,8 +144,9 @@ works for embedders on the module path and on the classpath alike.
 | `bubas-support` | Mandatory prelude and the optional packages | api |
 | `bubas-test` | The `.bu` script corpus and the runner that executes it | api, analyser, runtime, support (test scope) |
 | `bubas-bunit` | The mocking framework: recorder, `BubasCallInterceptor`, consistency checker, `TestResult` | api, analyser, runtime |
-| `bubas-bunit-commands` | One DSL over it: the statements a BUBAS unit test is written with | api, bunit |
-| `bubas-bunit-standard` | The assembly an application depends on: sealed test language and `BunitSuite` | both, analyser, support |
+| `bubas-bunit-matchers` | `ARGS`, `Arguments` and the matchers, usable by any BUNIT vocabulary | api, bunit |
+| `bubas-bunit-commands` | One DSL over it: the statements a BUBAS unit test is written with | api, bunit, matchers |
+| `bubas-bunit-standard` | The assembly an application depends on: sealed test language and `BunitSuite` | the three above, analyser, support |
 
 The pattern matcher sits with the parser deliberately. They would be separable only at the cost of
 an interface module and runtime injection of its implementation, to solve a dependency that does

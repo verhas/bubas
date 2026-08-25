@@ -1,5 +1,6 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.Matching;
 import javax0.bubas.bunit.NamesTarget;
 import javax0.bubas.bunit.Expectation;
 import javax0.bubas.api.StatementContext;
@@ -17,7 +18,7 @@ public final class ExpectNotCalled {
         final var calls = recorder.callsTo(name);
         if (!calls.isEmpty()) {
             ctx.error("expected " + name + " never to be called, but it was called "
-                    + calls.size() + " time(s), first with (" + Values.show(calls.getFirst()) + ")");
+                    + calls.size() + " time(s), first with (" + Matching.show(calls.getFirst()) + ")");
         }
     }
 }

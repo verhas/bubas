@@ -206,6 +206,7 @@ source ──▶ lexer ──▶ pattern matcher ──▶ parser ──▶ symb
 | `bubas-support` | the standard statements and functions |
 | `bubas-test` | executable `.bu` programs and the runner that checks them |
 | `bubas-bunit` | the mocking framework for testing BUBAS programs |
+| `bubas-bunit-matchers` | argument lists and matchers, for any test vocabulary |
 | `bubas-bunit-commands` | the statements a BUBAS unit test is written with |
 | `bubas-bunit-standard` | the assembled test framework, which is what you depend on |
 
@@ -221,8 +222,8 @@ has.
 
 ```basic
 PROGRAM OverLimitIsRejected
-    "LOAD_ORDER"  WITH 42   RETURNS "o1"
-    "ORDER_TOTAL" WITH "o1" RETURNS 1500.00
+    "LOAD_ORDER"  WITH ARGS(42)   RETURNS "o1"
+    "ORDER_TOTAL" WITH ARGS("o1") RETURNS 1500.00
     "APPROVE _" IS MOCKED
 
     ARGUMENT "orderId" IS 42
@@ -233,6 +234,12 @@ PROGRAM OverLimitIsRejected
     RESULT IS FALSE
     "APPROVE _" WAS NOT CALLED
 END.
+```
+
+An expectation can say what matters about a call without pinning what does not:
+
+```basic
+"LOG_EVENT _, _" WAS CALLED WITH ARGS("INFO", CONTAINS("over limit"))
 ```
 
 ```java
@@ -276,7 +283,7 @@ finishes has verified itself rather than merely not crashed.
 ## Status
 
 **Implemented and executable.** The front end, analyser and interpreter all work, and BUBAS
-programs can be unit tested in BUBAS; `mvn test` runs 504 tests, 67 of which are whole BUBAS
+programs can be unit tested in BUBAS; `mvn test` runs 530 tests, 67 of which are whole BUBAS
 programs executed end to end.
 
 | Phase | Scope | State |

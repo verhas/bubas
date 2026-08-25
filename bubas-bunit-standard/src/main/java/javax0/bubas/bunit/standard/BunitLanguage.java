@@ -2,6 +2,7 @@ package javax0.bubas.bunit.standard;
 
 import javax0.bubas.analyser.BubasLanguage;
 import javax0.bubas.bunit.commands.Bunit;
+import javax0.bubas.bunit.matchers.Matchers;
 import javax0.bubas.support.Standard;
 
 /**
@@ -22,6 +23,7 @@ public final class BunitLanguage {
 
     private static final BubasLanguage LANGUAGE = BubasLanguage.builder()
             .install(Standard::register)
+            .install(Matchers::register)
             .install(Bunit::register)
             .seal();
 
