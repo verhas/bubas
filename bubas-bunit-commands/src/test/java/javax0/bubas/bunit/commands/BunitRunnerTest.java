@@ -1,6 +1,8 @@
-package javax0.bubas.bunit;
+package javax0.bubas.bunit.commands;
 
 import javax0.bubas.analyser.BubasLanguage;
+import javax0.bubas.bunit.BunitRunner;
+import javax0.bubas.bunit.TestResult;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
@@ -36,6 +38,14 @@ class BunitRunnerTest {
         }
     }
 
+    /** Writes an INTEGER: the case a token cannot cover, so the mock has to supply it. */
+    public static final class CountInto {
+        public void call(StatementContext ctx, javax0.bubas.api.VariableArg total,
+                         ExpressionArg region) {
+            throw new IllegalStateException("the real implementation must never run under test");
+        }
+    }
+
     public static final class LogEvent {
         public void call(StatementContext ctx, ExpressionArg level, ExpressionArg message) {
             ctx.log(level.evaluate().asString(), message.evaluate().asString());
@@ -49,6 +59,8 @@ class BunitRunnerTest {
             .defineFunction("ORDER_TOTAL", OrderTotal.class)
             .defineStatement("APPROVE {expression/Order:target}", Approve.class)
             .defineStatement("LOG_EVENT {expression:level}, {expression:message}", LogEvent.class)
+            .defineStatement("COUNT ORDERS INTO {new > identifier/INTEGER:total > initialized}"
+                    + " FOR {expression:region}", CountInto.class)
             .seal();
 
     private static final String SUBJECT = """
@@ -70,7 +82,7 @@ class BunitRunnerTest {
             """;
 
     private static TestResult run(String test) {
-        return BunitRunner.of(LANGUAGE, SUBJECT).run(test);
+        return BunitRunner.of(BunitLanguageTest.language(), LANGUAGE, SUBJECT).run(test);
     }
 
     @Test
@@ -188,6 +200,47 @@ class BunitRunnerTest {
         assertThat(result.diagnostic())
                 .contains("expected LOG_EVENT _, _ to be called with (\"WARN\", \"over limit\")")
                 .contains("but it was called with (\"INFO\", \"over limit\")");
+    }
+
+    @Test
+    void a_mock_supplies_the_variable_a_mocked_command_would_have_written() {
+        final var subject = """
+                PROGRAM CountThem RETURNS INTEGER
+                    COUNT ORDERS INTO total FOR "EU"
+                    RETURN total
+                END.
+                """;
+        final var result = BunitRunner.of(BunitLanguageTest.language(), LANGUAGE, subject).run("""
+                PROGRAM SuppliedWrite
+                    "COUNT ORDERS INTO _ FOR _" IS MOCKED
+                    "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
+                    RUN
+                    RESULT IS 42
+                END.
+                """);
+        assertThat(result.passed()).as("%s", result.diagnostic()).isTrue();
+    }
+
+    /**
+     * Without the supply the slot is never written, which is exactly the hazard the consistency
+     * checker exists to catch before a test ever runs.
+     */
+    @Test
+    void without_the_supply_the_variable_is_never_written() {
+        final var subject = """
+                PROGRAM CountThem RETURNS INTEGER
+                    COUNT ORDERS INTO total FOR "EU"
+                    RETURN total
+                END.
+                """;
+        final var result = BunitRunner.of(BunitLanguageTest.language(), LANGUAGE, subject).run("""
+                PROGRAM MissingWrite
+                    "COUNT ORDERS INTO _ FOR _" IS MOCKED
+                    RUN
+                    RESULT IS 42
+                END.
+                """);
+        assertThat(result.passed()).isFalse();
     }
 
     @Test

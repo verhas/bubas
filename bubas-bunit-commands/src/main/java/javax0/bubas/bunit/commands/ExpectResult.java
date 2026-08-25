@@ -1,9 +1,11 @@
 package javax0.bubas.bunit.commands;
 
+import javax0.bubas.bunit.Expectation;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
 
 /** {@code RESULT IS FALSE} — what the subject returned. */
+@Expectation
 public final class ExpectResult {
 
     public static final String PATTERN = "RESULT IS {expression:value}";
