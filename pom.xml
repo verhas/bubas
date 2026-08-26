@@ -51,16 +51,16 @@
     <properties>
         <!-- The one place a release is numbered. Modules inherit it as ${revision};
              flatten-maven-plugin resolves it away before anything is installed or deployed. -->
-        <revision>1.0.0-SNAPSHOT</revision>
+        <revision>1.0.0</revision>
         <maven.compiler.release>21</maven.compiler.release>
-        <flatten.version>1.6.0</flatten.version>
-        <source.plugin.version>3.3.1</source.plugin.version>
+        <flatten.version>1.8.0</flatten.version>
+        <source.plugin.version>3.4.0</source.plugin.version>
         <javadoc.plugin.version>3.12.0</javadoc.plugin.version>
-        <gpg.plugin.version>3.2.7</gpg.plugin.version>
-        <central.plugin.version>0.7.0</central.plugin.version>
+        <gpg.plugin.version>3.2.8</gpg.plugin.version>
+        <central.plugin.version>0.9.0</central.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <junit.version>5.11.4</junit.version>
-        <assertj.version>3.27.3</assertj.version>
+        <junit.version>5.14.4</junit.version>
+        <assertj.version>3.27.7</assertj.version>
     </properties>
 
     <dependencyManagement>
