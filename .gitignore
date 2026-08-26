@@ -3,4 +3,5 @@
 .mcp.json
 .github
 .claude
-.msdhip
+.mdship
+*.md.bak

@@ -1,0 +1,22 @@
+PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE purchase Order
+    DECLARE total DECIMAL
+    DECLARE taxRate DECIMAL FINAL = 0.07
+
+    purchase = LOAD_ORDER(orderId)
+
+    IF NOT ORDER_WAS_FOUND(purchase) THEN
+        LOG_EVENT "ERROR", "no such order: " + orderId
+        RETURN FALSE
+    END IF
+
+    total = ORDER_TOTAL(purchase) * (1.0 + taxRate)
+
+    IF total > limit THEN
+        LOG_EVENT "INFO", "over limit: " + total
+        RETURN FALSE
+    END IF
+
+    LOG_EVENT "INFO", "approved, total " + total
+    RETURN TRUE
+END.

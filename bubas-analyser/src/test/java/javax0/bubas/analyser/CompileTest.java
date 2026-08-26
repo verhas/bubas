@@ -98,32 +98,23 @@ class CompileTest {
             .seal();
 
     /**
-     * The example from {@code README.md}, verbatim. Kept in sync by hand, deliberately: if the
-     * documentation's flagship program stops compiling, this test is the thing that says so.
+     * The program {@code SPEC.md} §14 and {@code README.md} both show, read from the file they
+     * both include rather than copied into a third place.
+     * <p>
+     * Three copies of one program is three chances to drift, and documentation drifts silently —
+     * nothing compiles a fenced code block. This compiles the file the documents display, so the
+     * flagship example cannot rot without a test going red.
      */
-    private static final String APPROVE_ORDER = """
-            PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
-                DECLARE purchase Order
-                DECLARE total DECIMAL
-                DECLARE taxRate DECIMAL FINAL = 0.07
-            
-                purchase = LOAD_ORDER(orderId)
-            
-                IF NOT ORDER_WAS_FOUND(purchase) THEN
-                    LOG_EVENT "ERROR", "no such order: " + orderId
-                    RETURN FALSE
-                END IF
-            
-                total = ORDER_TOTAL(purchase) * (1.0 + taxRate)
-            
-                IF total > limit THEN
-                    LOG_EVENT "INFO", "over limit: " + total
-                    RETURN FALSE
-                END IF
-            
-                RETURN TRUE
-            END.
-            """;
+    private static final String APPROVE_ORDER = read("/examples/approve-order.bu");
+
+    private static String read(String resource) {
+        try (var stream = CompileTest.class.getResourceAsStream(resource)) {
+            return new String(java.util.Objects.requireNonNull(stream, resource).readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("cannot read " + resource, e);
+        }
+    }
 
     /**
      * The insurance vocabulary the second {@code README.md} example is written against — a

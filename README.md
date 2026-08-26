@@ -8,6 +8,14 @@ no user-defined functions, no data structures, no objects, one global scope. Eve
 can do beyond sequencing, deciding and looping comes from a vocabulary that Java developers define
 for it.
 
+<!--INCLUDE
+from: "bubas-analyser/src/test/resources/examples/approve-order.bu"
+prefix: "```basic"
+postfix: "```"
+_content_generated_: 575:md5:fc969a8fa81e2450798c25333daf293c
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
 ```basic
 PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
     DECLARE purchase Order
@@ -28,9 +36,11 @@ PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
         RETURN FALSE
     END IF
 
+    LOG_EVENT "INFO", "approved, total " + total
     RETURN TRUE
 END.
 ```
+<!--/INCLUDE-->
 
 `LOAD_ORDER`, `ORDER_WAS_FOUND`, `ORDER_TOTAL` and `LOG_EVENT` are not part of BUBAS. They are
 Java classes the host application chose to expose. Neither is `Order` — it is a Java type the

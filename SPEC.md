@@ -1,6 +1,6 @@
 # BUBAS Language Specification
 
-**Version** 2.0 (draft) · **Date** 2026-08-20 · **Status** Design settled, implementation not started
+**Version** 2.0 · **Status** Implemented; see [`README.md`](README.md) for what is built and what is not
 
 BUBAS is an orchestration language for subject matter experts. This document defines the
 language, its static semantics, and the Java embedding API. It is the contract between the
@@ -8,25 +8,32 @@ BUBAS implementation and the applications that embed it.
 
 ---
 
-## Table of Contents
+**Contents**
 
-1. [Overview](#1-overview)
-2. [Core Principles](#2-core-principles)
-3. [Architecture](#3-architecture)
-4. [Lexical Structure](#4-lexical-structure)
-5. [Type System](#5-type-system)
-6. [Expressions](#6-expressions)
-7. [Statements](#7-statements)
-8. [Variable State and Static Analysis](#8-variable-state-and-static-analysis)
-9. [The Pattern System](#9-the-pattern-system)
-10. [Java Integration](#10-java-integration)
-11. [Errors](#11-errors)
-12. [Standard Prelude](#12-standard-prelude)
-13. [Code Generation](#13-code-generation)
-14. [Worked Example](#14-worked-example)
-15. [Reserved Words](#15-reserved-words)
-16. [Open Questions](#16-open-questions)
-17. [Glossary](#17-glossary)
+<!--TOC min-level: 2
+max-level: 2
+_content_generated_: 722:md5:e95978c844e41424a7364564675e2264
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+- [1. Overview](#1-overview)
+- [2. Core Principles](#2-core-principles)
+- [3. Architecture](#3-architecture)
+- [4. Lexical Structure](#4-lexical-structure)
+- [5. Type System](#5-type-system)
+- [6. Expressions](#6-expressions)
+- [7. Statements](#7-statements)
+- [8. Variable State and Static Analysis](#8-variable-state-and-static-analysis)
+- [9. The Pattern System](#9-the-pattern-system)
+- [10. Java Integration](#10-java-integration)
+- [11. Errors](#11-errors)
+- [12. The Standard Module](#12-the-standard-module)
+- [13. Code Generation](#13-code-generation)
+- [14. Worked Example](#14-worked-example)
+- [15. Reserved Words](#15-reserved-words)
+- [16. Open Questions](#16-open-questions)
+- [17. Glossary](#17-glossary)
+<!--/TOC-->
 
 ---
 
@@ -36,21 +43,21 @@ BUBAS is a typed, minimal orchestration language. It is **not** a general-purpos
 language. It exists so that a subject matter expert can sequence business steps, make decisions,
 loop over data and call into Java — and nothing else.
 
-### Two layers
+### 1.1. Two layers
 
 | Layer | Written by | Responsible for |
 |-------|-----------|-----------------|
 | **BUBAS** | Subject matter experts, or an LLM on their behalf | Sequencing, decisions, iteration, calling Java |
 | **Java** | Developers | Algorithms, domain objects, infrastructure, persistence, I/O |
 
-### What BUBAS is
+### 1.2. What BUBAS is
 
 - A coordination language for non-programmers
 - Statically typed, with all type errors reported before execution
 - Extensible: a Java developer defines the vocabulary the script author sees
 - Predictable enough for an LLM to generate reliably
 
-### What BUBAS is not
+### 1.3. What BUBAS is not
 
 - Object-oriented — no classes, inheritance or polymorphism
 - Functional — no lambdas, closures or higher-order functions
@@ -109,7 +116,7 @@ BUBAS separates definition, compilation and execution into three objects with di
    Value
 ```
 
-### Why three layers
+### 3.1. Why three layers
 
 Registration is expensive: pattern compilation, overlap analysis and the opaque-type lattice are
 computed once, at `seal()`. Every `Interpreter` forked afterwards inherits that work. Compilation
@@ -126,7 +133,7 @@ This is why `BubasLanguage` and `BubasProgram` belong to the analyser and `Inter
 runtime: the runtime depends on the analyser, never the reverse, and execution is entered through
 `Interpreter.of(program)` rather than a factory method on the program.
 
-### Sealing
+### 3.2. Sealing
 
 `seal()` closes registration permanently. From that moment the reserved-word set is fixed, so a
 later registration could invalidate an already-compiled program; registering after seal throws.
@@ -138,13 +145,13 @@ At seal the implementation verifies that:
 - type references in patterns resolve
 - no two patterns can match the same line (unless overlap analysis is disabled)
 
-### Concurrency
+### 3.3. Concurrency
 
 A sealed `BubasLanguage` and a `BubasProgram` are immutable and safe to share across threads.
 An `Interpreter` is not thread-safe and executes exactly one program, once. Concurrent
 orchestration means one `Interpreter` per thread, all sharing one `BubasProgram`.
 
-### Components
+### 3.4. Components
 
 | Component | Purpose |
 |-----------|---------|
@@ -158,11 +165,19 @@ orchestration means one `Interpreter` per thread, all sharing one `BubasProgram`
 | Function dispatcher | Evaluates arguments, invokes Java implementations |
 | Code generator | Emits target-language source from the core tree (Phase 3) |
 
+Two things are built on the language rather than being part of it, and this document defines
+neither. They are named here only so that a reader knows where they sit.
+
+| Built on it | What it is | Where it is described |
+|-------------|------------|-----------------------|
+| BUNIT | Unit testing a BUBAS program, in BUBAS. A vocabulary like any other, which an embedder may replace wholesale — which is exactly why its statements are not specified here | [`BUNIT.md`](BUNIT.md), and a tutorial |
+| Vocabulary export | A sealed language described for a generator or a person, from what is derived plus what a `@BubasDescription` says | [10.9](#109-describing-a-language) |
+
 ---
 
 ## 4. Lexical Structure
 
-### 4.1 Comments
+### 4.1. Comments
 
 A comment begins with an apostrophe and runs to the end of the **physical** line.
 
@@ -173,7 +188,7 @@ DECLARE x INTEGER        ' an end-of-line comment
 
 An apostrophe inside a string literal does not start a comment.
 
-### 4.2 Logical lines and continuation
+### 4.2. Logical lines and continuation
 
 The lexer joins physical lines into **logical lines**. Everywhere else in this specification,
 "line" means a logical line. A physical line is continued when any of the following holds:
@@ -226,7 +241,7 @@ FOR i = 0 TO _
     LENGTH(items) - 1
 ```
 
-### 4.3 Keywords
+### 4.3. Keywords
 
 Keywords are case-insensitive; `IF`, `if` and `If` are the same word. The core keyword set is
 listed in [§15](#15-reserved-words). Registered command keywords — the literal words of a
@@ -239,7 +254,7 @@ against its registries — the same layering rule as the `NOT` case above. The s
 `AND`, `OR` and `MOD`, which the continuation rule must recognise; those are core and can never
 be extended, so knowing them costs the lexer no coupling.
 
-### 4.4 Names
+### 4.4. Names
 
 Variable names, function names and opaque type names start with a letter or underscore and
 continue with letters, digits and underscores. "Letter" means any Unicode letter, not only ASCII:
@@ -259,7 +274,7 @@ userId = 5           ' correct
 All names share one namespace with all keywords. A variable may not be named after a core
 keyword, a pattern keyword, a registered function or a registered opaque type.
 
-### 4.5 Literals
+### 4.5. Literals
 
 ```basic
 42        0        -10        1000000            ' INTEGER
@@ -270,7 +285,7 @@ TRUE      FALSE                                  ' BOOLEAN
 
 String escapes: `\n`, `\t`, `\r`, `\\`, `\"`.
 
-### 4.6 Punctuation
+### 4.6. Punctuation
 
 Any character that is not whitespace, a name character, a digit, a quote or an apostrophe is a
 single-character punctuation token. The lexer does not decide whether it belongs where it was
@@ -288,7 +303,7 @@ where it is written.
 
 ---
 
-### 4.7 Lossless lexing
+### 4.7. Lossless lexing
 
 Every character of the source lands either in a token or in a piece of **trivia** — whitespace, a
 comment, a continuation underscore, or a line terminator. Concatenating a logical line's trivia,
@@ -314,7 +329,7 @@ are simply more zero-token lines. The parser skips them.
 
 ## 5. Type System
 
-### 5.1 Types
+### 5.1. Types
 
 | Type | Java representation | Array default | Notes |
 |------|--------------------|---------------|-------|
@@ -348,7 +363,7 @@ line 3: 'order' collides with the opaque type 'Order';
     DECLARE order Order
 ```
 
-### 5.2 Absence
+### 5.2. Absence
 
 BUBAS has no `NULL` literal, no null test and no null-producing operation. `null` remains an
 ordinary Java value: an opaque array element starts as `null`, and a Java function may return
@@ -359,7 +374,7 @@ it. A script that must branch on absence uses a function the embedder supplies:
 IF ORDER_WAS_FOUND(purchase) THEN
 ```
 
-### 5.3 Arrays
+### 5.3. Arrays
 
 An array is declared with its size between the name and the element type. The size is any
 `INTEGER` expression, evaluated once when the declaration executes.
@@ -383,7 +398,7 @@ SORT_ITEMS(items)        ' legal: bare array name as an argument
 copy = items         ' error: an array is not an expression
 ```
 
-### 5.4 Assignability
+### 5.4. Assignability
 
 A value of type `S` may be assigned to, or passed as, a target of type `T` when:
 
@@ -435,7 +450,7 @@ Such a function can declare `ANY_ARRAY` instead, at the price of casting `BubasA
 > author reading `=` should be able to assume one value moved, not that an entire collection was
 > aliased or copied — and which of those happened would be invisible at the assignment.
 
-### 5.5 Type vocabulary outside BUBAS source
+### 5.5. Type vocabulary outside BUBAS source
 
 `NUMBER`, `ARRAY` and `VOID` never appear in BUBAS source. `NUMBER` and `ARRAY` are pattern
 constraint vocabulary ([§9.4](#94-constraints)); `VOID` is a Java-side function return type.
@@ -444,7 +459,7 @@ constraint vocabulary ([§9.4](#94-constraints)); `VOID` is a Java-side function
 
 ## 6. Expressions
 
-### 6.1 Operators and precedence
+### 6.1. Operators and precedence
 
 Highest to lowest:
 
@@ -458,14 +473,14 @@ Highest to lowest:
 
 All binary operators are left-associative.
 
-### 6.2 INTEGER arithmetic
+### 6.2. INTEGER arithmetic
 
 - `/` truncates toward zero: `7 / 2` is `3`, `-7 / 2` is `-3`
 - `MOD` takes the sign of the dividend: `-7 MOD 2` is `-1`
 - Division or `MOD` by zero is a runtime error
 - Overflow is a runtime error, never a wraparound
 
-### 6.3 DECIMAL arithmetic
+### 6.3. DECIMAL arithmetic
 
 `+`, `-` and `*` are exact. `/` uses the interpreter's `MathContext`, which defaults to
 `MathContext.DECIMAL128` (34 digits, `HALF_EVEN`) and may be changed at runtime by a Java
@@ -475,7 +490,7 @@ function. Consequently:
 - there is **no compile-time constant folding**, of division or of anything else
 - generated Java reads the `MathContext` from the runtime rather than baking it in
 
-### 6.4 Comparison
+### 6.4. Comparison
 
 | Operand types | Legal operators |
 |---------------|-----------------|
@@ -487,7 +502,7 @@ function. Consequently:
 `DECIMAL` equality compares numeric value, not representation: `2.0 = 2.00` is `TRUE`. Mixed
 `INTEGER`/`DECIMAL` comparison widens the integer first.
 
-### 6.5 String concatenation
+### 6.5. String concatenation
 
 `+` concatenates when the **left** operand is a `STRING`, coercing the right operand. It never
 coerces the left operand.
@@ -505,7 +520,7 @@ scale (`10.50` renders as `10.50`); `BOOLEAN` as `TRUE` or `FALSE`, matching the
 opaque value cannot be coerced to a string at all — the embedder supplies a domain-named
 function if one is wanted.
 
-### 6.6 Function calls in expressions
+### 6.6. Function calls in expressions
 
 Parentheses are mandatory in an expression. A function used in an expression must not return
 `VOID`.
@@ -519,7 +534,7 @@ IF VALIDATE_ORDER(order) AND IS_URGENT(order) THEN
 
 ## 7. Statements
 
-### 7.1 Program structure
+### 7.1. Program structure
 
 A source file contains exactly one program. Its name is documentation and must be a valid name.
 
@@ -545,7 +560,7 @@ PROGRAM ProcessOrder(orderId INTEGER,
                      region STRING) RETURNS BOOLEAN
 ```
 
-### 7.2 Declarations
+### 7.2. Declarations
 
 ```basic
 DECLARE count INTEGER
@@ -587,7 +602,7 @@ by it too.
 > The analysis gets simpler as a side effect — declaredness stops needing flow analysis entirely —
 > but that is a consequence, not the reason.
 
-### 7.3 Assignment
+### 7.3. Assignment
 
 Assignment has no keyword. BUBAS is not BASIC; `LET` faded out of the languages that had it, and
 no language written since asks for it on the most frequent line in every script.
@@ -601,7 +616,7 @@ The target must be declared and not final. The value must be assignable to the t
 type. Assignment is the one built-in whose pattern carries no keyword at all, which is why a
 pattern is not required to begin with one — see [§9.1](#91-matching).
 
-### 7.4 Conditionals
+### 7.4. Conditionals
 
 ```basic
 IF score >= 90 THEN
@@ -617,7 +632,7 @@ END IF
 statements are line-based, `ELSE IF x THEN` is two statements on one line and is rejected
 without needing a special rule.
 
-### 7.5 Loops
+### 7.5. Loops
 
 ```basic
 DO WHILE count < 10          DO
@@ -661,7 +676,7 @@ END FOR
 `EXIT FOR` and `EXIT DO` each leave the innermost enclosing loop **of that kind**; there are no
 labels. Using one with no enclosing loop of that kind is a compile error.
 
-### 7.6 Return
+### 7.6. Return
 
 ```basic
 IF NOT VALIDATE_ORDER(order) THEN
@@ -673,7 +688,7 @@ RETURN TRUE
 
 `RETURN` may appear anywhere, including inside loops, and terminates the program.
 
-### 7.7 Statement-form calls
+### 7.7. Statement-form calls
 
 A `VOID` function may be called as a statement, with or without parentheses. A function that
 returns a value may **not** be called as a statement, so a result can never be discarded
@@ -689,7 +704,7 @@ LOAD_ORDER 42                  ' error: LOAD_ORDER returns a value
 
 ## 8. Variable State and Static Analysis
 
-### 8.1 Two axes
+### 8.1. Two axes
 
 Variable state is a pair, not a single enum.
 
@@ -715,7 +730,7 @@ END IF
 x = x + 1        ' error: x is not definitely initialized
 ```
 
-### 8.2 Definite assignment
+### 8.2. Definite assignment
 
 Reading a variable requires it to be `INITIALIZED` on every path reaching that point.
 
@@ -729,7 +744,7 @@ Reading a variable requires it to be `INITIALIZED` on every path reaching that p
 - **An indexed target changes nothing.** `a[i] = 5` does not make `a` initialized, because it
   already was: an array is fully initialized at its declaration
 
-### 8.3 Rejected at compile time
+### 8.3. Rejected at compile time
 
 - reading a variable that is not definitely initialized
 - assigning a `FINAL` variable, or a program parameter
@@ -748,7 +763,7 @@ A statement pattern is a single-line syntax definition registered from Java. It 
 compiler how to recognise a statement, what it requires of the variables it mentions, and what
 it guarantees afterwards.
 
-### 9.1 Matching
+### 9.1. Matching
 
 A pattern matches a whole logical line, comment already stripped. Literal words in the pattern
 match case-insensitively; placeholders capture the rest.
@@ -803,7 +818,7 @@ line matching. Beginning with an existing pattern keyword such as `DECLARE` is a
 overlap analysis passes, so an embedder may add a declaration variant but can never displace a
 built-in. In practice, choose a fresh word: `WHEN`, not `IF`.
 
-### 9.2 Placeholder syntax
+### 9.2. Placeholder syntax
 
 ```
 { prefixes > kind[/constraint] : name > postfixes }
@@ -851,7 +866,7 @@ two cases can never both apply.
 > has to work out which `X` a constraint meant. A vocabulary that has outgrown being comprehensible
 > as a unit has a problem that a shadowing rule would not fix.
 
-### 9.3 Kinds
+### 9.3. Kinds
 
 | Kind | Captures |
 |------|----------|
@@ -886,7 +901,7 @@ ADD -50.50 TO total    ' matches
 ADD 3 - 5 TO total     ' no match: a literal is not an expression
 ```
 
-### 9.4 Constraints
+### 9.4. Constraints
 
 A constraint follows the kind after `/`.
 
@@ -917,7 +932,7 @@ declared later.
 A reference means **assignment-compatible with**, so `DECLARE d DECIMAL = 5` is legal. Write
 `/=T` to demand exactly the same type. An unresolvable name is a registration error.
 
-### 9.5 Preconditions and postconditions
+### 9.5. Preconditions and postconditions
 
 Prefixes are requirements checked before the statement; postfixes are guarantees the analyser
 relies on afterwards. There are two independent prefix axes, written mutability first:
@@ -963,7 +978,7 @@ combined with a `declared` or `initialized` prefix; the postcondition of a custo
 **verified when its handler returns**, and a handler that fails to deliver what its pattern
 promises raises an error at its own statement rather than corrupting the analyser's model.
 
-### 9.6 The standard statements
+### 9.6. The standard statements
 
 A language without declaration and assignment is unusable, so the standard module supplies them.
 They are **ordinary patterns with ordinary implementations** — nothing in the language privileges
@@ -1001,7 +1016,7 @@ already made the slot; with a `declared` postcondition there is no value to supp
 to do. The other four do one thing each — evaluate the initializer and write it, or allocate the
 array — which is the whole of what makes them "built in".
 
-### 9.7 Custom statements
+### 9.7. Custom statements
 
 A command is a class, exactly like a function — see [§10.1](#101-one-class-one-thing). Its single
 public method takes the context followed by one parameter per placeholder, in pattern order.
@@ -1064,7 +1079,7 @@ public final class ExecuteTimes {
 
 ## 10. Java Integration
 
-### 10.1 One class, one thing
+### 10.1. One class, one thing
 
 Every function and every command is implemented by its own class. The runtime instantiates it
 once per sealed language, through a public no-arg constructor or a public static `provider()`
@@ -1097,7 +1112,7 @@ embedder's objects the way a lambda could. Every dependency arrives through `ctx
 which makes the service registry the only path from a shared, sealed language to per-run state —
 enforced by construction rather than by convention.
 
-#### Naming a command
+#### 10.1.1. Naming a command
 
 A function is named where it is registered. A command is not — its pattern is its syntax — so it
 gets a name derived from that pattern: the **skeleton**, every literal verbatim and every
@@ -1127,7 +1142,7 @@ looking like a skeleton. Two declared names in one language may not differ only 
 application that never mocks anything should not be made to invent names for commands nobody will
 refer to.
 
-### 10.2 Signatures are derived from Java
+### 10.2. Signatures are derived from Java
 
 A BUBAS signature is read off the Java method. The first parameter is always the context; the
 rest are the BUBAS parameters, in order.
@@ -1188,7 +1203,7 @@ and `@Param("orderId")` overrides them. Names are documentation only, since BUBA
 positional, so a class compiled without the flag degrades to `arg0` rather than failing and
 `seal()` reports it as a diagnostic.
 
-#### The `ANY` parameter
+#### 10.2.1. The `ANY` parameter
 
 A function parameter declared as `Value` accepts any BUBAS value:
 
@@ -1214,7 +1229,7 @@ exists only in a signature, derived from a Java parameter, which is what keeps t
 typing whole. It is the scalar sibling of `ANY_ARRAY`, which has always existed for the same reason:
 `LENGTH` is element-agnostic, and some operations are value-agnostic.
 
-#### Variadic functions
+#### 10.2.2. Variadic functions
 
 A variadic Java method is a variadic BUBAS function. The signature records the *element* type, so
 
@@ -1236,7 +1251,7 @@ an array declares an array parameter, which is a different and equally available
 which are fixed in number, so a variadic handler could never be filled. It is rejected at `seal()`
 rather than silently derived as an array parameter.
 
-### 10.3 Building a language
+### 10.3. Building a language
 
 ```java
 BubasLanguage lang = BubasLanguage.builder()
@@ -1264,7 +1279,7 @@ BubasLanguage lang = BubasLanguage.builder()
 Every definition is one call returning the builder. There is no nested builder and no terminal
 method, because the class carries everything a nested builder used to declare.
 
-#### Defining twice
+#### 10.3.1. Defining twice
 
 A name may be defined once. Defining it again — a function, an opaque type, or a statement with the
 same pattern — is an error naming both, because it used to be neither deliberate nor reported: the
@@ -1287,7 +1302,7 @@ neither form substitutes for the other, and neither may be left pending when `in
 is reached — a bundle decides its own definitions, and an override has to name the one thing it
 replaces.
 
-#### Services on the language and on the run
+#### 10.3.2. Services on the language and on the run
 
 A service registered on the builder is shared by every interpreter that language produces, which is
 what makes a singleton a singleton instead of something each run has to be handed again. A service
@@ -1316,7 +1331,7 @@ A map preserves nothing the language depends on: two patterns that match one lin
 rather than something resolved by registration order ([§9.1](#91-matching)), so a plain `HashMap`
 is as correct as a `LinkedHashMap`. Order affects only the sequence diagnostics are reported in.
 
-#### Bundles
+#### 10.3.3. Bundles
 
 A vocabulary that several embedders share is packaged as a method taking a `Registrar` and applied
 with `install`:
@@ -1359,7 +1374,7 @@ Both end at the same `define` calls, and both are opt-in, but only one of them i
 embedder wrote down. The `extensions()` selector in the example above is planned and
 not implemented; [§10.5](#105-extensions-and-discovery) records why it may stay that way.
 
-### 10.4 Compiling and running
+### 10.4. Compiling and running
 
 ```java
 BubasProgram prog = lang.compile(source);
@@ -1378,7 +1393,7 @@ for (long id : orderIds) {
 
 `run()` may be called once per `Interpreter`; a second call throws.
 
-#### Interception
+#### 10.4.1. Interception
 
 An interpreter may be given a `BubasCallInterceptor`, which answers for a function or a command in
 place of its implementation:
@@ -1412,9 +1427,10 @@ Interception is installed on an interpreter and never on a language, so a sealed
 nothing about testing and the same checked program runs either way. Not installing one runs the real
 implementations, which is what makes an integration mode free rather than a second code path.
 
-[`BUNIT.md`](BUNIT.md) describes the framework built on it.
+BUNIT is the framework built on it: see [`BUNIT.md`](BUNIT.md), which is not normative. Its statements are a vocabulary, not part of the language, and
+another test vocabulary may replace them without any of this section changing.
 
-### 10.5 Extensions and discovery
+### 10.5. Extensions and discovery
 
 **Planned, not implemented.** Nothing in this section exists yet: not `BubasExtension`,
 `BubasFunction`, `BubasCommand`, the abstract bases, the `@BubasFunction` and `@BubasCommand`
@@ -1487,7 +1503,7 @@ public class Validate extends AbstractBubasCommand {
 The only difference between the two routes is where the name or pattern comes from: the builder
 call supplies it for a plain class, the annotation supplies it for a discoverable one.
 
-#### Registration
+#### 10.5.1. Registration
 
 `ServiceLoader` matches the exact service type requested, so providers must be declared for the
 marker rather than for a subtype:
@@ -1513,7 +1529,7 @@ automatic registration would let an unrelated jar appearing on the classpath res
 existing script uses as a variable name, breaking it with no change to either the script or the
 embedding code.
 
-### 10.6 Types
+### 10.6. Types
 
 ```java
 BubasType.INTEGER
@@ -1531,7 +1547,7 @@ BubasType.ANY_ARRAY
 Phase 4 vocabulary export. `ANY_ARRAY` is only ever a parameter type — never a variable type, a
 return type or a constraint.
 
-### 10.7 Contexts
+### 10.7. Contexts
 
 **A function cannot touch the variable store at all.** Its arguments arrive as typed method
 parameters and it returns a value; that is the whole interface. Only a statement handler may read
@@ -1568,7 +1584,7 @@ Services are invisible to BUBAS. No syntax refers to them and no script can obse
 exist so that shared implementations in a sealed language can reach per-run state such as a
 transaction, a tenant or a correlation id.
 
-#### Ambient configuration
+#### 10.7.1. Ambient configuration
 
 State that many functions share — a format pattern, the digit count for loan arithmetic, a
 mandator id — is a service, not a variable. A function or command sets it, and everything else
@@ -1593,7 +1609,7 @@ public final class SetLoanDigits {
 between concurrent orchestrations. This is the layering principle applied: state shared across
 implementations belongs in Java, not threaded through every call site in the script.
 
-### 10.8 Values and arguments
+### 10.8. Values and arguments
 
 ```java
 public interface Value {
@@ -1634,7 +1650,7 @@ public interface LiteralArg {
 `as(Class)` is checked against the registered opaque type rather than blind-casting, so a
 mismatch produces a BUBAS diagnostic instead of a `ClassCastException`.
 
-#### An indexed reference
+#### 10.8.1. An indexed reference
 
 When a `var` placeholder matched `A[5]`, the index arrives **unevaluated**, like every other
 expression a command receives. It is the one expression with a cap: **at most once**. The reason
@@ -1671,7 +1687,7 @@ handler may not do is touch a location without having evaluated the index that s
 other. Given `MODIFY A[5]`, the handler alters `A[5]`; it has no way to reach `A[6]`, and that is
 not an oversight but the guarantee the script author reads off the line.
 
-#### A whole array
+#### 10.8.2. A whole array
 
 An array-typed placeholder is the opposite case and is unrestricted. `RESET A FROM 3 TO 7` matches
 `{var/ARRAY:a}` with no index at all, so `get()` yields the array itself — the interpreter's
@@ -1707,7 +1723,7 @@ placeholder's constraint.
 
 Whether the handler did its part is verified when it returns.
 
-### 10.9 Describing a language
+### 10.9. Describing a language
 
 A signature says what a function *takes*. Nothing derived says what it *means*, and meaning is what
 a reader who is not looking at the Java needs: a subject matter expert choosing an operation, a code
@@ -1726,7 +1742,7 @@ code and appear beside the prose in an export. A description repeating them adds
 one day contradict them — and the prose is always the half that is wrong. What cannot be derived is
 what the description is for: what the operation means, when to reach for it, what it fails on.
 
-#### Where an opaque type's description lives
+#### 10.9.1. Where an opaque type's description lives
 
 An opaque type is usually a domain class — `Order`, `Claim` — that a REST layer, a rules engine and
 BUBAS all hold. Annotating it would make the domain model depend on one of its consumers, and
@@ -1747,7 +1763,7 @@ public interface OrderDoc {
 It is a separate call rather than something `defineOpaqueType` notices, because registering a class
 other than the one named in the call reads well until it surprises someone.
 
-#### Saying a description was reviewed
+#### 10.9.2. Saying a description was reviewed
 
 Prose goes stale silently: the class gains a method, changes a signature, and sentences that were
 true last year quietly are not. `@BubasReviewed` records the checksum of the described class's
@@ -1769,7 +1785,7 @@ What it catches is a change of *shape*. A function whose behaviour changed and w
 not moves no checksum, and nothing here reaches that: a green checksum means the description was
 reviewed against this shape, not that it is true.
 
-#### The export
+#### 10.9.3. The export
 
 ```java
 var export = VocabularyExport.of(language);
@@ -1818,7 +1834,7 @@ try {
 call. Anything thrown by a Java function is wrapped with the line information of the statement
 that called it.
 
-### Definition errors
+### 11.1. Definition errors
 
 A `BubasException` always points at a line of BUBAS source and is aimed at the script author.
 Mistakes in how the embedder *defined* the language are a different category, raised at
@@ -1878,7 +1894,7 @@ as further packages, installed the same way (Phase 2).
 A `BubasProgram` can be compiled to another language. Java is the first target; the design does not
 assume it is the only one.
 
-### What the back ends share
+### 13.1. What the back ends share
 
 Both the interpreter and every code generator consume the same **core tree**, produced once by
 lowering the checked program. The core tree exists for exactly this reason. In the syntax tree a
@@ -1902,7 +1918,7 @@ It is a lowered **tree**, not a flat instruction list: keeping `IF`, `DO` and `F
 a Java generator emits natural Java rather than reconstructing control flow from jumps, and source
 positions survive so generated code maps back to the script.
 
-### Commands
+### 13.2. Commands
 
 Every statement pattern is a command with an implementation, including the standard ones. A code
 generator may therefore always fall back to emitting a call to the very implementation the
@@ -1914,13 +1930,13 @@ in the target language rather than a call into the runtime. The form of that des
 Phase 3 question and deliberately not settled here; what is settled is that it is optional, and
 that its absence costs output quality rather than correctness.
 
-### Limits
+### 13.3. Limits
 
 Functions and commands are Java classes. A target that is not Java can share the core semantics but
 cannot call the vocabulary: every function would need an implementation in that language. The
 equivalence guarantee covers what BUBAS pins, and stops where the embedder's code begins.
 
-### Conformance
+### 13.4. Conformance
 
 The generated code and the interpreter are separate implementations of one operation set, so **a
 conformance suite is mandatory**: every test program must run through both back ends and produce
@@ -1972,6 +1988,14 @@ public final class OrderVocabulary {
 }
 ```
 
+<!--INCLUDE
+from: "bubas-analyser/src/test/resources/examples/approve-order.bu"
+prefix: "```basic"
+postfix: "```"
+_content_generated_: 575:md5:fc969a8fa81e2450798c25333daf293c
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
 ```basic
 PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
     DECLARE purchase Order
@@ -1996,6 +2020,7 @@ PROGRAM ApproveOrder(orderId INTEGER, limit DECIMAL) RETURNS BOOLEAN
     RETURN TRUE
 END.
 ```
+<!--/INCLUDE-->
 
 ```java
 BubasProgram prog = lang.compile(source);
@@ -2011,7 +2036,7 @@ boolean approved = Interpreter.of(prog)
 
 ## 15. Reserved Words
 
-### Core keywords
+### 15.1. Core keywords
 
 ```
 PROGRAM   RETURNS   RETURN   END
@@ -2023,18 +2048,18 @@ TRUE      FALSE
 INTEGER   DECIMAL   STRING   BOOLEAN
 ```
 
-### Built-in pattern keywords
+### 15.2. Built-in pattern keywords
 
 ```
 DECLARE   FINAL
 ```
 
-### Reserved at seal
+### 15.3. Reserved at seal
 
 Every literal token of every registered statement pattern, every registered function name, and
 every registered opaque type name.
 
-### Not BUBAS keywords
+### 15.4. Not BUBAS keywords
 
 `OPAQUE`, `VOID`, `NUMBER` and `ARRAY` never appear in BUBAS source. `OPAQUE` and `VOID` belong
 to the Java API; `NUMBER` and `ARRAY` are pattern constraint vocabulary. The placeholder state
