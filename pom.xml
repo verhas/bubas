@@ -25,6 +25,7 @@
         <module>bubas-analyser</module>
         <module>bubas-support</module>
         <module>bubas-runtime</module>
+        <module>bubas-export</module>
         <module>bubas-bunit</module>
         <module>bubas-bunit-matchers</module>
         <module>bubas-bunit-commands</module>

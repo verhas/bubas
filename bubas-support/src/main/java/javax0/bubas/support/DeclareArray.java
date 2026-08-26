@@ -1,5 +1,6 @@
 package javax0.bubas.support;
 
+import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
@@ -18,6 +19,11 @@ import java.util.Arrays;
  * An opaque array is left null-filled: null is a perfectly ordinary value for one, and the
  * language has no way to make anything else.
  */
+@BubasDescription("""
+        Brings an array into existence with a size worked out as the program runs.
+        Elements start at zero, empty text or false, according to the type. The size is fixed once
+        the array exists; there is no growing it.
+        """)
 public final class DeclareArray {
 
     public static final String PATTERN = "DECLARE {new > identifier/ARRAY/T:name > initialized}"

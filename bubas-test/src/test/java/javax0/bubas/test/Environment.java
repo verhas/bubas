@@ -1,6 +1,8 @@
 package javax0.bubas.test;
 
 import javax0.bubas.analyser.BubasLanguage;
+import javax0.bubas.api.BubasDescribes;
+import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
@@ -19,6 +21,21 @@ final class Environment {
     private Environment() {
     }
 
+    /**
+     * The description of {@link Parcel}, on an interface of its own.
+     * <p>
+     * A domain class is usually shared and has no reason to carry BUBAS annotations. Here it makes
+     * no difference — {@code Parcel} is a test fixture — but the sample export is what a reader
+     * will copy, so it shows the arrangement they should copy.
+     */
+    @BubasDescribes(Parcel.class)
+    @BubasDescription("""
+            Something wrapped for posting, holding one whole number.
+            A script can hold one and pass it about; ask what is inside it with CONTENTS.
+            """)
+    public interface ParcelDoc {
+    }
+
     /** A value BUBAS can hold and pass but never look into. */
     public static final class Parcel {
         private final long content;
@@ -32,12 +49,18 @@ final class Environment {
         }
     }
 
+    @BubasDescription("""
+            Wraps a whole number into a parcel.
+            """)
     public static final class Wrap {
         public Parcel call(Context ctx, long value) {
             return new Parcel(value);
         }
     }
 
+    @BubasDescription("""
+            The number inside a parcel.
+            """)
     public static final class Contents {
         public long call(Context ctx, Parcel parcel) {
             return parcel.content();
@@ -45,6 +68,9 @@ final class Environment {
     }
 
     /** Variadic: BUBAS sees CONCAT(parts STRING...) -> STRING and calls it with a spread list. */
+    @BubasDescription("""
+            Joins any number of pieces of text into one, in the order given.
+            """)
     public static final class Concat {
         public String call(Context ctx, String... parts) {
             return String.join("", parts);
@@ -55,12 +81,18 @@ final class Environment {
      * A wildcard parameter: BUBAS sees SHOW(value ANY) -> STRING and accepts any type. The handler
      * asks the value what it is rather than being told by its own signature.
      */
+    @BubasDescription("""
+            Renders any value as text, with the name of its type in front of it.
+            """)
     public static final class Show {
         public String call(Context ctx, Value value) {
             return value.type() + "=" + String.valueOf(value.as(Object.class));
         }
     }
 
+    @BubasDescription("""
+            Writes a line to the log. Answers nothing, so it is written as a statement.
+            """)
     public static final class Print {
         public void call(Context ctx, String message) {
             ctx.log("INFO", message);
@@ -73,6 +105,10 @@ final class Environment {
      * The condition arrives unevaluated and is evaluated once, which is also the simplest
      * demonstration that a command controls when its expressions run.
      */
+    @BubasDescription("""
+            Checks that something is true, and stops the program naming the message if it is not.
+            Written as a statement so a test reads as a list of claims.
+            """)
     public static final class Assert {
         public void call(StatementContext ctx, String message, ExpressionArg condition) {
             if (!condition.evaluate().asBoolean()) {
@@ -86,7 +122,7 @@ final class Environment {
 
     static BubasLanguage language() {
         final var builder = BubasLanguage.builder()
-                .defineOpaqueType("Parcel", Parcel.class)
+                .defineOpaqueTypeVia("Parcel", ParcelDoc.class)
                 .defineFunction("WRAP", Wrap.class)
                 .defineFunction("CONTENTS", Contents.class)
                 .defineFunction("CONCAT", Concat.class)

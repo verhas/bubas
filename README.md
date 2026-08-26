@@ -206,6 +206,7 @@ source ──▶ lexer ──▶ pattern matcher ──▶ parser ──▶ symb
 | `bubas-support` | the standard statements and functions |
 | `bubas-test` | executable `.bu` programs and the runner that checks them |
 | `bubas-bunit` | the mocking framework for testing BUBAS programs |
+| `bubas-export` | describes a sealed language for a generator, or a person |
 | `bubas-bunit-matchers` | argument lists and matchers, for any test vocabulary |
 | `bubas-bunit-commands` | the statements a BUBAS unit test is written with |
 | `bubas-bunit-standard` | the assembled test framework, which is what you depend on |
@@ -261,6 +262,57 @@ unwritten, an argument for a parameter the program does not take, a mock answeri
 or declared for the wrong number of arguments — each is reported with a line, in the test, before
 the program runs. See [`BUNIT.md`](BUNIT.md) for why it is built this way.
 
+## Telling a generator what the vocabulary means
+
+A signature says what a function takes. It does not say what it *means*, and meaning is what an LLM
+needs before it can write anything worth compiling.
+
+```java
+@BubasDescription("Finds an order by the identifier the customer was given. Fails if none.")
+public final class LoadOrder {
+    public Order call(Context ctx, long orderId) { … }
+}
+```
+
+```java
+Files.writeString(prompt, VocabularyExport.of(language).asMarkdown());
+```
+
+which yields the language, described:
+
+```markdown
+### LOAD_ORDER(orderId INTEGER) -> Order
+
+Finds an order by the identifier the customer was given. Fails if none.
+
+### COUNT ORDERS INTO _ FOR _
+
+    COUNT ORDERS INTO {new > identifier/INTEGER:total > initialized} FOR {expression/STRING:region}
+
+Counts the orders of a region, leaving the number in the variable named.
+
+Leaves a value in: total
+```
+
+Shape is derived, meaning is written, and the two never overlap — **a description must not restate
+anything the export already knows.** Prose repeating a signature adds nothing and will one day
+contradict it, and the prose is always the half that is wrong.
+
+**No Java appears in an export**: no class names, no packages. Whoever reads it is going to write
+BUBAS, and the Java behind a function matters to them the way a bicycle matters to a fish. It is
+also why an export can be handed to an outside model without handing over an inventory of your
+internals.
+
+Descriptions are demanded by the export and by nothing else. A language without them seals,
+compiles and runs perfectly — it simply cannot be exported, because an export with holes reads like
+documentation. Nobody who doesn't export pays for them; nobody who does can forget them.
+
+A description on the wrong side of a rewrite is worse than none, so `@BubasReviewed` records a
+checksum of the described class's public surface. Change the class and `seal()` refuses the
+language, prints what the surface is now, and names the value to write once the description has been
+re-read. It catches a change of shape; a function whose behaviour changed and whose signature did
+not moves no checksum, and nothing pretends otherwise.
+
 ## Try it
 
 ```bash
@@ -283,7 +335,7 @@ finishes has verified itself rather than merely not crashed.
 ## Status
 
 **Implemented and executable.** The front end, analyser and interpreter all work, and BUBAS
-programs can be unit tested in BUBAS; `mvn test` runs 530 tests, 67 of which are whole BUBAS
+programs can be unit tested in BUBAS; `mvn test` runs 621 tests, 67 of which are whole BUBAS
 programs executed end to end.
 
 | Phase | Scope | State |
@@ -291,7 +343,7 @@ programs executed end to end.
 | 1 | Lexer, parser, symbol table, flow analysis, lowering, interpreter | done |
 | 2 | Pattern system, custom statements, standard statement and function set | done |
 | 3 | Code generation to Java, plus the interpreter/codegen conformance suite | not started |
-| 4 | Vocabulary export and prompt tooling for LLM code generation | not started |
+| 4 | Vocabulary export for LLM code generation | export done, prompt tooling not started |
 | 5 | Diagnostics, profiling, hardening | ongoing |
 | — | BUNIT: unit testing BUBAS programs in BUBAS | done, still growing |
 

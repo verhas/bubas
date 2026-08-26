@@ -121,6 +121,14 @@ mistaken for oversights:
   one definition and is then spent; it fails when the name is absent, because an override of nothing
   is an unfinished rename. `overrideAll()` is its counterpart for a map, and a pending flag may not
   cross `install()` or reach `seal()`.
+- **A description must never restate anything derivable, and only the export demands one.**
+  Signatures, types, arity, patterns, pre- and postconditions all appear beside the prose in an
+  export; prose repeating them adds nothing and eventually contradicts them, and the prose is the
+  half that is wrong. Requiring descriptions at `seal()` was considered and rejected: a missing one
+  is not a bug — the language runs perfectly — and forcing prose produces `@BubasDescription("Loads
+  an order")` on `LOAD_ORDER`, which is noise shaped like documentation. The gate belongs on
+  `VocabularyExport`, which is the only thing that suffers from a hole. `bubas-export` is a module
+  nothing depends on, so an inventory generator never reaches production by accident.
 - **Extension registration is opt-in, discovery is not** — and discovery is planned, not built.
   `ServiceLoader` finds whatever is on the classpath; the builder decides what gets registered.
   Registering automatically would let an unrelated jar reserve a word an existing script uses as a
@@ -143,6 +151,7 @@ works for embedders on the module path and on the classpath alike.
 | `bubas-runtime` | `Interpreter`, dispatcher, variable store | api, analyser |
 | `bubas-support` | Mandatory prelude and the optional packages | api |
 | `bubas-test` | The `.bu` script corpus and the runner that executes it | api, analyser, runtime, support (test scope) |
+| `bubas-export` | `VocabularyExport`: a sealed language described for a generator or a person | api, analyser |
 | `bubas-bunit` | The mocking framework: recorder, `BubasCallInterceptor`, consistency checker, `TestResult` | api, analyser, runtime |
 | `bubas-bunit-matchers` | `ARGS`, `Arguments` and the matchers, usable by any BUNIT vocabulary | api, bunit |
 | `bubas-bunit-commands` | One DSL over it: the statements a BUBAS unit test is written with | api, bunit, matchers |

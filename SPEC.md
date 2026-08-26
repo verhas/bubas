@@ -1707,6 +1707,95 @@ placeholder's constraint.
 
 Whether the handler did its part is verified when it returns.
 
+### 10.9 Describing a language
+
+A signature says what a function *takes*. Nothing derived says what it *means*, and meaning is what
+a reader who is not looking at the Java needs: a subject matter expert choosing an operation, a code
+generator being told what a vocabulary is for.
+
+```java
+@BubasDescription("Finds an order by the identifier the customer was given. Fails if none.")
+public final class LoadOrder {
+    public Order call(Context ctx, long orderId) { … }
+}
+```
+
+**A description must not state anything that can be derived.** Names, parameter names and types,
+return types, variadicity, patterns, placeholder kinds, pre- and postconditions are all read off the
+code and appear beside the prose in an export. A description repeating them adds nothing and will
+one day contradict them — and the prose is always the half that is wrong. What cannot be derived is
+what the description is for: what the operation means, when to reach for it, what it fails on.
+
+#### Where an opaque type's description lives
+
+An opaque type is usually a domain class — `Order`, `Claim` — that a REST layer, a rules engine and
+BUBAS all hold. Annotating it would make the domain model depend on one of its consumers, and
+describing it at each registration would put the same prose in as many places as there are languages
+exposing it. An empty interface is neither:
+
+```java
+@BubasDescribes(Order.class)
+@BubasDescription("An order a customer placed, as the order service knows it.")
+public interface OrderDoc {
+}
+```
+
+```java
+.defineOpaqueTypeVia("Order", OrderDoc.class)
+```
+
+It is a separate call rather than something `defineOpaqueType` notices, because registering a class
+other than the one named in the call reads well until it surprises someone.
+
+#### Saying a description was reviewed
+
+Prose goes stale silently: the class gains a method, changes a signature, and sentences that were
+true last year quietly are not. `@BubasReviewed` records the checksum of the described class's
+public surface, and `seal()` refuses a language whose descriptions were reviewed against a different
+shape.
+
+Three states, and the difference between the last two matters:
+
+| | |
+|---|---|
+| annotation absent | nothing is checked — reviewing is opt-in per class |
+| empty value | the first time: sealing reports the checksum to write, and asks nobody to review anything, because there is nothing yet to compare against |
+| a value | checked; a mismatch prints the current surface and names what to re-read |
+
+The checksum is reported, never written for you. A build that edits its own sources to make itself
+pass has stopped being a check.
+
+What it catches is a change of *shape*. A function whose behaviour changed and whose signature did
+not moves no checksum, and nothing here reaches that: a green checksum means the description was
+reviewed against this shape, not that it is true.
+
+#### The export
+
+```java
+var export = VocabularyExport.of(language);
+Files.writeString(prompt, export.asMarkdown());
+Files.writeString(schema, export.asJson());
+```
+
+Derived and written, together and not overlapping: shape from the language, meaning from the
+annotations.
+
+**No Java appears in it** — no class names, no packages, no implementation detail. Whoever reads
+this is going to write BUBAS, and the Java behind a function matters to them the way a bicycle
+matters to a fish. It also means an export can be handed to someone without handing them an
+inventory of the host application's internals.
+
+**Descriptions are required by the export and nowhere else.** A language without them seals,
+compiles and runs perfectly; it simply cannot be exported, because an export with holes in it reads
+like documentation, which is worse than having none. Putting the requirement here rather than on the
+builder means nobody who does not export pays for it, and nobody who does can forget — you cannot
+get an export without satisfying it. Everything undescribed is named at once, since an author
+filling holes one rebuild at a time gives up before the third.
+
+`bubas-export` is a module of its own that nothing depends on. An export is a build-time artefact,
+and keeping the machinery off every other module's classpath makes shipping it a decision rather
+than an accident.
+
 ---
 
 ## 11. Errors

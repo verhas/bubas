@@ -1,5 +1,6 @@
 package javax0.bubas.support;
 
+import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
 import javax0.bubas.api.VariableArg;
@@ -14,6 +15,11 @@ import javax0.bubas.api.VariableArg;
  * An indexed reference needs its index evaluated before the location can be written, and that
  * evaluation may happen only once — which is exactly what this does.
  */
+@BubasDescription("""
+        Puts a value into a variable, or into one element of an array.
+        The only way a script changes anything it holds. The value must be of the variable's type,
+        except that a whole number may go into a DECIMAL.
+        """)
 public final class Assign {
 
     public static final String PATTERN =

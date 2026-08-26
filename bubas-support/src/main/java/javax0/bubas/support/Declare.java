@@ -1,5 +1,6 @@
 package javax0.bubas.support;
 
+import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.StatementContext;
 import javax0.bubas.api.VariableArg;
@@ -12,6 +13,12 @@ import javax0.bubas.api.VariableArg;
  * already made the slot. With a {@code declared} postcondition there is no value to supply, which
  * leaves nothing for this command to do.
  */
+@BubasDescription("""
+        Brings a variable into existence, holding nothing yet.
+        Every variable a program uses is declared once, at the top level: BUBAS has no local
+        variables, so a declaration inside a branch or a loop would look scoped while being global.
+        Something must assign it before anything reads it.
+        """)
 public final class Declare {
 
     public static final String PATTERN = "DECLARE {new > identifier/T:name > declared} {type:T}";

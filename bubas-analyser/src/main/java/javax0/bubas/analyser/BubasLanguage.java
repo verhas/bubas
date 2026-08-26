@@ -9,8 +9,11 @@ import javax0.bubas.analyser.pattern.PatternParser;
 import javax0.bubas.analyser.pattern.StatementPattern;
 import javax0.bubas.analyser.statement.StatementParser;
 import javax0.bubas.api.BubasDefinitionException;
+import javax0.bubas.api.BubasDescribes;
+import javax0.bubas.api.BubasReviewed;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Registrar;
+import javax0.bubas.api.Surface;
 import javax0.bubas.lexer.Lexer;
 
 import java.util.*;
@@ -36,11 +39,14 @@ public final class BubasLanguage {
     private final Map<String, FunctionSignature> functions;
     private final List<CommandDefinition> commands;
     private final Map<Class<?>, Map<String, Object>> services;
+    private final Map<String, Class<?>> documentedBy;
 
     private BubasLanguage(Vocabulary vocabulary, ConstraintResolver constraints,
                           Map<String, BubasType.Opaque> opaqueTypes,
                           Map<String, FunctionSignature> functions, List<CommandDefinition> commands,
-                          Map<Class<?>, Map<String, Object>> services) {
+                          Map<Class<?>, Map<String, Object>> services,
+                          Map<String, Class<?>> documentedBy) {
+        this.documentedBy = Map.copyOf(documentedBy);
         this.vocabulary = vocabulary;
         this.constraints = constraints;
         // Ordered rather than Map.copyOf: registration order is what enumeration reports, and a
@@ -97,6 +103,17 @@ public final class BubasLanguage {
         return List.copyOf(functions.values());
     }
 
+    /**
+     * The interface documenting an opaque type, when one stands in for it.
+     * <p>
+     * A domain class is usually shared and has no reason to carry BUBAS annotations, so its
+     * documentation lives on an empty interface instead. Everything else — a function, a command —
+     * is documented on its own implementation class, which is reachable already.
+     */
+    public Optional<Class<?>> documentation(String opaqueType) {
+        return Optional.ofNullable(documentedBy.get(Keywords.canonical(opaqueType)));
+    }
+
     /** Every registered opaque type, in registration order. */
     public List<BubasType.Opaque> opaqueTypes() {
         return List.copyOf(opaqueTypes.values());
@@ -127,6 +144,8 @@ public final class BubasLanguage {
         private final Map<String, Class<?>> functions = new LinkedHashMap<>();
         private final Map<String, Class<?>> statements = new LinkedHashMap<>();
         private final Map<Class<?>, Map<String, Object>> services = new LinkedHashMap<>();
+        /** An opaque type's BUBAS name to the interface holding its documentation. */
+        private final Map<String, Class<?>> documentedBy = new LinkedHashMap<>();
         private boolean skipOverlapAnalysis;
         private Mode mode = Mode.DEFINE;
 
@@ -194,6 +213,29 @@ public final class BubasLanguage {
         @Override
         public Builder defineStatement(String pattern, Class<?> implementation) {
             return one(statements, "statement", pattern, implementation, false);
+        }
+
+        /**
+         * Registers the class an interface {@link javax0.bubas.api.BubasDescribes describes},
+         * taking that interface's documentation with it.
+         * <p>
+         * A domain class is usually shared — a REST layer, a rules engine and BUBAS all hold an
+         * {@code Order} — so annotating it would make the domain model depend on one of its
+         * consumers, and describing it at each registration would copy the same prose once per
+         * language. An empty interface is neither.
+         *
+         * @param documentation an interface carrying {@code @BubasDescribes(TheClass.class)}
+         */
+        public Builder defineOpaqueTypeVia(String name, Class<?> documentation) {
+            final var describes = documentation.getAnnotation(BubasDescribes.class);
+            if (describes == null) {
+                throw new BubasDefinitionException("opaque type '" + name + "': "
+                        + documentation.getTypeName() + " carries no @BubasDescribes, so there is"
+                        + " nothing for it to stand in for. Register the class itself with"
+                        + " defineOpaqueType.");
+            }
+            documentedBy.put(Keywords.canonical(name), documentation);
+            return defineOpaqueType(name, describes.value());
         }
 
         @Override
@@ -339,6 +381,7 @@ public final class BubasLanguage {
             }
 
             checkDeclaredNamesAreDistinct(definitions);
+            checkDescriptionsWereReviewed();
 
             final var vocabulary = Vocabulary.builder()
                     .function(functions.keySet().toArray(String[]::new))
@@ -349,7 +392,47 @@ public final class BubasLanguage {
                 new OverlapAnalysis(vocabulary).check(patterns);
             }
             return new BubasLanguage(vocabulary, constraints, types, signatures, definitions,
-                    services);
+                    services, documentedBy);
+        }
+
+        /**
+         * Refuses a language whose descriptions were reviewed against a different shape.
+         * <p>
+         * Only classes carrying {@link javax0.bubas.api.BubasReviewed} are checked, so reviewing is
+         * opt-in and a project that has not adopted it pays nothing. An empty value is the first
+         * time: the checksum is reported and nobody is asked to review anything, because there is
+         * nothing yet to compare against.
+         * <p>
+         * The checksum is reported, never written. A build that edits its own sources to make
+         * itself pass has stopped being a check.
+         */
+        private void checkDescriptionsWereReviewed() {
+            final var subjects = new LinkedHashMap<Class<?>, Class<?>>();
+            opaqueTypes.forEach((name, type) ->
+                    subjects.put(type, documentedBy.getOrDefault(Keywords.canonical(name), type)));
+            functions.values().forEach(type -> subjects.put(type, type));
+            statements.values().forEach(type -> subjects.put(type, type));
+            subjects.forEach(BubasLanguage.Builder::review);
+        }
+
+        private static void review(Class<?> subject, Class<?> documentation) {
+            final var reviewed = documentation.getAnnotation(BubasReviewed.class);
+            if (reviewed == null) {
+                return;
+            }
+            final var current = Surface.checksum(subject);
+            if (current.equals(reviewed.value())) {
+                return;
+            }
+            if (reviewed.value().isEmpty()) {
+                throw new BubasDefinitionException("write " + current + " into @BubasReviewed on "
+                        + documentation.getTypeName());
+            }
+            throw new BubasDefinitionException(subject.getTypeName() + " has changed since its"
+                    + " description was reviewed. Its public surface is now:\n        "
+                    + String.join("\n        ", Surface.of(subject))
+                    + "\n    Re-read the description, then write " + current
+                    + " into @BubasReviewed on " + documentation.getTypeName());
         }
 
         /**
