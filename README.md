@@ -394,6 +394,34 @@ that test the design rather than the code:
 
 If you embed BUBAS in something real, open an issue and say what happened.
 
+## Releasing
+
+Releases are cut locally, on purpose. The signing key Maven Central knows exists on one machine
+and a local backup — not in a cloud, not in a secrets vault — so nothing in CI is able to sign,
+and nothing in CI is trusted with the ability.
+
+```bash
+mvn -P release deploy
+```
+
+The `release` profile attaches sources and javadoc, signs everything with GPG, and publishes
+through the Central portal. It needs two things on the machine that runs it: the signing key
+available to `gpg`, and credentials for the `central` server id in `~/.m2/settings.xml`.
+
+What CI can do it does. Every push runs
+
+```bash
+mvn -P release verify -Dgpg.skip=true
+```
+
+which is the release build with only the signing removed — so a release that would have failed on
+a malformed javadoc comment, a module that packages badly, or a missing sources jar fails on the
+push that caused it rather than halfway through a deploy.
+
+Version numbers live in one place: the `revision` property in the parent `pom.xml`. Every module
+inherits it, and `flatten-maven-plugin` resolves it away before anything is installed or published,
+because a pom that still says `${revision}` cannot be resolved by anyone who lacks the parent.
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).

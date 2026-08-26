@@ -1,7 +1,13 @@
 # Builds and tests on every push and pull request.
 #
-# `verify` rather than `test`: it runs the same phases a release does short of signing and
-# deploying, so a change that breaks packaging is caught here rather than during a release.
+# Releases are made locally, deliberately: the signing key exists on one machine and a local
+# backup, and nothing here can sign. What this can do is prove the release would have worked —
+# so `-P release verify` with signing skipped runs the tests *and* attaches the sources and
+# javadoc jars Maven Central demands. A release that would fail on a malformed javadoc comment
+# or a module that packages badly fails here instead, on the push that caused it.
+#
+# One command rather than two: `verify` under the release profile already runs everything a plain
+# `verify` would, so running both would only double the build.
 name: build
 
 on:
@@ -21,8 +27,8 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build and test
-        run: mvn -B --no-transfer-progress verify
+      - name: Test, and rehearse the release
+        run: mvn -B --no-transfer-progress -P release verify -Dgpg.skip=true
 
       # The sample export is written by the test run. Keeping it lets anyone read a concrete
       # vocabulary without building the project themselves.
