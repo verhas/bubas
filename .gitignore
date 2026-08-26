@@ -1,7 +1,8 @@
 /**/target/
 .idea
 .mcp.json
-.github
 .claude
 .mdship
 *.md.bak
+.flattened-pom.xml
+.github/prompts

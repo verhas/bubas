@@ -318,10 +318,17 @@ compiles and runs perfectly — it simply cannot be exported, because an export 
 documentation. Nobody who doesn't export pays for them; nobody who does can forget them.
 
 A description on the wrong side of a rewrite is worse than none, so `@BubasReviewed` records a
-checksum of the described class's public surface. Change the class and `seal()` refuses the
-language, prints what the surface is now, and names the value to write once the description has been
-re-read. It catches a change of shape; a function whose behaviour changed and whose signature did
-not moves no checksum, and nothing pretends otherwise.
+checksum of the described class's public surface. Change the class and the **export** refuses,
+prints what the surface is now, and names the value to write once the description has been re-read.
+
+The export and not `seal()`, for the reason descriptions are demanded there too. A checksum fires on
+any change to a described class, most of which are ordinary development having nothing to do with
+documentation — failing to seal would break startup and every test of an application that generates
+none, and the rational answer to that is to delete the annotation. A check that fires too widely
+destroys the thing it protects.
+
+It catches a change of shape; a function whose behaviour changed and whose signature did not moves
+no checksum, and nothing pretends otherwise.
 
 ## Try it
 

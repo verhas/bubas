@@ -1767,8 +1767,15 @@ other than the one named in the call reads well until it surprises someone.
 
 Prose goes stale silently: the class gains a method, changes a signature, and sentences that were
 true last year quietly are not. `@BubasReviewed` records the checksum of the described class's
-public surface, and `seal()` refuses a language whose descriptions were reviewed against a different
+public surface, and the **export** refuses one whose descriptions were reviewed against a different
 shape.
+
+The export rather than `seal()`: a checksum fires on any change to a described class's public
+surface, and most such changes are ordinary development with nothing to do with documentation.
+Refusing to seal would break startup and every test of an application that generates no
+documentation at all, whose rational answer is to delete the annotation — so the check would destroy
+what it exists to protect. It reaches only the person generating documentation, who is the person it
+is asking.
 
 Three states, and the difference between the last two matters:
 

@@ -172,6 +172,121 @@ class VocabularyExportTest {
                 .functions()).hasSize(1);
     }
 
+    // ---------------------------------------------------------------- reviewed descriptions
+
+    /** A domain class with one member, so its surface is small enough to reason about. */
+    public static final class Parcel {
+        public long weight() {
+            return 0;
+        }
+    }
+
+    @BubasDescribes(Parcel.class)
+    @BubasDescription("Something posted to a customer.")
+    public interface UncheckedDoc {
+    }
+
+    @BubasDescribes(Parcel.class)
+    @BubasDescription("Something posted to a customer.")
+    @javax0.bubas.api.BubasReviewed("")
+    public interface FirstTimeDoc {
+    }
+
+    @BubasDescribes(Parcel.class)
+    @BubasDescription("Something posted to a customer.")
+    @javax0.bubas.api.BubasReviewed("0000000000000000")
+    public interface StaleDoc {
+    }
+
+    /**
+     * Not guessed: exporting with an empty checksum reported this value, and it was written here.
+     * If it ever fails, the check is working — the message names the value to write.
+     */
+    @BubasDescribes(Parcel.class)
+    @BubasDescription("Something posted to a customer.")
+    @javax0.bubas.api.BubasReviewed("6CC503F783713212")
+    public interface ReviewedDoc {
+    }
+
+    @BubasDescription("Counts something.")
+    @javax0.bubas.api.BubasReviewed("0000000000000000")
+    public static final class StaleFunction {
+        public long call(Context ctx) {
+            return 0;
+        }
+    }
+
+    private static String exporting(BubasLanguage language) {
+        return catchThrowableOfType(BubasDefinitionException.class,
+                () -> VocabularyExport.of(language)).getMessage();
+    }
+
+    /** Reviewing is opt-in per class: no annotation, no check. */
+    @Test
+    void a_class_with_no_checksum_is_not_checked() {
+        assertThat(VocabularyExport.of(BubasLanguage.builder()
+                .defineOpaqueTypeVia("Parcel", UncheckedDoc.class).seal()).types()).hasSize(1);
+    }
+
+    /**
+     * The first time there is nothing to compare against, so nobody is told to review anything —
+     * only where to write the value.
+     */
+    @Test
+    void an_empty_checksum_asks_only_that_the_value_be_written() {
+        assertThat(exporting(BubasLanguage.builder()
+                .defineOpaqueTypeVia("Parcel", FirstTimeDoc.class).seal()))
+                .isEqualTo("write " + javax0.bubas.api.Surface.checksum(Parcel.class)
+                        + " into @BubasReviewed on " + FirstTimeDoc.class.getTypeName())
+                .doesNotContain("Re-read")
+                .doesNotContain("has changed");
+    }
+
+    @Test
+    void a_checksum_that_no_longer_matches_names_what_to_re_read() {
+        assertThat(exporting(BubasLanguage.builder()
+                .defineOpaqueTypeVia("Parcel", StaleDoc.class).seal()))
+                .contains(Parcel.class.getTypeName() + " has changed since its description was"
+                        + " reviewed")
+                .contains("Its public surface is now:")
+                .contains("long weight()")
+                .contains("Re-read the description, then write ")
+                .contains("on " + StaleDoc.class.getTypeName());
+    }
+
+    @Test
+    void a_matching_checksum_exports() {
+        assertThat(VocabularyExport.of(BubasLanguage.builder()
+                .defineOpaqueTypeVia("Parcel", ReviewedDoc.class).seal()).types())
+                .singleElement()
+                .satisfies(type -> assertThat(type.name()).isEqualTo("Parcel"));
+    }
+
+    /** A function's own class is its subject: there is no descriptor standing in for it. */
+    @Test
+    void a_function_is_checked_against_its_own_surface() {
+        assertThat(exporting(BubasLanguage.builder()
+                .defineFunction("TALLY", StaleFunction.class).seal()))
+                .contains(StaleFunction.class.getTypeName() + " has changed")
+                .contains("long call(javax0.bubas.api.Context)");
+    }
+
+    /**
+     * A checksum records that a description was reviewed, so it means nothing where there is none.
+     * Descriptions are therefore checked first, and the diagnostic says the useful thing.
+     */
+    @Test
+    void a_missing_description_is_reported_before_a_stale_checksum() {
+        @BubasDescribes(Parcel.class)
+        @javax0.bubas.api.BubasReviewed("0000000000000000")
+        final class NoDescription {
+        }
+        assertThat(exporting(BubasLanguage.builder()
+                .defineOpaqueTypeVia("Parcel", NoDescription.class).seal()))
+                .contains("nothing describes:")
+                .doesNotContain("has changed since");
+    }
+
     @Test
     void the_markdown_reads_as_a_vocabulary_rather_than_a_dump() {
         final var markdown = VocabularyExport.of(described().seal()).asMarkdown();

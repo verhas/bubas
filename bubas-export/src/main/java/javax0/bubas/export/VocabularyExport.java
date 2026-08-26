@@ -5,6 +5,8 @@ import javax0.bubas.analyser.CommandDefinition;
 import javax0.bubas.analyser.FunctionSignature;
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasDescription;
+import javax0.bubas.api.BubasReviewed;
+import javax0.bubas.api.Surface;
 import javax0.bubas.analyser.pattern.Constraint;
 import javax0.bubas.analyser.pattern.Placeholder;
 import javax0.bubas.analyser.pattern.Postcondition;
@@ -96,6 +98,9 @@ public final class VocabularyExport {
                     + "\n    An export says what a vocabulary means, so it cannot be built out of"
                     + " things nobody has said anything about. Add @BubasDescription to each.");
         }
+        // After descriptions are known to exist: a checksum records that one was *reviewed*, so it
+        // means nothing where there is none to review.
+        reviewed(language);
         return new VocabularyExport(types, functions, commands);
     }
 
@@ -119,6 +124,55 @@ public final class VocabularyExport {
     /** For a prompt, or a person. */
     public String asMarkdown() {
         return Markdown.of(this);
+    }
+
+    /**
+     * Refuses an export whose descriptions were reviewed against a different shape.
+     * <p>
+     * Here rather than at {@code seal()}, which is where it was first built and where it was wrong.
+     * A checksum fires on any change to a described class's public surface — most of which are
+     * ordinary development, unrelated to documentation. Failing to seal would break startup and
+     * every test of an application that generates no documentation at all, and the rational answer
+     * to that is to delete the annotation. A check that fires too widely destroys the thing it
+     * protects; this one now reaches only the person generating documentation, who is the person
+     * it is asking.
+     * <p>
+     * Only classes carrying {@link javax0.bubas.api.BubasReviewed} are checked, so reviewing stays
+     * opt-in per class. An empty value is the first time: the checksum is reported and nobody is
+     * asked to review anything, because there is nothing yet to compare against.
+     * <p>
+     * The checksum is reported, never written. A build that edits its own sources to make itself
+     * pass has stopped being a check.
+     */
+    private static void reviewed(BubasLanguage language) {
+        for (final var type : language.opaqueTypes()) {
+            review(type.javaType(),
+                    language.documentation(type.name()).orElse(type.javaType()));
+        }
+        language.functions().forEach(signature ->
+                review(signature.implementation().owner(), signature.implementation().owner()));
+        language.commands().forEach(definition ->
+                review(definition.implementation().owner(), definition.implementation().owner()));
+    }
+
+    private static void review(Class<?> subject, Class<?> documentation) {
+        final var reviewed = documentation.getAnnotation(BubasReviewed.class);
+        if (reviewed == null) {
+            return;
+        }
+        final var current = Surface.checksum(subject);
+        if (current.equals(reviewed.value())) {
+            return;
+        }
+        if (reviewed.value().isEmpty()) {
+            throw new BubasDefinitionException("write " + current + " into @BubasReviewed on "
+                    + documentation.getTypeName());
+        }
+        throw new BubasDefinitionException(subject.getTypeName() + " has changed since its"
+                + " description was reviewed. Its public surface is now:\n        "
+                + String.join("\n        ", Surface.of(subject))
+                + "\n    Re-read the description, then write " + current
+                + " into @BubasReviewed on " + documentation.getTypeName());
     }
 
     private static Function function(FunctionSignature signature, List<String> missing) {

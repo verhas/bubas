@@ -127,7 +127,11 @@ mistaken for oversights:
   half that is wrong. Requiring descriptions at `seal()` was considered and rejected: a missing one
   is not a bug — the language runs perfectly — and forcing prose produces `@BubasDescription("Loads
   an order")` on `LOAD_ORDER`, which is noise shaped like documentation. The gate belongs on
-  `VocabularyExport`, which is the only thing that suffers from a hole. `bubas-export` is a module
+  `VocabularyExport`, which is the only thing that suffers from a hole. `@BubasReviewed` moved
+  there for the same reason after being built at `seal()` first: a checksum fires on any change to a
+  described class, most of them ordinary development, so refusing to seal would break startup and
+  every test of an application generating no documentation — whose rational answer is to delete the
+  annotation. A check that fires too widely destroys what it protects. `bubas-export` is a module
   nothing depends on, so an inventory generator never reaches production by accident.
 - **Extension registration is opt-in, discovery is not** — and discovery is planned, not built.
   `ServiceLoader` finds whatever is on the classpath; the builder decides what gets registered.

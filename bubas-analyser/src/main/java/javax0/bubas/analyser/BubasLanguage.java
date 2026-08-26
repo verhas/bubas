@@ -10,10 +10,8 @@ import javax0.bubas.analyser.pattern.StatementPattern;
 import javax0.bubas.analyser.statement.StatementParser;
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasDescribes;
-import javax0.bubas.api.BubasReviewed;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Registrar;
-import javax0.bubas.api.Surface;
 import javax0.bubas.lexer.Lexer;
 
 import java.util.*;
@@ -381,7 +379,6 @@ public final class BubasLanguage {
             }
 
             checkDeclaredNamesAreDistinct(definitions);
-            checkDescriptionsWereReviewed();
 
             final var vocabulary = Vocabulary.builder()
                     .function(functions.keySet().toArray(String[]::new))
@@ -393,46 +390,6 @@ public final class BubasLanguage {
             }
             return new BubasLanguage(vocabulary, constraints, types, signatures, definitions,
                     services, documentedBy);
-        }
-
-        /**
-         * Refuses a language whose descriptions were reviewed against a different shape.
-         * <p>
-         * Only classes carrying {@link javax0.bubas.api.BubasReviewed} are checked, so reviewing is
-         * opt-in and a project that has not adopted it pays nothing. An empty value is the first
-         * time: the checksum is reported and nobody is asked to review anything, because there is
-         * nothing yet to compare against.
-         * <p>
-         * The checksum is reported, never written. A build that edits its own sources to make
-         * itself pass has stopped being a check.
-         */
-        private void checkDescriptionsWereReviewed() {
-            final var subjects = new LinkedHashMap<Class<?>, Class<?>>();
-            opaqueTypes.forEach((name, type) ->
-                    subjects.put(type, documentedBy.getOrDefault(Keywords.canonical(name), type)));
-            functions.values().forEach(type -> subjects.put(type, type));
-            statements.values().forEach(type -> subjects.put(type, type));
-            subjects.forEach(BubasLanguage.Builder::review);
-        }
-
-        private static void review(Class<?> subject, Class<?> documentation) {
-            final var reviewed = documentation.getAnnotation(BubasReviewed.class);
-            if (reviewed == null) {
-                return;
-            }
-            final var current = Surface.checksum(subject);
-            if (current.equals(reviewed.value())) {
-                return;
-            }
-            if (reviewed.value().isEmpty()) {
-                throw new BubasDefinitionException("write " + current + " into @BubasReviewed on "
-                        + documentation.getTypeName());
-            }
-            throw new BubasDefinitionException(subject.getTypeName() + " has changed since its"
-                    + " description was reviewed. Its public surface is now:\n        "
-                    + String.join("\n        ", Surface.of(subject))
-                    + "\n    Re-read the description, then write " + current
-                    + " into @BubasReviewed on " + documentation.getTypeName());
         }
 
         /**

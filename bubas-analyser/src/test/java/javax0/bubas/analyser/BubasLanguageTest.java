@@ -187,7 +187,7 @@ class BubasLanguageTest {
     }
 
     @Nested
-    @DisplayName("descriptions and the checksum that says they were reviewed")
+    @DisplayName("registering a described type")
     class Descriptions {
 
         /** A domain class that knows nothing about BUBAS, which is the point. */
@@ -202,40 +202,7 @@ class BubasLanguageTest {
         public interface ParcelDoc {
         }
 
-        @javax0.bubas.api.BubasDescribes(Parcel.class)
-        @javax0.bubas.api.BubasDescription("Something posted to a customer.")
-        @javax0.bubas.api.BubasReviewed("")
-        public interface FirstTimeDoc {
-        }
-
-        @javax0.bubas.api.BubasDescribes(Parcel.class)
-        @javax0.bubas.api.BubasDescription("Something posted to a customer.")
-        @javax0.bubas.api.BubasReviewed("0000000000000000")
-        public interface StaleDoc {
-        }
-
-        /**
-         * The checksum below was not guessed: sealing with an empty one reported it, and it was
-         * written here. That is the whole workflow, and this test is it being followed.
-         */
-        @javax0.bubas.api.BubasDescribes(Parcel.class)
-        @javax0.bubas.api.BubasDescription("Something posted to a customer.")
-        @javax0.bubas.api.BubasReviewed("6CC503F783713212")
-        public interface ReviewedDoc {
-        }
-
         public interface NotADescriptor {
-        }
-
-        @javax0.bubas.api.BubasReviewed("0000000000000000")
-        public static final class StaleFunction {
-            public long call(Context ctx) {
-                return 0;
-            }
-        }
-
-        private static String error(ThrowableAssert.ThrowingCallable building) {
-            return catchThrowableOfType(BubasDefinitionException.class, building).getMessage();
         }
 
         @Test
@@ -244,75 +211,28 @@ class BubasLanguageTest {
                     .defineOpaqueTypeVia("Parcel", ParcelDoc.class).seal();
             assertThat(language.opaqueType("Parcel"))
                     .contains(BubasType.opaque("Parcel", Parcel.class));
+            assertThat(language.documentation("Parcel")).contains(ParcelDoc.class);
         }
 
         @Test
         void an_interface_describing_nothing_is_refused() {
-            assertThat(error(() -> BubasLanguage.builder()
-                    .defineOpaqueTypeVia("Parcel", NotADescriptor.class)))
+            assertThat(catchThrowableOfType(BubasDefinitionException.class,
+                    () -> BubasLanguage.builder()
+                            .defineOpaqueTypeVia("Parcel", NotADescriptor.class)).getMessage())
                     .contains("carries no @BubasDescribes")
                     .contains("Register the class itself with defineOpaqueType");
         }
 
-        /** Reviewing is opt-in per class: no annotation, no check. */
-        @Test
-        void a_class_with_no_checksum_is_not_checked() {
-            assertThat(BubasLanguage.builder()
-                    .defineOpaqueTypeVia("Parcel", ParcelDoc.class).seal()).isNotNull();
-        }
-
         /**
-         * The first time there is nothing to compare against, so nobody is told to review
-         * anything — only where to write the value.
+         * Sealing says nothing about descriptions or checksums. A missing description is not a
+         * fault in the language, and a stale checksum is a fault in the documentation — neither
+         * should stop an application starting. Both are checked by the export, which is the only
+         * thing that suffers from them.
          */
         @Test
-        void an_empty_checksum_asks_only_that_the_value_be_written() {
-            final var message = error(() -> BubasLanguage.builder()
-                    .defineOpaqueTypeVia("Parcel", FirstTimeDoc.class).seal());
-            assertThat(message)
-                    .isEqualTo("write " + Surface.checksum(Parcel.class)
-                            + " into @BubasReviewed on " + FirstTimeDoc.class.getTypeName())
-                    .doesNotContain("Re-read")
-                    .doesNotContain("has changed");
-        }
-
-        @Test
-        void a_checksum_that_no_longer_matches_names_what_to_re_read() {
-            final var message = error(() -> BubasLanguage.builder()
-                    .defineOpaqueTypeVia("Parcel", StaleDoc.class).seal());
-            assertThat(message)
-                    .contains(Parcel.class.getTypeName() + " has changed since its description"
-                            + " was reviewed")
-                    .contains("Its public surface is now:")
-                    .contains("long weight()")
-                    .contains("Re-read the description, then write "
-                            + Surface.checksum(Parcel.class))
-                    .contains("on " + StaleDoc.class.getTypeName());
-        }
-
-        @Test
-        void a_matching_checksum_seals() {
-            assertThat(BubasLanguage.builder()
-                    .defineOpaqueTypeVia("Parcel", ReviewedDoc.class).seal()
-                    .opaqueTypes()).hasSize(1);
-        }
-
-        /**
-         * If this fails because someone changed {@code Parcel}, the check is working: the message
-         * names the new value to write into {@code ReviewedDoc}.
-         */
-        @Test
-        void the_recorded_checksum_is_the_one_the_surface_yields() {
-            assertThat(Surface.checksum(Parcel.class)).isEqualTo("6CC503F783713212");
-        }
-
-        /** A function's own class is its subject: there is no descriptor to stand in for it. */
-        @Test
-        void a_function_is_checked_against_its_own_surface() {
-            assertThat(error(() -> BubasLanguage.builder()
-                    .defineFunction("COUNT", StaleFunction.class).seal()))
-                    .contains(StaleFunction.class.getTypeName() + " has changed")
-                    .contains("long call(javax0.bubas.api.Context)");
+        void sealing_asks_nothing_about_descriptions() {
+            assertThat(base().defineOpaqueTypeVia("Parcel", ParcelDoc.class)
+                    .seal().functions()).hasSize(1);
         }
     }
 
