@@ -370,8 +370,6 @@ explicit, one `defineFunction` or `defineStatement` at a time. The `provider()` 
 convention implementations may use is already supported, so classes written for discovery work
 through explicit registration unchanged.
 
-This is an MVP, not a released library. Expect the API to move.
-
 Six language questions remain deliberately open and are listed in
 [SPEC.md §16](SPEC.md#16-open-questions).
 
