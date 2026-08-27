@@ -30,6 +30,20 @@ jobs:
       - name: Test, and rehearse the release
         run: mvn -B --no-transfer-progress -P release verify -Dgpg.skip=true
 
+      # Every example in the tutorials and the book is pulled from code the step above just
+      # compiled and ran, and every quoted output is a file that run produced. Regenerating the
+      # documents here and diffing proves the committed versions still match the code. A snippet
+      # that drifted, a reworded diagnostic, a changed total: all become a red build on the push
+      # that caused them, instead of a surprise for a reader. See DOCUMENTATION/AUTHORING.md D7.
+      #
+      # Pinned to the version used locally: the gate compares generated text, so tool and author
+      # must agree. Bumping one means bumping the other.
+      - name: Check the documentation is not stale
+        run: |
+          python3 -m pip install --quiet mdship==1.2.0
+          mdship update README.md SPEC.md $(find DOCUMENTATION -name '*.md')
+          git diff --exit-code -- '*.md'
+
       # The sample export is written by the test run. Keeping it lets anyone read a concrete
       # vocabulary without building the project themselves.
       - name: Upload the sample vocabulary export

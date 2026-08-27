@@ -46,6 +46,7 @@
         <module>bubas-bunit-commands</module>
         <module>bubas-bunit-standard</module>
         <module>bubas-test</module>
+        <module>bubas-doc</module>
     </modules>
 
     <properties>
