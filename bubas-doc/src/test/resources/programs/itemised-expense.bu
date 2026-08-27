@@ -1,0 +1,40 @@
+PROGRAM ApproveExpense(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+    DECLARE meals DECIMAL = 0.0
+    DECLARE i INTEGER
+    DECLARE line Item
+    DECLARE ceiling DECIMAL FINAL = 1000.00
+    DECLARE mealCap DECIMAL FINAL = 60.00
+    DECLARE receiptFloor DECIMAL FINAL = 25.00
+
+    FOR i = 0 TO ITEM_COUNT(claim) - 1
+        line = ITEM_AT(claim, i)
+
+        IF AMOUNT_OF(line) > receiptFloor AND NOT HAS_RECEIPT(line) THEN
+            REJECT claim, "no receipt for " + MERCHANT_OF(line)
+            RETURN FALSE
+        END IF
+
+        IF CATEGORY_OF(line) = "meals" THEN
+            meals = meals + AMOUNT_OF(line)
+        END IF
+    END FOR
+
+    IF meals > mealCap THEN
+        ESCALATE claim, "meals came to " + meals + ", the cap is " + mealCap
+        RETURN FALSE
+    END IF
+
+    total = TOTAL_OF(claim)
+
+    IF total > ceiling THEN
+        REJECT claim, "over " + ceiling + " — needs a business case first"
+        RETURN FALSE
+    ELSEIF total > limit THEN
+        ESCALATE claim, "over the " + limit + " limit"
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

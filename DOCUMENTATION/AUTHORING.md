@@ -66,6 +66,14 @@ stage 40 because there is nowhere else for it to be. Propagation is not solved, 
 Stages are therefore selections from one final, compiled codebase — named regions pulled out by
 `INCLUDE` — never separate directories holding separate copies.
 
+This applies to the **vocabulary** as much as to the programs, and that is not optional: adding
+stage 2's `ESCALATE` to a single shared language object would have silently falsified the
+five-minute tutorial's claim to show a language of three operations. Each stage is instead a
+builder method calling the one before it — `core()`, then `escalating()`, then `itemised()` — so
+every document sees the definitions its stage actually had. A test compiles a later stage's program
+against an earlier stage's language and requires it to fail, which is what stops the staging from
+quietly becoming decorative.
+
 ### D3 — The domain is personal expense report approval
 
 BUBAS claims that the person who owns a rule can read and verify the program implementing it. A
@@ -189,6 +197,27 @@ plausible varied scores — not a constant, or the examples read as fake.
 
 A real HTTP-calling implementation appears in the text as illustration and is never wired into the
 reactor. The build must run offline, for anyone, forever.
+
+### D15 — Staged programs are real copies, and compilation is what makes that acceptable
+
+For the vocabulary, D2 holds exactly: there is one definition of `TOTAL_OF` and one of `APPROVE`.
+
+The programs are different. `escalating-expense.bu` restates lines from `approve-expense.bu`, and
+`itemised-expense.bu` restates lines from both, because a `.bu` file has to be a whole program.
+There is no way to show a rule growing without showing it more than once, and showing it grow is
+the point of a tutorial.
+
+What makes the copies safe is that **every stage is compiled and run**. Rename an operation, change
+its arity, change a parameter type, and every stage that mentions it fails the build. For
+everything the compiler can see, compilation is the propagation mechanism D2 wanted.
+
+What it does not catch: a policy number changed in one stage and not another. Both still compile.
+The generated transcripts narrow the gap — a changed threshold changes that stage's output, and the
+staleness gate then fires — but two stages can still disagree about what the meal cap is with
+nothing going red, as long as each is internally consistent. **When a constant appears in more than
+one stage, the other stages have to be checked by hand.** This is the one place in the design where
+a human still carries the propagation, and it is worth keeping small: prefer thresholds that appear
+in exactly one stage.
 
 ### D13 — Operations are named to read as English, not as stacked nouns
 

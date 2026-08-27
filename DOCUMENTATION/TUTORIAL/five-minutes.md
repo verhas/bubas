@@ -60,19 +60,12 @@ end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 433:md5:b9bbd4c9c1eadb6c3b5a49840029c19c
+_content_generated_: 14:md5:5e8aa2340fe150dfe0b9e762570df7b9
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
-public static final BubasLanguage LANGUAGE = BubasLanguage.builder()
-        .install(Standard::register)
-        .defineOpaqueType("Report", Report.class)
-        .defineFunction("TOTAL_OF", TotalOf.class)
-        .defineStatement("APPROVE {expression/Report:claim}", Approve.class)
-        .defineStatement("REJECT {expression/Report:claim}, {expression/STRING:reason}",
-                Reject.class)
-        .seal();
+
 ```
 <!--/INCLUDE-->
 
@@ -208,7 +201,7 @@ you expose can do anything Java can do. A vocabulary is only as narrow as the op
 
 ## Next
 
-The fifteen-minute tutorial (next to be written) extends this same language — receipts required
+The [fifteen-minute tutorial](fifteen-minutes.md) extends this same language — receipts required
 above a threshold, per-category limits, and escalation to a manager — and the book continues from
 there.
 
