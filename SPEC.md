@@ -1544,7 +1544,7 @@ BubasType.ANY_ARRAY
 
 `BubasType` is mostly an introspection type now that signatures are derived: it surfaces through
 `Value.type()`, `BubasArray.elementType()`, `ctx.type(name)` in a statement handler, and the
-Phase 4 vocabulary export. `ANY_ARRAY` is only ever a parameter type — never a variable type, a
+vocabulary export ([10.9](#109-describing-a-language)). `ANY_ARRAY` is only ever a parameter type — never a variable type, a
 return type or a constraint.
 
 ### 10.7. Contexts
@@ -2088,9 +2088,7 @@ Deliberately unresolved; each needs a decision before the affected component is 
    would need a parameter type form that does not exist yet.
 4. **Diagnostic message catalogue.** Format, message identity and whether errors carry column
    as well as line.
-5. **Prompt export format.** Phase 4 exports the function and statement vocabulary for LLM
-   consumption; the schema is undecided.
-6. **Whether extension discovery is built at all.** [§10.5](#105-extensions-and-discovery) is
+5. **Whether extension discovery is built at all.** [§10.5](#105-extensions-and-discovery) is
    specified but unimplemented, and the rationale there argues that bundles ([§10.3](#103-building-a-language))
    deliver its convenience without moving the vocabulary out of the embedder's own source. The
    decision is to build it, drop it, or keep the annotations and abandon only classpath scanning.

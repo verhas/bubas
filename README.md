@@ -352,8 +352,8 @@ finishes has verified itself rather than merely not crashed.
 ## Status
 
 **Implemented and executable.** The front end, analyser and interpreter all work, and BUBAS
-programs can be unit tested in BUBAS; `mvn test` runs 621 tests, 67 of which are whole BUBAS
-programs executed end to end.
+programs can be unit tested in BUBAS. `mvn test` runs over six hundred tests, more than a hundred of
+them whole BUBAS programs — the language's own corpus and BUNIT's.
 
 | Phase | Scope | State |
 |-------|-------|-------|
@@ -370,7 +370,7 @@ explicit, one `defineFunction` or `defineStatement` at a time. The `provider()` 
 convention implementations may use is already supported, so classes written for discovery work
 through explicit registration unchanged.
 
-Six language questions remain deliberately open and are listed in
+The language questions that remain deliberately open are listed in
 [SPEC.md §16](SPEC.md#16-open-questions).
 
 ## Documentation
