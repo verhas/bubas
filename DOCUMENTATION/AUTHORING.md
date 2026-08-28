@@ -112,8 +112,16 @@ Markers are host-language comments, so `INCLUDE` excludes them from the rendered
 ' snippet: approve           (BUBAS)
 ```
 
-Selection is by **named marker, never by line range**. Line ranges break the moment someone inserts
-a line, and break silently — the document still renders, showing the wrong code.
+Selection is by **named marker or by a regex anchored on real content, never by line range**. Line
+ranges break the moment someone inserts a line, and break silently — the document still renders,
+showing the wrong code.
+
+A marker that disappears also fails silently: `mdship update` reports success and emits an **empty**
+block rather than an error. The document is then wrong in the least visible way possible. Nothing in
+mdship catches this — [D7](#d7-a-stale-document-fails-the-build)'s gate is the only thing that does,
+because the emptied block changes the committed file and the diff fires. For regex-anchored
+includes the gate is therefore not a belt-and-braces extra; it is the sole protection, and it must
+run on every push.
 
 ### D6 — Quoted output is derived, not duplicated
 
@@ -248,6 +256,76 @@ chapter, and by then the language can say something sensible about a miss.
 One operation among twenty. If the AI chapter grows into an AI book, the thesis blurs and the
 documentation stops being about BUBAS.
 
+### D16 — Java appears only in Part 3 of the book
+
+Parts 1 (the language) and 2 (testing) contain no Java at all. Part 3 is embedding, and defining a
+vocabulary *is* embedding.
+
+The first draft of the outline put the vocabulary-definition chapters in Part 1 on the grounds that
+its reader includes the embedding programmer. That was wrong twice over. It made Part 1 unhandable
+— a document that turns into Java a third of the way through cannot be given to a finance manager —
+and it hollowed out Part 3, which the other two parts are supposed to be pointing at.
+
+The embedding programmer is still a Part 1 reader. They need the language before they can design
+one; they just do not need Java to learn it.
+
+Two chapters split rather than moved as a result. The model-backed operation appears in Part 1 as
+something a rule writer consumes (a score is advice, the threshold is yours) and in Part 3 as a
+design argument (advisory output versus verdict). The vocabulary document appears in Part 1 as
+something to read and in Part 3 as something to build.
+
+A consequence worth keeping: the book's own shape now demonstrates its claim instead of quietly
+contradicting it.
+
+### D17 — The chapter list lives in exactly one file
+
+`DOCUMENTATION/BOOK/BOOK.md` is the book skeleton and the only place chapter numbers and titles are
+written. An earlier `OUTLINE.md` held the same 33 chapters as a planning table; two files that must
+agree forever is the duplication the rest of this document exists to prevent, so it was deleted
+rather than kept in step.
+
+Planning data that is not part of the book stays here instead, referencing chapters by number:
+
+- **Application stages by part.** Part 1 uses stages 1–4 and 7. Part 2 uses 7–8. Part 3 uses 4–10.
+  Code can therefore be built several chapters ahead of the prose, and the tutorials already ship
+  stages 1–3.
+- **Merge candidates** if the book runs long: chapters 6 and 7 into one on control flow; 22 and 23
+  into one on a vocabulary's nouns and verbs. Neither is merged now, because each carries an
+  argument and not only a mechanism.
+- **Part 3 covers two jobs** — building a language (21–26) and running an application (27–33). That
+  is the natural seam if three parts ever become four.
+
+### D18 — Chapters are flat files whose names carry no ordering
+
+One file per chapter in `DOCUMENTATION/BOOK/`, named from the title, with **no number prefix and no
+per-part subdirectory**.
+
+Both of those would write the chapter list a second time, which
+[D17](#d17-the-chapter-list-lives-in-exactly-one-file) forbids. A leading `07-` encodes position and
+a `PART1/` directory encodes membership; either one makes inserting or moving a chapter a rename of
+everything after it, plus every cross-reference. Flat and unnumbered, inserting a chapter is one new
+file and one edited line in `BOOK.md`.
+
+This is not theoretical. Six chapters moved from Part 1 to Part 3 while the outline was being
+agreed, before a single chapter file existed. Under a per-part layout that would have been six file
+moves and every link between them.
+
+`BOOK.md` holds the order, the numbering and the part structure, and links to each chapter.
+
+**Abstracts live in the chapter, not in the skeleton.** Each chapter file carries its one-paragraph
+abstract between `<!-- abstract -->` markers, and `BOOK.md` includes it. The description is written
+once, in the file it describes, and `BOOK.md` becomes an assembly point rather than a document
+anyone maintains by hand.
+
+Two mechanical notes for anyone touching this. An INCLUDE pattern **must not contain `-->`**,
+because the placeholder is itself an HTML comment and the first `-->` closes it — so the markers are
+matched as `'<!-- abstract'` and `'<!-- /abstract'`. And `section:` selection was tried first and
+rejected: it includes the heading, and a trailing section runs to end of file.
+
+**A single assembled file** — one artifact for print or PDF — is a second generated document that
+includes all chapters in order. Not built yet; the flat layout makes it a list rather than a tree
+walk.
+
 ## Mechanics
 
 ```
@@ -258,9 +336,11 @@ bubas-doc/                                  in the reactor, excluded from deploy
                                             target/doc-outputs/
   src/test/resources/programs/*.bu          the programs the documents show
 DOCUMENTATION/
+  AUTHORING.md                              this file: how the documents are built
   TUTORIAL/five-minutes.md
   TUTORIAL/fifteen-minutes.md
-  BOOK/01-….md                              one file per chapter
+  BOOK/BOOK.md                              the skeleton and the only chapter list
+  BOOK/01-….md                              one file per chapter, as they are written
 ```
 
 Everything lives in **test scope**, following `bubas-test`, which already does exactly this: a

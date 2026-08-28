@@ -7,7 +7,7 @@ PROGRAM ApproveExpense(claim Report, limit DECIMAL) RETURNS BOOLEAN
     DECLARE mealCap DECIMAL FINAL = 60.00
     DECLARE receiptFloor DECIMAL FINAL = 25.00
 
-    FOR i = 0 TO ITEM_COUNT(claim) - 1
+    FOR i = 1 TO ITEM_COUNT(claim)
         line = ITEM_AT(claim, i)
 
         IF AMOUNT_OF(line) > receiptFloor AND NOT HAS_RECEIPT(line) THEN

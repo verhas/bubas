@@ -11,6 +11,21 @@ Every fragment below is pulled from code the build compiles and runs.
 
 ## Where we left off
 
+<!--INCLUDE
+from: "../../bubas-doc/src/test/resources/programs/approve-expense.bu"
+start:
+  pattern: 'total = TOTAL_OF'
+  include: true
+end:
+  pattern: 'APPROVE claim'
+  include: true
+prefix: "```"
+postfix: "```"
+margin: 0
+_content_generated_: 144:md5:dcf14742603ae3abb4a4344350613662
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
 ```
 total = TOTAL_OF(claim)
 
@@ -21,6 +36,7 @@ END IF
 
 APPROVE claim
 ```
+<!--/INCLUDE-->
 
 Two outcomes, one threshold. Everything from here is added to that, never rewritten.
 
@@ -166,15 +182,15 @@ end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 239:md5:722d2ab05cf74e7793bb280df6d15ca5
+_content_generated_: 255:md5:47d9b6bf3368c90dfcea9c7639233682
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
-@BubasDescription("The line at a position on a claim, counting from zero.")
+@BubasDescription("The line at a position on a claim. The first line is line 1.")
 public static final class ItemAt {
-    public Item call(Context ctx, Report claim, long index) {
-        return claim.items.get((int) index);
+    public Item call(Context ctx, Report claim, long position) {
+        return claim.items.get((int) position - 1);
     }
 }
 ```
@@ -186,7 +202,7 @@ Now the rule can say what expense policy actually says:
 from: "../../bubas-doc/src/test/resources/programs/itemised-expense.bu"
 prefix: "```"
 postfix: "```"
-_content_generated_: 1128:md5:c72378f180b4299ae552e08566cf4fc1
+_content_generated_: 1124:md5:49efedf6684ce961fa9cddc187d09389
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
@@ -200,7 +216,7 @@ PROGRAM ApproveExpense(claim Report, limit DECIMAL) RETURNS BOOLEAN
     DECLARE mealCap DECIMAL FINAL = 60.00
     DECLARE receiptFloor DECIMAL FINAL = 25.00
 
-    FOR i = 0 TO ITEM_COUNT(claim) - 1
+    FOR i = 1 TO ITEM_COUNT(claim)
         line = ITEM_AT(claim, i)
 
         IF AMOUNT_OF(line) > receiptFloor AND NOT HAS_RECEIPT(line) THEN
@@ -234,8 +250,12 @@ END.
 ```
 <!--/INCLUDE-->
 
-**`FOR i = 0 TO ITEM_COUNT(claim) - 1`** counts from zero, and the bounds are worked out once on
-entry rather than on every pass. `EXIT FOR` leaves early when you need it.
+**`FOR i = 1 TO ITEM_COUNT(claim)`** counts from one, because the first line on an expense claim
+is line 1. Nothing here is an array — `ITEM_AT` is a business-level question, and it answers the
+way the person asking it would count. Zero-based indexing is a convention that leaks out of how
+arrays are laid out in memory, and since the language never exposes an array, it has nothing to
+leak out of. The bounds are worked out once on entry rather than on every pass, and `EXIT FOR`
+leaves early when you need it.
 
 **`AND`, `OR` and `NOT`** read as words. `NOT` binds tightest, then comparisons, then `AND`, then
 `OR`, so `AMOUNT_OF(line) > receiptFloor AND NOT HAS_RECEIPT(line)` groups the way it reads.

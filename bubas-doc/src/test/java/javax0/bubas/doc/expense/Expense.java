@@ -153,10 +153,10 @@ public final class Expense {
     }
 
     // snippet: item-at
-    @BubasDescription("The line at a position on a claim, counting from zero.")
+    @BubasDescription("The line at a position on a claim. The first line is line 1.")
     public static final class ItemAt {
-        public Item call(Context ctx, Report claim, long index) {
-            return claim.items.get((int) index);
+        public Item call(Context ctx, Report claim, long position) {
+            return claim.items.get((int) position - 1);
         }
     }
     // end snippet
