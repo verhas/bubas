@@ -2,6 +2,7 @@ package javax0.bubas.bunit;
 
 import javax0.bubas.analyser.BubasLanguage;
 import javax0.bubas.analyser.BubasProgram;
+import javax0.bubas.analyser.core.CoreProgram;
 import javax0.bubas.api.BubasCallInterceptor;
 import javax0.bubas.api.BubasException;
 import javax0.bubas.api.ExpressionArg;
@@ -87,9 +88,26 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
                 .put(placeholder, value);
     }
 
+    /**
+     * A STRING given for an opaque parameter names a token, exactly as it does for a mocked
+     * return. The subject's own declaration says which parameters those are.
+     * <p>
+     * Converting here rather than at {@link #run()} keeps the parameter's name in hand, and leaves
+     * {@code run} to report only the type errors that really are type errors.
+     */
     @Override
     public void argument(String name, Value value) {
-        arguments.put(name, value);
+        arguments.put(name, token(value, declaredType(name)));
+    }
+
+    /** The type the subject declared for that parameter, or {@code null} if it has none. */
+    private BubasType declaredType(String name) {
+        return subject.variables().stream()
+                .limit(subject.parameterCount())
+                .filter(slot -> slot.name().equals(name))
+                .findFirst()
+                .map(CoreProgram.Slot::type)
+                .orElse(null);
     }
 
     @Override
@@ -98,7 +116,15 @@ final class Recorder implements MockRecorder, BubasCallInterceptor {
         final var interpreter = Interpreter.of(subject)
                 .intercept(this)
                 .logger((level, message) -> log.add(level + ": " + message));
-        arguments.forEach((name, value) -> interpreter.argument(name, value.as(Object.class)));
+        // A token carries its BUBAS type and has no Java class to be checked against; the
+        // Value overload is the way in for those. Everything else goes in as itself.
+        arguments.forEach((name, value) -> {
+            if (value.as(Object.class) instanceof Token) {
+                interpreter.argument(name, value);
+            } else {
+                interpreter.argument(name, value.as(Object.class));
+            }
+        });
         try {
             result = interpreter.run();
         } catch (BubasException e) {

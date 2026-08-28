@@ -1,0 +1,17 @@
+'PASS
+' An expectation may name the opaque value a command was given, not merely that it was called.
+' SUBJECT: decide-passed-in-order.bu
+PROGRAM ExpectationNamesAnOpaqueArgument
+    "ORDER_TOTAL" WITH ARGS("the order") RETURNS 5000.00
+    "APPROVE _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "purchase" IS "the order"
+    ARGUMENT "limit"    IS 1000.00
+
+    RUN
+
+    RESULT IS FALSE
+    "REJECT _, _" WAS CALLED WITH ARGS("the order", "over limit")
+    "APPROVE _" WAS NOT CALLED
+END.

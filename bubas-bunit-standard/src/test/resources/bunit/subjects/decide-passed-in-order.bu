@@ -1,0 +1,13 @@
+PROGRAM DecidePassedInOrder(purchase Order, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+
+    total = ORDER_TOTAL(purchase)
+
+    IF total > limit THEN
+        REJECT purchase, "over limit"
+        RETURN FALSE
+    END IF
+
+    APPROVE purchase
+    RETURN TRUE
+END.

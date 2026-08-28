@@ -22,7 +22,8 @@ public final class Matching {
     /**
      * A {@link Matcher} judges; anything else is compared. DECIMAL compares by value rather than by
      * scale, exactly as {@code =} does in the language, so a mock answering {@code 1.50} satisfies
-     * an expectation of {@code 1.5}.
+     * an expectation of {@code 1.5}. A STRING written against a {@link Token} compares with its
+     * name, because that is the only way a test can refer to an opaque value at all.
      */
     public static boolean same(Value expected, Value actual) {
         if (expected == null || actual == null) {
@@ -35,6 +36,9 @@ public final class Matching {
         final var got = actual.as(Object.class);
         if (wanted instanceof BigDecimal one && got instanceof BigDecimal other) {
             return one.compareTo(other) == 0;
+        }
+        if (wanted instanceof String text && got instanceof Token(String name)) {
+            return text.equals(name);
         }
         return Objects.equals(wanted, got);
     }
@@ -51,7 +55,15 @@ public final class Matching {
         return true;
     }
 
-    /** How a value reads in a diagnostic. A matcher describes itself; a string keeps its quotes. */
+    /**
+     * How a value reads in a diagnostic. A matcher describes itself; a string keeps its quotes, and
+     * so does a token.
+     * <p>
+     * A token is quoted because a test writes it as a quoted name and can refer to it no other way.
+     * Rendering it bare made a genuine mismatch — expected {@code "a"}, got a token named {@code b}
+     * — read as though the quotes were the problem, which is a misleading thing for a diagnostic to
+     * do about the one value kind a test cannot construct.
+     */
     public static String show(Value value) {
         if (value == null) {
             return "nothing";
@@ -60,7 +72,9 @@ public final class Matching {
         if (raw instanceof Matcher matcher) {
             return matcher.describe();
         }
-        return raw instanceof String text ? '"' + text + '"' : String.valueOf(raw);
+        return raw instanceof String || raw instanceof Token
+                ? "\"" + raw + "\""
+                : String.valueOf(raw);
     }
 
     public static String show(List<Value> values) {

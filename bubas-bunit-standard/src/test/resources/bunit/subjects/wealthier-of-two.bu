@@ -1,0 +1,15 @@
+PROGRAM WealthierOfTwo(first Order, second Order) RETURNS BOOLEAN
+    DECLARE one DECIMAL
+    DECLARE other DECIMAL
+
+    one = ORDER_TOTAL(first)
+    other = ORDER_TOTAL(second)
+
+    IF one > other THEN
+        APPROVE first
+        RETURN TRUE
+    END IF
+
+    APPROVE second
+    RETURN FALSE
+END.

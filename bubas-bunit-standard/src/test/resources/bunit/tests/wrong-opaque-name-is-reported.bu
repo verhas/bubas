@@ -1,0 +1,17 @@
+'FAIL
+' Naming the wrong opaque value is reported as the name it is, not as a quoting accident.
+' SUBJECT: decide-passed-in-order.bu
+' ERROR: but it was called with ("the order")
+PROGRAM WrongOpaqueNameIsReported
+    "ORDER_TOTAL" WITH ARGS("the order") RETURNS 500.00
+    "APPROVE _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "purchase" IS "the order"
+    ARGUMENT "limit"    IS 1000.00
+
+    RUN
+
+    RESULT IS TRUE
+    "APPROVE _" WAS CALLED WITH ARGS("a different order")
+END.

@@ -1,0 +1,18 @@
+'PASS
+' An opaque parameter is supplied by naming a token, exactly as a mocked return is.
+' The subject is handed the order rather than fetching it, which nothing else in the corpus covers.
+' SUBJECT: decide-passed-in-order.bu
+PROGRAM OpaqueArgumentIsAToken
+    "ORDER_TOTAL" WITH ARGS("the order") RETURNS 500.00
+    "APPROVE _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "purchase" IS "the order"
+    ARGUMENT "limit"    IS 1000.00
+
+    RUN
+
+    RESULT IS TRUE
+    "APPROVE _" WAS CALLED
+    "REJECT _, _" WAS NOT CALLED
+END.

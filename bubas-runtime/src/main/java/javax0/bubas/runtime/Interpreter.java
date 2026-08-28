@@ -72,6 +72,34 @@ public final class Interpreter {
         return this;
     }
 
+    /**
+     * Supplies a parameter with a value that already carries its own BUBAS type.
+     * <p>
+     * For every kind of value a program can construct, {@link #argument(String, Object)} is the way
+     * in and the Java class is the check. An opaque value is the exception: a caller may hold
+     * something that stands for a domain object without being one — a test's stand-in, most
+     * obviously, since an opaque value is the only kind BUBAS cannot construct. There is no Java
+     * class to check such a thing against, and the honest check is the BUBAS type it declares.
+     * <p>
+     * The declared type still has to match, so this trusts the caller about the representation and
+     * about nothing else.
+     */
+    public Interpreter argument(String name, Value value) {
+        final var slot = parameters.get(name);
+        if (slot == null) {
+            throw new BubasException(program.name() + " has no parameter named '" + name + "'",
+                    0, "");
+        }
+        final var declared = program.variables().get(slot).type();
+        if (value == null || !declared.equals(value.type())) {
+            throw new BubasException("'" + name + "' is " + declared + ", so it cannot be given a "
+                    + (value == null ? "null" : value.type()), 0, "");
+        }
+        slots[slot] = value.as(Object.class);
+        supplied.add(name);
+        return this;
+    }
+
     public <T> Interpreter registerService(Class<T> type, T service) {
         return registerService(type, "", service);
     }

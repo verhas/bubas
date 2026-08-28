@@ -104,7 +104,7 @@ class BunitRunnerTest {
                 """);
         assertThat(result.passed()).as("%s", result.diagnostic()).isTrue();
         assertThat(result.name()).isEqualTo("OverLimitIsRejected");
-        assertThat(result.calls()).containsExactly("LOAD_ORDER(42)", "ORDER_TOTAL(o1)");
+        assertThat(result.calls()).containsExactly("LOAD_ORDER(42)", "ORDER_TOTAL(\"o1\")");
         assertThat(result.log()).containsExactly("INFO: over limit");
     }
 

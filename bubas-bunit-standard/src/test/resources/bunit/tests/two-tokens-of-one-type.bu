@@ -1,0 +1,17 @@
+'PASS
+' Two opaque values of the same type are told apart by name, not by the order they were used.
+' The mocks answer differently for each, and the expectation names which one was approved.
+' SUBJECT: wealthier-of-two.bu
+PROGRAM TwoTokensOfOneType
+    "ORDER_TOTAL" WITH ARGS("big")   RETURNS 900.00
+    "ORDER_TOTAL" WITH ARGS("small") RETURNS 100.00
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "first"  IS "small"
+    ARGUMENT "second" IS "big"
+
+    RUN
+
+    RESULT IS FALSE
+    "APPROVE _" WAS CALLED WITH ARGS("big")
+END.
