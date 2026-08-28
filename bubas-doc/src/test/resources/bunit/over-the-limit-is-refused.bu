@@ -1,0 +1,14 @@
+PROGRAM OverTheLimitIsRefused
+    "TOTAL_OF" WITH ARGS("Bob's claim") RETURNS 1230.00
+    "APPROVE _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "claim" IS "Bob's claim"
+    ARGUMENT "limit" IS 200.00
+
+    RUN
+
+    RESULT IS FALSE
+    "REJECT _, _" WAS CALLED WITH ARGS("Bob's claim", CONTAINS("over the"))
+    "APPROVE _" WAS NOT CALLED
+END.

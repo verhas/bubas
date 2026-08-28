@@ -301,13 +301,11 @@ for is pretended. What that buys, and the one thing it can never tell you.
 from: "tokens.md"
 start: '<!-- abstract'
 end: '<!-- /abstract'
-_content_generated_: 229:md5:dd3e8f0b4685e9da49366ded64bc8e3a
+_content_generated_: 82:md5:9b38fcb549c0991cfe07c7c26c4f2798
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
-Some values cannot be constructed in a test, because they are sealed — you can hold a claim but not
-build one. Tokens are how a test names a value it cannot make, and how the same value is recognised
-when the rule passes it on.
+Standing in for opaque values you cannot construct; naming rather than building.
 <!--/INCLUDE-->
 
 ### 16. [Matching arguments](matching-arguments.md)
@@ -376,15 +374,13 @@ chose, is what you are really testing.
 from: "a-suite-that-stays-honest.md"
 start: '<!-- abstract'
 end: '<!-- /abstract'
-_content_generated_: 246:md5:3e540af2f9e76bcd803743cdb6367ab4
+_content_generated_: 241:md5:0e505ea27a6ca9d7a499a52f86db6b91
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 Organising tests so they keep their value: what to cover, what not to bother with, and the coverage
 claim a finite vocabulary makes possible that a general-purpose language cannot — you can enumerate
 every operation a rule is able to call.
-
----
 <!--/INCLUDE-->
 
 ## Part 3 — Embedding

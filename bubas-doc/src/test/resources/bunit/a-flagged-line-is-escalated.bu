@@ -1,0 +1,20 @@
+PROGRAM AFlaggedLineIsEscalated
+    "ITEM_COUNT" WITH ARGS("the claim") RETURNS 2
+    "ITEM_AT" WITH ARGS("the claim", 1) RETURNS "the taxi"
+    "ITEM_AT" WITH ARGS("the claim", 2) RETURNS "the dinner"
+    "ANOMALY_SCORE_OF" WITH ARGS("the taxi")   RETURNS 2
+    "ANOMALY_SCORE_OF" WITH ARGS("the dinner") RETURNS 8
+    "TOTAL_OF" WITH ARGS("the claim") RETURNS 411.00
+    "ESCALATE _, _" IS MOCKED
+    "APPROVE _" IS MOCKED
+
+    ARGUMENT "claim"  IS "the claim"
+    ARGUMENT "limit"  IS 2000.00
+    ARGUMENT "flagAt" IS 8
+
+    RUN
+
+    RESULT IS FALSE
+    "ESCALATE _, _" WAS CALLED WITH ARGS("the claim", CONTAINS("scored 8"))
+    "APPROVE _" WAS NOT CALLED
+END.

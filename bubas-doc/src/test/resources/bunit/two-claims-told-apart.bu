@@ -1,0 +1,15 @@
+PROGRAM TwoClaimsToldApart
+    "TOTAL_OF" WITH ARGS("the small claim") RETURNS 40.00
+    "TOTAL_OF" WITH ARGS("the big claim")   RETURNS 900.00
+    "APPROVE _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "claim" IS "the big claim"
+    ARGUMENT "limit" IS 200.00
+
+    RUN
+
+    RESULT IS FALSE
+    "REJECT _, _" WAS CALLED WITH ARGS("the big claim", ANYTHING())
+    "TOTAL_OF" WAS CALLED WITH ARGS("the big claim")
+END.

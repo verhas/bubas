@@ -1,0 +1,13 @@
+PROGRAM ExactlyAtTheLimitIsApproved
+    "TOTAL_OF" WITH ARGS("a claim") RETURNS 200.00
+    "APPROVE _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "claim" IS "a claim"
+    ARGUMENT "limit" IS 200.00
+
+    RUN
+
+    RESULT IS TRUE
+    "APPROVE _" WAS CALLED
+END.
