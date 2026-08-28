@@ -1,0 +1,13 @@
+PROGRAM ForgotToSupply
+    "TOTAL_OF" WITH ARGS("Erin's claim") RETURNS 450.00
+    "ROUTE _ TO _ AT _" IS MOCKED
+    "BUDGET_LEFT" RETURNS 2500.00
+    "ESCALATE _, _" IS MOCKED
+
+    ARGUMENT "claim" IS "Erin's claim"
+    ARGUMENT "limit" IS 200.00
+
+    RUN
+
+    RESULT IS FALSE
+END.

@@ -302,10 +302,11 @@ rather than kept in step.
 
 Planning data that is not part of the book stays here instead, referencing chapters by number:
 
-- **Application stages.** Five exist, and Part 1 uses all of them: 1 core, 2 escalation, 3 line
-  items, 4 category totals, 5 the anomaly score. The tutorials ship stages 1–3. Part 2 works
-  against stage 5; Part 3 adds what its own chapters need. Stage numbering follows the code rather
-  than a plan made in advance.
+- **Application stages.** Six exist: 1 core, 2 escalation, 3 line items, 4 category totals,
+  5 the anomaly score, 6 routing. Part 1 uses 1–5 and the tutorials ship 1–3. Part 2 works
+  against stage 6, which exists because the consistency checker needs a command that writes
+  ([D19](#d19-a-command-that-writes-one-variable-should-have-been-a-function)). Stage numbering
+  follows the code rather than a plan made in advance.
 - **Merge candidates** if the book runs long: chapters 6 and 7 into one on control flow; 22 and 23
   into one on a vocabulary's nouns and verbs. Neither is merged now, because each carries an
   argument and not only a mechanism.
@@ -342,6 +343,24 @@ rejected: it includes the heading, and a trailing section runs to end of file.
 **A single assembled file** — one artifact for print or PDF — is a second generated document that
 includes all chapters in order. Not built yet; the flat layout makes it a list rather than a tree
 walk.
+
+### D19 — A command that writes one variable should have been a function
+
+`ROUTE claim TO approver AT centre` is a command because one reading of the approval policy
+decides two things — who signs, and which budget it lands on — and asking twice could get answers
+from two different readings.
+
+Had it produced only the approver, it should have been `approver = FIND_APPROVER(claim)`. A
+writing command with a single target is a function wearing a disguise: harder to read, harder to
+compose, and it declares a variable as a side effect of being called.
+
+So the test for the command form is **more than one answer, decided together**. Not "it writes
+rather than returns"; every function writes something.
+
+This is also what makes stage 6 worth having. The consistency checker's central rule concerns
+commands that write, and it treats the two targets differently — an opaque one is given a token
+automatically, a `STRING` must be supplied by the mock or the test is refused before the subject
+runs. One command demonstrates both, which no earlier stage could.
 
 ## Mechanics
 
@@ -411,8 +430,8 @@ the day it is written.
 
 ## Open
 
-- The AI operation's name: `ANOMALY_SCORE_OF` versus `FISHINESS_OF`. Undecided, and not needed
-  until the book reaches it. Stage 1's names are settled under [D13](#d13-operations-are-named-to-read-as-english-not-as-stacked-nouns).
+- Nothing outstanding on naming. `ANOMALY_SCORE_OF` is settled; every operation name follows
+  [D13](#d13-operations-are-named-to-read-as-english-not-as-stacked-nouns).
 - Whether README and SPEC should eventually pull their examples from a module too. They are
   hand-maintained copies today (D4 keeps their domain, not their staleness), and the argument for
   fixing that is the same argument this document makes.

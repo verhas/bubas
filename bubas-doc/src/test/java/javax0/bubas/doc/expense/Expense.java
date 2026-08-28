@@ -6,6 +6,7 @@ import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
+import javax0.bubas.api.VariableArg;
 import javax0.bubas.support.Standard;
 
 import java.math.BigDecimal;
@@ -52,7 +53,7 @@ public final class Expense {
 
     /** A value BUBAS holds and passes but cannot look inside. */
     public static final class Report {
-        private final long id;
+        final long id;
         private final String employee;
         private final List<Item> items;
 
@@ -288,6 +289,64 @@ public final class Expense {
     }
     // end snippet
 
+    // ---------------------------------------------------------------- stage 6: routing
+
+    @BubasDescribes(CostCentre.class)
+    @BubasDescription("""
+            The budget a claim will be charged against, and the thing an approver signs for.
+            Ask BUDGET_LEFT how much of it is still unspent this period.
+            """)
+    public interface CostCentreDoc {
+    }
+
+    /** Where the money comes from. Opaque, like everything else the domain owns. */
+    public record CostCentre(String code, BigDecimal remaining) {
+        @Override
+        public String toString() {
+            return "cost centre " + code;
+        }
+    }
+
+    // snippet: route
+    /**
+     * Two answers from one lookup, which is the only reason this is a command rather than a
+     * function. Who signs and which budget it lands on are decided together, by one reading of the
+     * approval policy; asking twice could get answers from two different readings.
+     */
+    @BubasDescription("""
+            Works out who has to approve a claim and which budget it will be charged to.
+            Both come from one reading of the approval policy, so they are always consistent.
+            """)
+    public static final class Route {
+        public void call(StatementContext ctx, ExpressionArg claim, VariableArg approver,
+                         VariableArg centre) {
+            final var filed = claim.evaluate().as(Report.class);
+            approver.set(filed.total().compareTo(new BigDecimal("1000")) > 0
+                    ? "the finance director" : "the line manager");
+            centre.set(new CostCentre("CC-" + filed.id, new BigDecimal("2500.00")));
+        }
+    }
+    // end snippet
+
+    @BubasDescription("How much of a cost centre's budget is still unspent, in euro.")
+    public static final class BudgetLeft {
+        public BigDecimal call(Context ctx, CostCentre centre) {
+            return centre.remaining();
+        }
+    }
+
+    // snippet: routing-language
+    /** Stage 6: one operation, two answers, and the budget they point at. */
+    static BubasLanguage.Builder routing() {
+        return screening()
+                .defineOpaqueTypeVia("CostCentre", CostCentreDoc.class)
+                .defineFunction("BUDGET_LEFT", BudgetLeft.class)
+                .defineStatement("ROUTE {expression/Report:claim}"
+                        + " TO {new > identifier/STRING:approver > initialized}"
+                        + " AT {new > identifier/CostCentre:centre > initialized}", Route.class);
+    }
+    // end snippet
+
     // ---------------------------------------------------------------- the sealed stages
 
     public static final BubasLanguage STAGE_1 = core().seal();
@@ -295,4 +354,5 @@ public final class Expense {
     public static final BubasLanguage STAGE_3 = itemised().seal();
     public static final BubasLanguage STAGE_4 = categorised().seal();
     public static final BubasLanguage STAGE_5 = screening().seal();
+    public static final BubasLanguage STAGE_6 = routing().seal();
 }

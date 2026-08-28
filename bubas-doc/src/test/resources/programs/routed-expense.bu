@@ -1,0 +1,23 @@
+PROGRAM RouteForApproval(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+    DECLARE remaining DECIMAL
+
+    total = TOTAL_OF(claim)
+
+    IF total <= limit THEN
+        APPROVE claim
+        RETURN TRUE
+    END IF
+
+    ROUTE claim TO approver AT centre
+
+    remaining = BUDGET_LEFT(centre)
+
+    IF remaining < total THEN
+        REJECT claim, "no budget left for " + approver + " to sign against"
+        RETURN FALSE
+    END IF
+
+    ESCALATE claim, "needs " + approver + ", " + remaining + " still available"
+    RETURN FALSE
+END.
