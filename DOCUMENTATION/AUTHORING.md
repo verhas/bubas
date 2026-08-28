@@ -117,11 +117,22 @@ ranges break the moment someone inserts a line, and break silently — the docum
 showing the wrong code.
 
 A marker that disappears also fails silently: `mdship update` reports success and emits an **empty**
-block rather than an error. The document is then wrong in the least visible way possible. Nothing in
-mdship catches this — [D7](#d7-a-stale-document-fails-the-build)'s gate is the only thing that does,
-because the emptied block changes the committed file and the diff fires. For regex-anchored
-includes the gate is therefore not a belt-and-braces extra; it is the sole protection, and it must
-run on every push.
+block rather than an error. The document is then wrong in the least visible way possible.
+
+Two checks are needed for this, and they catch different things.
+
+[D7](#d7-a-stale-document-fails-the-build)'s gate is a **transition** check: it fires on the build
+where the block empties, because the committed file changes. It is blind to an empty block that was
+committed earlier, because from then on there is nothing to diff.
+
+`DocumentationTest` is the matching **state** check: it walks every document on every build and
+fails if any generated block came out empty, whenever that happened.
+
+Both are required, and the reason is not hypothetical. The five-minute tutorial's central snippet —
+the language definition, the thing the tutorial exists to show — sat empty through several commits
+after the vocabulary was restructured and a marker was renamed. Neither mdship nor the gate said a
+word, and a local gate rehearsal that ran `git add` before `git diff --exit-code` could not have
+failed in any case. **Verify the gate the way CI runs it: update, then diff, with nothing staged.**
 
 ### D6 — Quoted output is derived, not duplicated
 
@@ -131,6 +142,11 @@ has two copies agreeing by luck, checked by nothing.
 Instead the test **writes the real output** to `target/doc-outputs/<name>.txt`, and the document
 includes that file. One copy, derived. Every number, printed line, and quoted diagnostic in the
 prose is something the code actually produced during the build.
+
+Output files are named for **what they contain, not which document shows them** —
+`stage1-decisions.txt`, not `five-minutes.txt`. A tutorial and a book chapter covering the same
+stage then include the same generated file instead of each commissioning its own near-identical
+copy. Test classes follow the same rule: `StageOneTest`, not `FiveMinuteTest`.
 
 The same mechanism generates each chapter's vocabulary reference: `VocabularyExport.asMarkdown()`
 run against that stage's language object produces the listing, so "what the language knows at this
@@ -286,9 +302,10 @@ rather than kept in step.
 
 Planning data that is not part of the book stays here instead, referencing chapters by number:
 
-- **Application stages by part.** Part 1 uses stages 1–4 and 7. Part 2 uses 7–8. Part 3 uses 4–10.
-  Code can therefore be built several chapters ahead of the prose, and the tutorials already ship
-  stages 1–3.
+- **Application stages.** Five exist, and Part 1 uses all of them: 1 core, 2 escalation, 3 line
+  items, 4 category totals, 5 the anomaly score. The tutorials ship stages 1–3. Part 2 works
+  against stage 5; Part 3 adds what its own chapters need. Stage numbering follows the code rather
+  than a plan made in advance.
 - **Merge candidates** if the book runs long: chapters 6 and 7 into one on control flow; 22 and 23
   into one on a vocabulary's nouns and verbs. Neither is merged now, because each carries an
   argument and not only a mechanism.
@@ -342,6 +359,12 @@ DOCUMENTATION/
   BOOK/BOOK.md                              the skeleton and the only chapter list
   BOOK/01-….md                              one file per chapter, as they are written
 ```
+
+A chapter that must show what the language gained includes `vocabulary-added-N.md`, produced by
+running the export over two consecutive stages and keeping the difference. That is how Parts 1
+and 2 honour [D16](#d16-java-appears-only-in-part-3-of-the-book) while still showing the reader what
+arrived: the language describes itself, in the words a subject-matter expert reads, instead of
+the chapter showing Java.
 
 Everything lives in **test scope**, following `bubas-test`, which already does exactly this: a
 vocabulary and a corpus of programs that exist to be exercised rather than published. Test scope

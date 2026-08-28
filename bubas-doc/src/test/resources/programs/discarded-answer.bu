@@ -1,0 +1,14 @@
+PROGRAM ApproveExpense(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+
+    TOTAL_OF claim
+
+    total = TOTAL_OF(claim)
+
+    IF total > limit THEN
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

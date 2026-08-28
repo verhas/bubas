@@ -1,0 +1,21 @@
+PROGRAM RouteExpense(claim Report, limit DECIMAL, urgent BOOLEAN) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+    DECLARE ceiling DECIMAL FINAL = 1000.00
+
+    total = TOTAL_OF(claim)
+
+    IF total > ceiling THEN
+        REJECT claim, "over " + ceiling + " — needs a business case first"
+        RETURN FALSE
+    ELSEIF total > limit AND NOT urgent THEN
+        ESCALATE claim, "over the " + limit + " limit"
+        RETURN FALSE
+    ELSEIF total > limit THEN
+        NOTE "urgent, so cleared over the limit"
+        APPROVE claim
+        RETURN TRUE
+    ELSE
+        APPROVE claim
+        RETURN TRUE
+    END IF
+END.

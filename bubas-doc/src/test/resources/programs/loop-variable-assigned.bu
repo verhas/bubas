@@ -1,0 +1,15 @@
+PROGRAM ApproveExpense(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE i INTEGER
+    DECLARE line Item
+
+    NOTE "limit is " + limit
+
+    FOR i = 1 TO ITEM_COUNT(claim)
+        line = ITEM_AT(claim, i)
+        i = i + 1
+        NOTE MERCHANT_OF(line)
+    END FOR
+
+    APPROVE claim
+    RETURN TRUE
+END.

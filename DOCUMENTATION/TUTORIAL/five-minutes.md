@@ -50,27 +50,37 @@ a rule can audit the thing that implements it.
 
 ## The vocabulary is the language
 
-`TOTAL_OF`, `APPROVE` and `REJECT` are not BUBAS keywords. There are no such keywords. Somebody
-wrote them, in Java, on purpose:
+`TOTAL_OF`, `APPROVE` and `REJECT` are not BUBAS keywords. There are no such keywords. Every word
+in that program that means anything to this domain was written, in Java, on purpose:
 
 <!--INCLUDE
 from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Expense.java"
-start: '// snippet: language'
+start: '// snippet: core-language'
 end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 14:md5:5e8aa2340fe150dfe0b9e762570df7b9
+_content_generated_: 554:md5:2d53d8b4eb2a134aca3d385ea99e4955
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
-
+/** Stage 1: what the five-minute tutorial shows. */
+static BubasLanguage.Builder core() {
+    return BubasLanguage.builder()
+            .install(Standard::register)
+            .defineOpaqueTypeVia("Report", ReportDoc.class)
+            .defineFunction("TOTAL_OF", TotalOf.class)
+            .defineFunction("NOTE", Note.class)
+            .defineStatement("APPROVE {expression/Report:claim}", Approve.class)
+            .defineStatement("REJECT {expression/Report:claim}, {expression/STRING:reason}",
+                    Reject.class);
+}
 ```
 <!--/INCLUDE-->
 
-That is the whole language definition. Three operations and one type. A program compiled against
-it can say those things and nothing else.
+That is the whole language definition — a handful of operations and a single type. A program
+compiled against it can say those things and nothing else.
 
 `Report` is an **opaque type**: BUBAS can hold one, pass it to an operation and store it in a
 variable, but it cannot look inside. There is no `claim.employee.manager.email` in this language,
@@ -140,7 +150,7 @@ behind an operation being as relevant to that reader as a bicycle is to a fish.
 Compile once, run as often as you like. Given a limit of 200.00 and the two claims on file:
 
 <!--INCLUDE
-from: "../../bubas-doc/target/doc-outputs/five-minutes.txt"
+from: "../../bubas-doc/target/doc-outputs/stage1-decisions.txt"
 prefix: "```"
 postfix: "```"
 _content_generated_: 240:md5:9e2dc796adea37b002456d7099825fd8
@@ -167,7 +177,7 @@ Suppose the total is compared against the limit a line too early, before it has 
 Here is what the compiler says — captured from the compiler, not transcribed:
 
 <!--INCLUDE
-from: "../../bubas-doc/target/doc-outputs/five-minutes-error.txt"
+from: "../../bubas-doc/target/doc-outputs/stage1-untotalled.txt"
 prefix: "```"
 postfix: "```"
 _content_generated_: 94:md5:f83ee1b96cdd26eb0f9f59a6129e28ad

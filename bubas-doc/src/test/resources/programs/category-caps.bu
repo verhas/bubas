@@ -1,0 +1,14 @@
+PROGRAM CategoryCaps(claim Report, mealCap DECIMAL, travelCap DECIMAL) RETURNS BOOLEAN
+    IF TOTAL_FOR(claim, "meals") > mealCap THEN
+        ESCALATE claim, "meals came to " + TOTAL_FOR(claim, "meals")
+        RETURN FALSE
+    END IF
+
+    IF TOTAL_FOR(claim, "travel") > travelCap THEN
+        ESCALATE claim, "travel came to " + TOTAL_FOR(claim, "travel")
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

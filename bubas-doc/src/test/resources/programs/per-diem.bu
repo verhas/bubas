@@ -1,0 +1,15 @@
+PROGRAM ApprovePerDiem(claim Report, dailyCap DECIMAL, days INTEGER) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+    DECLARE perDay DECIMAL
+
+    total = TOTAL_OF(claim)
+    perDay = total / days
+
+    IF perDay > dailyCap THEN
+        REJECT claim, "averages " + perDay + " a day over " + days + " days, cap is " + dailyCap
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

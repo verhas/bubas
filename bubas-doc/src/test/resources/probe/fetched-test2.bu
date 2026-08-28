@@ -1,0 +1,15 @@
+PROGRAM UnderTheLimitIsApproved
+    "LOAD" WITH ARGS(7) RETURNS "Alice's claim"
+    "TOTAL_OF" WITH ARGS("Alice's claim") RETURNS 128.40
+    "APPROVE _" IS MOCKED
+    "REJECT _, _" IS MOCKED
+
+    ARGUMENT "claimId" IS 7
+    ARGUMENT "limit"   IS 200.00
+
+    RUN
+
+    RESULT IS TRUE
+    "APPROVE _" WAS CALLED WITH ARGS("Alice's claim")
+    "REJECT _, _" WAS NOT CALLED
+END.

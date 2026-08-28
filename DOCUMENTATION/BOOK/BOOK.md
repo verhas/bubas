@@ -112,14 +112,14 @@ By the end of this chapter you can read a BUBAS program, which is most of what t
 from: "values.md"
 start: '<!-- abstract'
 end: '<!-- /abstract'
-_content_generated_: 310:md5:739fe75c66b68261a3af85b71b44ad58
+_content_generated_: 310:md5:532b8c0741ec13907cf1c003387e8d95
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 The four kinds of value a program can hold — whole numbers, decimals, text, true and false — and
-why money is always `DECIMAL` and never a floating-point approximation of itself. There is no
-null: a value that has not been worked out yet cannot be read at all, a rule with consequences
-taken up in chapter 8.
+why money is always `DECIMAL` and never a floating-point approximation of itself. There is no null:
+a value that has not been worked out yet cannot be read at all, a rule with consequences taken up
+in chapter 8.
 <!--/INCLUDE-->
 
 ### 4. [Asking and telling](asking-and-telling.md)
@@ -220,14 +220,14 @@ which is a reasonable thing to want, and belongs behind an operation rather than
 from: "operations-that-consult-a-model.md"
 start: '<!-- abstract'
 end: '<!-- /abstract'
-_content_generated_: 347:md5:2d18cf810fd5a99462b2b83ae5797382
+_content_generated_: 347:md5:ca9810894404ed955319be9c19782888
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 An operation that returns how unusual a line of spending looks, on a scale of one to ten, and is
 backed by a model rather than a calculation. The score is advice; the threshold you compare it
-against is in your program, where you own it. What it costs to have an operation that will not
-give the same answer twice — which is where Part 2 begins.
+against is in your program, where you own it. What it costs to have an operation that will not give
+the same answer twice — which is where Part 2 begins.
 <!--/INCLUDE-->
 
 ### 11. [Knowing what you can say](knowing-what-you-can-say.md)
@@ -236,7 +236,7 @@ give the same answer twice — which is where Part 2 begins.
 from: "knowing-what-you-can-say.md"
 start: '<!-- abstract'
 end: '<!-- /abstract'
-_content_generated_: 385:md5:e12d922b58dddeed86a65226a3dcfc41
+_content_generated_: 380:md5:8c7fd8c927c1c24e61ece15e711ef2d9
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
@@ -244,8 +244,6 @@ Every BUBAS language can describe itself: a document listing every operation, wh
 what it is for, written for you rather than for a programmer. How to read it, how to tell whether a
 rule you have been asked to write is expressible, and how to ask for an operation that does not
 exist yet. That last one is a normal request, and Part 3 is where it gets answered.
-
----
 <!--/INCLUDE-->
 
 ## Part 2 — Testing

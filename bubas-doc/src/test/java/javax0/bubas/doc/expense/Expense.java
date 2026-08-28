@@ -110,13 +110,27 @@ public final class Expense {
         }
     }
 
+    // snippet: note
+    /**
+     * Answers nothing, so it is written as a statement — with or without brackets, because a VOID
+     * function may be called either way.
+     */
+    @BubasDescription("Records a note against the decision, for whoever reads it later.")
+    public static final class Note {
+        public void call(Context ctx, String message) {
+            ctx.log("NOTE", message);
+        }
+    }
+    // end snippet
+
     // snippet: core-language
     /** Stage 1: what the five-minute tutorial shows. */
     static BubasLanguage.Builder core() {
         return BubasLanguage.builder()
                 .install(Standard::register)
-                .defineOpaqueType("Report", Report.class)
+                .defineOpaqueTypeVia("Report", ReportDoc.class)
                 .defineFunction("TOTAL_OF", TotalOf.class)
+                .defineFunction("NOTE", Note.class)
                 .defineStatement("APPROVE {expression/Report:claim}", Approve.class)
                 .defineStatement("REJECT {expression/Report:claim}, {expression/STRING:reason}",
                         Reject.class);
@@ -193,7 +207,7 @@ public final class Expense {
     /** Stage 3: the claim stops being a single number and becomes a list of lines. */
     static BubasLanguage.Builder itemised() {
         return escalating()
-                .defineOpaqueType("Item", Item.class)
+                .defineOpaqueTypeVia("Item", ItemDoc.class)
                 .defineFunction("ITEM_COUNT", ItemCount.class)
                 .defineFunction("ITEM_AT", ItemAt.class)
                 .defineFunction("AMOUNT_OF", AmountOf.class)
@@ -203,9 +217,82 @@ public final class Expense {
     }
     // end snippet
 
+    // ---------------------------------------------------------------- stage 4: asking directly
+
+    // snippet: total-for
+    @BubasDescription("What one category of spending on a claim comes to, in euro.")
+    public static final class TotalFor {
+        public BigDecimal call(Context ctx, Report claim, String category) {
+            return claim.items.stream()
+                    .filter(line -> line.category().equals(category))
+                    .map(Item::amount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+    }
+    // end snippet
+
+    // snippet: categorised-language
+    /**
+     * Stage 4: one operation that replaces a loop, an array and a category-to-slot mapping in
+     * every rule that would otherwise have had to write them.
+     */
+    static BubasLanguage.Builder categorised() {
+        return itemised().defineFunction("TOTAL_FOR", TotalFor.class);
+    }
+    // end snippet
+
+    // ---------------------------------------------------------------- stage 5: an opinion
+
+    // snippet: anomaly-score
+    /**
+     * Stands in for a model. A real implementation would send the line to a service and return
+     * what it answered; this one is a fixed rule of thumb, because the build must run offline for
+     * anyone, forever, and a book whose examples change between printings is no use.
+     * <p>
+     * It returns a <em>score</em>, never a verdict. What counts as too high is a threshold in the
+     * rule, where the person accountable for the policy can read and change it. See
+     * {@code DOCUMENTATION/AUTHORING.md} D10.
+     */
+    @BubasDescription("""
+            How unusual a line of spending looks, from 1 (ordinary) to 10 (very unusual).
+            It is an opinion, not a decision: the rule decides what score is too high.
+            """)
+    public static final class AnomalyScoreOf {
+        private static final BigDecimal LARGE = new BigDecimal("100");
+        private static final BigDecimal VERY_LARGE = new BigDecimal("500");
+        private static final BigDecimal LAVISH_MEAL = new BigDecimal("75");
+
+        public long call(Context ctx, Item line) {
+            var score = 1L;
+            if (line.amount().compareTo(LARGE) > 0) {
+                score += 2;
+            }
+            if (line.amount().compareTo(VERY_LARGE) > 0) {
+                score += 3;
+            }
+            if (!line.hasReceipt()) {
+                score += 2;
+            }
+            if ("meals".equals(line.category()) && line.amount().compareTo(LAVISH_MEAL) > 0) {
+                score += 3;
+            }
+            return Math.min(score, 10);
+        }
+    }
+    // end snippet
+
+    // snippet: screening-language
+    /** Stage 5: an operation that has an opinion rather than an answer. */
+    static BubasLanguage.Builder screening() {
+        return categorised().defineFunction("ANOMALY_SCORE_OF", AnomalyScoreOf.class);
+    }
+    // end snippet
+
     // ---------------------------------------------------------------- the sealed stages
 
     public static final BubasLanguage STAGE_1 = core().seal();
     public static final BubasLanguage STAGE_2 = escalating().seal();
     public static final BubasLanguage STAGE_3 = itemised().seal();
+    public static final BubasLanguage STAGE_4 = categorised().seal();
+    public static final BubasLanguage STAGE_5 = screening().seal();
 }

@@ -1,0 +1,12 @@
+PROGRAM ApproveExpense(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE headroom DECIMAL
+
+    headroom = limit - TOTAL_OF(claim)
+
+    IF TOTAL_OF(claim) > limit THEN
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

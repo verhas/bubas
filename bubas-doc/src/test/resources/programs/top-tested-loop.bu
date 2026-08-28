@@ -1,0 +1,17 @@
+PROGRAM ApproveExpense(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE i INTEGER
+    DECLARE line Item
+    DECLARE lastMerchant STRING
+
+    i = 1
+
+    DO WHILE i <= ITEM_COUNT(claim)
+        line = ITEM_AT(claim, i)
+        lastMerchant = MERCHANT_OF(line)
+        i = i + 1
+    END DO
+
+    NOTE "last was " + lastMerchant + ", limit " + limit
+    APPROVE claim
+    RETURN TRUE
+END.

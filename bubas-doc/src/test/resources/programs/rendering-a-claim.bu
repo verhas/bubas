@@ -1,0 +1,5 @@
+PROGRAM ApproveExpense(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    NOTE "deciding " + claim + " against " + limit
+    APPROVE claim
+    RETURN TRUE
+END.

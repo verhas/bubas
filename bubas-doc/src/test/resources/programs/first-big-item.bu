@@ -1,0 +1,23 @@
+PROGRAM FirstBigItem(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE i INTEGER
+    DECLARE line Item
+    DECLARE found INTEGER
+
+    found = 0
+
+    FOR i = 1 TO ITEM_COUNT(claim)
+        line = ITEM_AT(claim, i)
+        IF AMOUNT_OF(line) > limit THEN
+            found = i
+            EXIT FOR
+        END IF
+    END FOR
+
+    IF found > 0 THEN
+        ESCALATE claim, "line " + found + " is over the limit on its own"
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

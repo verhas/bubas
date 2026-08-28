@@ -1,0 +1,34 @@
+PROGRAM CategoryCaps(claim Report, mealCap DECIMAL, travelCap DECIMAL) RETURNS BOOLEAN
+    DECLARE totals[2] DECIMAL
+    DECLARE i INTEGER
+    DECLARE slot INTEGER
+    DECLARE line Item
+
+    FOR i = 1 TO ITEM_COUNT(claim)
+        line = ITEM_AT(claim, i)
+
+        slot = -1
+        IF CATEGORY_OF(line) = "meals" THEN
+            slot = 0
+        ELSEIF CATEGORY_OF(line) = "travel" THEN
+            slot = 1
+        END IF
+
+        IF slot >= 0 THEN
+            totals[slot] = totals[slot] + AMOUNT_OF(line)
+        END IF
+    END FOR
+
+    IF totals[0] > mealCap THEN
+        ESCALATE claim, "meals came to " + totals[0]
+        RETURN FALSE
+    END IF
+
+    IF totals[1] > travelCap THEN
+        ESCALATE claim, "travel came to " + totals[1]
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

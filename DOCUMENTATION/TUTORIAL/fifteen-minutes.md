@@ -117,7 +117,7 @@ nailed down where a reader can see them.
 Run it against three claims — one comfortable, one over the limit, one over the ceiling:
 
 <!--INCLUDE
-from: "../../bubas-doc/target/doc-outputs/fifteen-minutes-escalation.txt"
+from: "../../bubas-doc/target/doc-outputs/stage2-decisions.txt"
 prefix: "```"
 postfix: "```"
 _content_generated_: 389:md5:b459d26baac3b5b92a63131df4ff1b4f
@@ -151,7 +151,7 @@ end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 567:md5:8df225b1f8617eb376f3991b3177e19e
+_content_generated_: 573:md5:cf294f7657ed73f104202efa65457d86
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
@@ -159,7 +159,7 @@ _content_generated_: 567:md5:8df225b1f8617eb376f3991b3177e19e
 /** Stage 3: the claim stops being a single number and becomes a list of lines. */
 static BubasLanguage.Builder itemised() {
     return escalating()
-            .defineOpaqueType("Item", Item.class)
+            .defineOpaqueTypeVia("Item", ItemDoc.class)
             .defineFunction("ITEM_COUNT", ItemCount.class)
             .defineFunction("ITEM_AT", ItemAt.class)
             .defineFunction("AMOUNT_OF", AmountOf.class)
@@ -271,7 +271,7 @@ Java method called `applyPolicy`.
 Five claims, one for each way the rule can end:
 
 <!--INCLUDE
-from: "../../bubas-doc/target/doc-outputs/fifteen-minutes-itemised.txt"
+from: "../../bubas-doc/target/doc-outputs/stage3-decisions.txt"
 prefix: "```"
 postfix: "```"
 _content_generated_: 657:md5:bf44462df9db0aaf7b6974976b165fb3
@@ -324,7 +324,7 @@ variables.
 Two opaque types are two types. Asking a line-item question about a whole claim does not compile:
 
 <!--INCLUDE
-from: "../../bubas-doc/target/doc-outputs/fifteen-minutes-error.txt"
+from: "../../bubas-doc/target/doc-outputs/stage3-wrong-type.txt"
 prefix: "```"
 postfix: "```"
 _content_generated_: 104:md5:13ed0ed4b94f92caa1042f9d34790e46

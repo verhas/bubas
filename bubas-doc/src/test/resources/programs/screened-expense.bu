@@ -1,0 +1,28 @@
+PROGRAM ScreenExpense(claim Report, limit DECIMAL, flagAt INTEGER) RETURNS BOOLEAN
+    DECLARE i INTEGER
+    DECLARE line Item
+    DECLARE worst INTEGER
+
+    worst = 0
+
+    FOR i = 1 TO ITEM_COUNT(claim)
+        line = ITEM_AT(claim, i)
+
+        IF ANOMALY_SCORE_OF(line) > worst THEN
+            worst = ANOMALY_SCORE_OF(line)
+        END IF
+    END FOR
+
+    IF worst >= flagAt THEN
+        ESCALATE claim, "a line scored " + worst + ", and this rule flags at " + flagAt
+        RETURN FALSE
+    END IF
+
+    IF TOTAL_OF(claim) > limit THEN
+        ESCALATE claim, "over the " + limit + " limit"
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

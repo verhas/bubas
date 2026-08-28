@@ -1,0 +1,16 @@
+PROGRAM ApproveWithNote(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+
+    total = TOTAL_OF(claim)
+
+    NOTE "checked against a limit of " + limit
+
+    IF total > limit THEN
+        NOTE("over by " + (total - limit))
+        REJECT claim, "over the " + limit + " limit"
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.
