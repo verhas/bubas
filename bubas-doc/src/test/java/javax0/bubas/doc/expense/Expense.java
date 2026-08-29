@@ -6,6 +6,7 @@ import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
+import javax0.bubas.api.Value;
 import javax0.bubas.api.VariableArg;
 import javax0.bubas.support.Standard;
 
@@ -31,6 +32,7 @@ public final class Expense {
 
     // ---------------------------------------------------------------- the domain
 
+    // snippet: report-doc
     @BubasDescribes(Report.class)
     @BubasDescription("""
             One employee's expense claim for a trip or a period.
@@ -38,6 +40,7 @@ public final class Expense {
             """)
     public interface ReportDoc {
     }
+    // end snippet
 
     @BubasDescribes(Item.class)
     @BubasDescription("""
@@ -51,6 +54,7 @@ public final class Expense {
     public record Item(String category, String merchant, BigDecimal amount, boolean hasReceipt) {
     }
 
+    // snippet: report-class
     /** A value BUBAS holds and passes but cannot look inside. */
     public static final class Report {
         final long id;
@@ -72,6 +76,7 @@ public final class Expense {
             return "report " + id + " (" + employee + ")";
         }
     }
+    // end snippet
 
     /** The host constructs claims. The language only ever receives them. */
     static Report claim(long id, String employee, Item... items) {
@@ -347,6 +352,44 @@ public final class Expense {
     }
     // end snippet
 
+    // ---------------------------------------------------------------- stage 7: telling people
+
+    // snippet: notify
+    /**
+     * Variadic: BUBAS sees {@code NOTIFY(people STRING...)} and calls it with a spread list, never
+     * with an array. An embedder who wants an array declares an array parameter instead.
+     */
+    @BubasDescription("Tells one or more people about a claim. Answers nothing.")
+    public static final class Notify {
+        public void call(Context ctx, String... people) {
+            ctx.log("NOTIFY", "told " + String.join(", ", people));
+        }
+    }
+    // end snippet
+
+    // snippet: record-any
+    /**
+     * A wildcard parameter: BUBAS sees {@code RECORD(label STRING, value ANY)} and accepts any
+     * type in the second position. The handler asks the value what it is rather than being told by
+     * its own signature.
+     */
+    @BubasDescription("Writes a labelled value into the decision record, whatever kind of value it is.")
+    public static final class Record {
+        public void call(Context ctx, String label, Value value) {
+            ctx.log("RECORD", label + " = " + value.as(Object.class) + " (" + value.type() + ")");
+        }
+    }
+    // end snippet
+
+    // snippet: telling-language
+    /** Stage 7: operations that take any number of things, or anything at all. */
+    static BubasLanguage.Builder telling() {
+        return routing()
+                .defineFunction("NOTIFY", Notify.class)
+                .defineFunction("RECORD", Record.class);
+    }
+    // end snippet
+
     // ---------------------------------------------------------------- the sealed stages
 
     public static final BubasLanguage STAGE_1 = core().seal();
@@ -355,4 +398,5 @@ public final class Expense {
     public static final BubasLanguage STAGE_4 = categorised().seal();
     public static final BubasLanguage STAGE_5 = screening().seal();
     public static final BubasLanguage STAGE_6 = routing().seal();
+    public static final BubasLanguage STAGE_7 = telling().seal();
 }

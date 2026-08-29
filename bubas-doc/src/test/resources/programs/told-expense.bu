@@ -1,0 +1,21 @@
+PROGRAM TellPeople(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+
+    total = TOTAL_OF(claim)
+
+    RECORD "total", total
+    RECORD "over the limit", total > limit
+
+    ROUTE claim TO approver AT centre
+
+    IF total > limit THEN
+        RECORD "budget left", BUDGET_LEFT(centre)
+        NOTIFY approver, "the claimant", "the finance inbox"
+        ESCALATE claim, "over the " + limit + " limit"
+        RETURN FALSE
+    END IF
+
+    NOTIFY "the claimant"
+    APPROVE claim
+    RETURN TRUE
+END.

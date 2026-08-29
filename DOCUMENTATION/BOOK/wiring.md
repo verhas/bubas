@@ -7,4 +7,148 @@ where the application's real work should sit so that the vocabulary stays a voca
 
 ---
 
-*Content to be written. [BOOK.md](BOOK.md) has this chapter's place in the book.*
+## Handlers must not own anything
+
+A handler class is constructed by BUBAS, not by you. It has no constructor you control, no fields
+you set, and no way to be injected into.
+
+That is not an oversight, and working around it is the first mistake people make. A handler that
+held a database connection would be a handler with a lifecycle, and the whole point of chapter 21's
+three objects is that only one of them has a lifecycle worth thinking about.
+
+So a handler reaches out instead:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Wiring.java"
+start:
+  pattern: '// snippet: thin-handler'
+  include: true
+end:
+  pattern: '// end snippet'
+  include: false
+prefix: "```java"
+postfix: "```"
+margin: 0
+_content_generated_: 288:md5:f3b01b383ae376c271374b3a0c767d49
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```java
+// snippet: thin-handler
+/** A handler translates and delegates. It owns nothing and has no lifecycle. */
+public static final class TotalOf {
+    public BigDecimal call(Context ctx, Expense.Report claim) {
+        return ctx.service(ClaimStore.class).totalOf(claim);
+    }
+}
+```
+<!--/INCLUDE-->
+
+`Context.service(Class)` returns whatever the application registered on the interpreter for this
+run. There is a qualified form, `service(Class, String)`, for when one type has several instances —
+two databases, two clients.
+
+## Registering them
+
+Services go on the interpreter, which means **per run**:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Wiring.java"
+start:
+  pattern: '// snippet: per-run-wiring'
+  include: true
+end:
+  pattern: '// end snippet'
+  include: false
+prefix: "```java"
+postfix: "```"
+margin: 0
+_content_generated_: 519:md5:8398df09b04e3dcb3cb21029b69b6828
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```java
+// snippet: per-run-wiring
+/** Services, arguments and the logger are supplied per run, never per language. */
+static Value decide(BubasProgram program, ClaimStore store, Expense.Report claim,
+                    BigDecimal limit, java.util.function.BiConsumer<String, String> auditLog) {
+    return Interpreter.of(program)
+            .registerService(ClaimStore.class, store)
+            .argument("claim", claim)
+            .argument("limit", limit)
+            .logger(auditLog)
+            .run();
+}
+```
+<!--/INCLUDE-->
+
+Per run rather than per language, and that is deliberate. It means a request-scoped transaction, a
+tenant-specific store or a test double can be supplied for one execution without touching anything
+shared. The language and the program stay immutable; everything that varies varies here.
+
+The cost is that a service forgotten is discovered when a handler asks for it. Registering the same
+set in one place — a small factory that turns a claim into a configured interpreter — is worth doing
+on the first day rather than the fortieth.
+
+## Logging
+
+`logger(BiConsumer<String, String>)` receives every `ctx.log(level, message)` a handler makes.
+
+Two things worth deciding early, because they are hard to change later.
+
+**The log is the rule's output, not diagnostics.** In every example in this book, `APPROVE` and
+`REJECT` record what they decided by logging it. That is the decision trail an auditor reads, and it
+should go somewhere durable and queryable, not to a rolling text file.
+
+**Levels are yours.** BUBAS passes the string through untouched. This book uses `DECISION`, `NOTE`
+and `RECORD` because they are what the domain calls them, and nothing forces `INFO`/`WARN`.
+
+## Where the real work goes
+
+The recurring failure in an embedded language is a vocabulary that quietly becomes the application.
+
+A thin handler translates and delegates. It converts BUBAS values into domain calls, calls
+something that already existed, and converts back. If a handler is more than a few lines, ask what
+it is doing that a domain service should have been doing.
+
+Two smells worth naming:
+
+**A handler that reads several services and combines them.** That combination is domain logic
+living in a translation layer, where it is hard to test and impossible to reuse from anywhere but
+BUBAS. It belongs in a service.
+
+**A handler that branches on the values it was given.** A decision inside a handler is a decision
+that has left the rule — chapter 23's warning about `CHECK_EXPENSE_POLICY`, in miniature. Sometimes
+it is legitimate (`ANOMALY_SCORE_OF` has to decide something), but it is always worth a second look.
+
+The test is the same one chapter 23 gave: *does this encode a decision somebody could disagree
+with?* If yes, it wants to be in the rule or behind a named service, not in the glue.
+
+## Configuration
+
+Thresholds, caps and limits are the interesting case, and the answer runs against instinct.
+
+**Do not configure them.** A cap that lives in a properties file has left the rule, and everything
+this book argues for has been given up quietly: it is no longer visible to the reviewer, no longer
+part of the artefact under review, no longer version-controlled with the logic it governs.
+
+Chapter 6's rule declares `ceiling` as a `FINAL` in the program, where a finance manager reads it.
+That is the right place. If a number varies by tenant or by period, it becomes a **parameter** —
+which is what `limit` is throughout this book — and the application supplies it per run.
+
+What genuinely belongs in configuration is infrastructure: endpoints, credentials, timeouts, which
+model version chapter 25 told you to pin. Nothing a rule-writer would recognise.
+
+## The shape it settles into
+
+Most applications end up with the same four pieces, and it is worth aiming at them directly:
+
+- **One place that builds and seals the language**, at startup, once.
+- **One place that compiles rules**, whenever the rule text changes, holding the compiled programs.
+- **A small factory** that turns a request into a configured interpreter with its services and
+  logger.
+- **Handlers that do nothing but translate.**
+
+Everything else is your application, unchanged and unaware that a language is involved. That is the
+sign it is wired correctly: the vocabulary is a thin edge on a system that would still make sense
+without it.

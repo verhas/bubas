@@ -408,13 +408,11 @@ What each costs, what each is safe to share, and why sealing exists.
 from: "defining-types.md"
 start: '<!-- abstract'
 end: '<!-- /abstract'
-_content_generated_: 245:md5:db3ca604b929ee47ff31896a44feb690
+_content_generated_: 74:md5:514a8b1e562715211e787bb1caa70fb6
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
-Opaque types from the other side. How a Java class becomes something a program can hold, why
-opacity is total rather than partial, and what you give up by exposing an operation instead of a
-field — along with what that buys back in chapter 27.
+Opaque types from the embedder's side; total opacity as a design choice.
 <!--/INCLUDE-->
 
 ### 23. [Defining functions](defining-functions.md)
@@ -513,12 +511,12 @@ where the application's real work should sit so that the vocabulary stays a voca
 from: "concurrency-and-lifecycle.md"
 start: '<!-- abstract'
 end: '<!-- /abstract'
-_content_generated_: 196:md5:4b79e56510aef96a987ec763b5046e3c
+_content_generated_: 185:md5:d127874e133289bf85421409a91afa52
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
-Seal at startup, compile on change, interpret per request. What is shared safely between threads,
-what must never be, and how this maps onto a web application, a batch job, and a queue consumer.
+Seal once, compile once, interpret per request. What is shared safely between threads, what must
+never be, and how this maps onto a web application, a batch job, and a queue consumer.
 <!--/INCLUDE-->
 
 ### 30. [Failing well](failing-well.md)

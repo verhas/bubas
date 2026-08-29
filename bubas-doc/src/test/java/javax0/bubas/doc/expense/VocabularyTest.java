@@ -32,8 +32,11 @@ class VocabularyTest {
     @Test
     void every_stage_can_describe_itself() throws IOException {
         for (final var stage : STAGES.entrySet()) {
+            // snippet: export
             final var export = VocabularyExport.of(stage.getValue());
-            Runs.write("vocabulary-stage-" + stage.getKey() + ".md", export.asMarkdown());
+            final var document = export.asMarkdown();
+            // end snippet
+            Runs.write("vocabulary-stage-" + stage.getKey() + ".md", document);
         }
     }
 
@@ -119,5 +122,24 @@ class VocabularyTest {
             block.setLength(0);
         }
         return out.toString();
+    }
+
+    /**
+     * Chapter 26: the export refuses to be built out of things nobody has described, and lists
+     * every one of them. Captured rather than quoted, because the wording is the product.
+     */
+    @Test
+    void an_undescribed_vocabulary_cannot_be_exported() throws IOException {
+        final var undescribed = javax0.bubas.analyser.BubasLanguage.builder()
+                .install(javax0.bubas.support.Standard::register)
+                .defineOpaqueType("Report", Expense.Report.class)
+                .defineFunction("TOTAL_OF", Expense.TotalOf.class)
+                .seal();
+
+        final var thrown = org.assertj.core.api.Assertions.catchThrowable(
+                () -> VocabularyExport.of(undescribed));
+
+        assertThat(thrown).isNotNull();
+        Runs.write("export-refusal.txt", thrown.getMessage());
     }
 }

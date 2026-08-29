@@ -52,6 +52,7 @@ final class Runs {
         return map;
     }
 
+    // snippet: interpret
     static Outcome run(BubasProgram program, Map<String, Object> arguments) {
         final var logged = new ArrayList<String>();
         final var interpreter = Interpreter.of(program);
@@ -62,6 +63,7 @@ final class Runs {
                 .asBoolean();
         return new Outcome(program.name(), arguments, answer, List.copyOf(logged));
     }
+    // end snippet
 
     /** The common case: a claim and a limit. */
     static Outcome run(BubasProgram program, Expense.Report claim, BigDecimal limit) {
