@@ -8,5 +8,5 @@
 .github/prompts
 # Python venv for the book build
 .venv/
-DOCUMENTATION/BOOK/BUBAS.pdf
 __pycache__/
+*.iml
