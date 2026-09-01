@@ -34,7 +34,7 @@ end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 554:md5:2d53d8b4eb2a134aca3d385ea99e4955
+_content_generated_: 548:md5:d327e7f6cfe9db574312eb7419008782
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
@@ -43,7 +43,7 @@ _content_generated_: 554:md5:2d53d8b4eb2a134aca3d385ea99e4955
 static BubasLanguage.Builder core() {
     return BubasLanguage.builder()
             .install(Standard::register)
-            .defineOpaqueTypeVia("Report", ReportDoc.class)
+            .defineOpaqueType("Report", Report.class)
             .defineFunction("TOTAL_OF", TotalOf.class)
             .defineFunction("NOTE", Note.class)
             .defineStatement("APPROVE {expression/Report:claim}", Approve.class)

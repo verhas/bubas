@@ -1,7 +1,6 @@
 package javax0.bubas.doc.expense;
 
 import javax0.bubas.analyser.BubasLanguage;
-import javax0.bubas.api.BubasDescribes;
 import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
@@ -32,30 +31,20 @@ public final class Expense {
 
     // ---------------------------------------------------------------- the domain
 
-    // snippet: report-doc
-    @BubasDescribes(Report.class)
-    @BubasDescription("""
-            One employee's expense claim for a trip or a period.
-            A program is given one to decide about; ask TOTAL_OF what it comes to.
-            """)
-    public interface ReportDoc {
-    }
-    // end snippet
-
-    @BubasDescribes(Item.class)
+    /** One line on a claim. */
     @BubasDescription("""
             A single line on a claim: what was bought, from whom, for how much.
             Ask AMOUNT_OF, CATEGORY_OF, MERCHANT_OF and HAS_RECEIPT about one.
             """)
-    public interface ItemDoc {
-    }
-
-    /** One line on a claim. */
     public record Item(String category, String merchant, BigDecimal amount, boolean hasReceipt) {
     }
 
     // snippet: report-class
     /** A value BUBAS holds and passes but cannot look inside. */
+    @BubasDescription("""
+            One employee's expense claim for a trip or a period.
+            A program is given one to decide about; ask TOTAL_OF what it comes to.
+            """)
     public static final class Report {
         final long id;
         private final String employee;
@@ -134,7 +123,7 @@ public final class Expense {
     static BubasLanguage.Builder core() {
         return BubasLanguage.builder()
                 .install(Standard::register)
-                .defineOpaqueTypeVia("Report", ReportDoc.class)
+                .defineOpaqueType("Report", Report.class)
                 .defineFunction("TOTAL_OF", TotalOf.class)
                 .defineFunction("NOTE", Note.class)
                 .defineStatement("APPROVE {expression/Report:claim}", Approve.class)
@@ -213,7 +202,7 @@ public final class Expense {
     /** Stage 3: the claim stops being a single number and becomes a list of lines. */
     static BubasLanguage.Builder itemised() {
         return escalating()
-                .defineOpaqueTypeVia("Item", ItemDoc.class)
+                .defineOpaqueType("Item", Item.class)
                 .defineFunction("ITEM_COUNT", ItemCount.class)
                 .defineFunction("ITEM_AT", ItemAt.class)
                 .defineFunction("AMOUNT_OF", AmountOf.class)
@@ -296,15 +285,11 @@ public final class Expense {
 
     // ---------------------------------------------------------------- stage 6: routing
 
-    @BubasDescribes(CostCentre.class)
+    /** Where the money comes from. Opaque, like everything else the domain owns. */
     @BubasDescription("""
             The budget a claim will be charged against, and the thing an approver signs for.
             Ask BUDGET_LEFT how much of it is still unspent this period.
             """)
-    public interface CostCentreDoc {
-    }
-
-    /** Where the money comes from. Opaque, like everything else the domain owns. */
     public record CostCentre(String code, BigDecimal remaining) {
         @Override
         public String toString() {
@@ -344,7 +329,7 @@ public final class Expense {
     /** Stage 6: one operation, two answers, and the budget they point at. */
     static BubasLanguage.Builder routing() {
         return screening()
-                .defineOpaqueTypeVia("CostCentre", CostCentreDoc.class)
+                .defineOpaqueType("CostCentre", CostCentre.class)
                 .defineFunction("BUDGET_LEFT", BudgetLeft.class)
                 .defineStatement("ROUTE {expression/Report:claim}"
                         + " TO {new > identifier/STRING:approver > initialized}"

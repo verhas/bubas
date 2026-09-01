@@ -83,7 +83,10 @@ public final class VocabularyExport {
         final var missing = new ArrayList<String>();
         final var types = new ArrayList<Type>();
         for (final var type : language.opaqueTypes()) {
-            final var documentation = language.documentation(type.name()).orElse(null);
+            // The ordinary case is a class its own author annotated, so the class is where the
+            // description is looked for. A documentation interface is the exception — for a type
+            // whose class cannot carry annotations — and when one was registered it wins.
+            final var documentation = language.documentation(type.name()).orElse(type.javaType());
             types.add(new Type(type.name(),
                     description(documentation, "opaque type " + type.name(), missing)));
         }

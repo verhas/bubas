@@ -94,7 +94,7 @@ end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 516:md5:fa90a5e4df8319adb398c2a758e041b8
+_content_generated_: 510:md5:3b550381c84de2655f29a839cd23a42a
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
@@ -102,7 +102,7 @@ _content_generated_: 516:md5:fa90a5e4df8319adb398c2a758e041b8
 /** Stage 6: one operation, two answers, and the budget they point at. */
 static BubasLanguage.Builder routing() {
     return screening()
-            .defineOpaqueTypeVia("CostCentre", CostCentreDoc.class)
+            .defineOpaqueType("CostCentre", CostCentre.class)
             .defineFunction("BUDGET_LEFT", BudgetLeft.class)
             .defineStatement("ROUTE {expression/Report:claim}"
                     + " TO {new > identifier/STRING:approver > initialized}"

@@ -151,7 +151,7 @@ end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 573:md5:cf294f7657ed73f104202efa65457d86
+_content_generated_: 567:md5:8df225b1f8617eb376f3991b3177e19e
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
@@ -159,7 +159,7 @@ _content_generated_: 573:md5:cf294f7657ed73f104202efa65457d86
 /** Stage 3: the claim stops being a single number and becomes a list of lines. */
 static BubasLanguage.Builder itemised() {
     return escalating()
-            .defineOpaqueTypeVia("Item", ItemDoc.class)
+            .defineOpaqueType("Item", Item.class)
             .defineFunction("ITEM_COUNT", ItemCount.class)
             .defineFunction("ITEM_AT", ItemAt.class)
             .defineFunction("AMOUNT_OF", AmountOf.class)

@@ -217,10 +217,12 @@ public final class BubasLanguage {
          * Registers the class an interface {@link javax0.bubas.api.BubasDescribes describes},
          * taking that interface's documentation with it.
          * <p>
-         * A domain class is usually shared — a REST layer, a rules engine and BUBAS all hold an
-         * {@code Order} — so annotating it would make the domain model depend on one of its
-         * consumers, and describing it at each registration would copy the same prose once per
-         * language. An empty interface is neither.
+         * This is the exception rather than the rule. A class you own is described by putting
+         * {@link javax0.bubas.api.BubasDescription} on it and registering it with
+         * {@link #defineOpaqueType(String, Class)}; the export reads the description from the
+         * class. Reach for this method when the class cannot carry the annotation — a
+         * {@code java.util.Date}, a type from a library, a domain model shared with consumers that
+         * must not depend on BUBAS — and describe it on an empty interface standing in for it.
          *
          * @param documentation an interface carrying {@code @BubasDescribes(TheClass.class)}
          */

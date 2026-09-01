@@ -165,6 +165,50 @@ class VocabularyExportTest {
                 .contains("opaque type Order");
     }
 
+    /** The ordinary case: a class its own author annotated, registered with defineOpaqueType. */
+    @BubasDescription("A claim somebody filed, described on the class itself.")
+    public static final class Claim {
+    }
+
+    /** A class that cannot be annotated — a library type — described through an interface. */
+    public static final class Borrowed {
+    }
+
+    @BubasDescribes(Borrowed.class)
+    @BubasDescription("A borrowed type, described on an interface standing in for it.")
+    public interface BorrowedDoc {
+    }
+
+    /**
+     * The rule, not the exception: annotating the class and registering it plainly is enough.
+     * <p>
+     * A documentation interface exists for types whose class cannot carry annotations. Requiring
+     * one for every type would have made the common case pay for the rare one.
+     */
+    @Test
+    void a_type_described_on_its_own_class_needs_no_interface() {
+        final var language = BubasLanguage.builder()
+                .defineOpaqueType("Claim", Claim.class).seal();
+
+        assertThat(VocabularyExport.of(language).types())
+                .singleElement()
+                .satisfies(type -> {
+                    assertThat(type.name()).isEqualTo("Claim");
+                    assertThat(type.description()).contains("described on the class itself");
+                });
+    }
+
+    /** And the exception still works, for a class nobody can annotate. */
+    @Test
+    void a_type_described_through_an_interface_still_works() {
+        final var language = BubasLanguage.builder()
+                .defineOpaqueTypeVia("Borrowed", BorrowedDoc.class).seal();
+
+        assertThat(VocabularyExport.of(language).types())
+                .singleElement()
+                .satisfies(type -> assertThat(type.description()).contains("standing in for it"));
+    }
+
     /** A language without descriptions seals, compiles and runs; it only cannot be exported. */
     @Test
     void a_language_without_descriptions_is_otherwise_perfectly_well() {

@@ -15,12 +15,16 @@ end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 579:md5:1320d06d72bc0d53d3270e41bc500973
+_content_generated_: 754:md5:83aea2551d757157be61a10d30fb40c3
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
 /** A value BUBAS holds and passes but cannot look inside. */
+@BubasDescription("""
+        One employee's expense claim for a trip or a period.
+        A program is given one to decide about; ask TOTAL_OF what it comes to.
+        """)
 public static final class Report {
     final long id;
     private final String employee;
@@ -52,7 +56,7 @@ It becomes a type by being registered:
 <!--INCLUDE
 from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Expense.java"
 start:
-  pattern: '\.defineOpaqueTypeVia\("Report"'
+  pattern: '\.defineOpaqueType\("Report"'
   include: true
 end:
   pattern: '\.defineFunction\("TOTAL_OF"'
@@ -60,12 +64,12 @@ end:
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 61:md5:edbb963f2b2cce795718b61333c53616
+_content_generated_: 55:md5:7a64656e2f2a19b8e0e4eb4c9b3208d1
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
-.defineOpaqueTypeVia("Report", ReportDoc.class)
+.defineOpaqueType("Report", Report.class)
 ```
 <!--/INCLUDE-->
 
@@ -113,22 +117,40 @@ field would have saved one operation and cost the whole of BUNIT.
 
 <!--INCLUDE
 from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Expense.java"
-start: '// snippet: report-doc'
+start: '// snippet: report-class'
 end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 249:md5:954042cd69ea9d489846e3cb3967cadc
+_content_generated_: 754:md5:83aea2551d757157be61a10d30fb40c3
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
-@BubasDescribes(Report.class)
+/** A value BUBAS holds and passes but cannot look inside. */
 @BubasDescription("""
         One employee's expense claim for a trip or a period.
         A program is given one to decide about; ask TOTAL_OF what it comes to.
         """)
-public interface ReportDoc {
+public static final class Report {
+    final long id;
+    private final String employee;
+    private final List<Item> items;
+
+    Report(long id, String employee, List<Item> items) {
+        this.id = id;
+        this.employee = employee;
+        this.items = items;
+    }
+
+    BigDecimal total() {
+        return items.stream().map(Item::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Override
+    public String toString() {
+        return "report " + id + " (" + employee + ")";
+    }
 }
 ```
 <!--/INCLUDE-->

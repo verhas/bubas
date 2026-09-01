@@ -128,12 +128,23 @@ class VocabularyTest {
      * Chapter 26: the export refuses to be built out of things nobody has described, and lists
      * every one of them. Captured rather than quoted, because the wording is the product.
      */
+    /** A class nobody described, and no interface stands in for it either. */
+    public static final class Ledger {
+    }
+
+    @javax0.bubas.api.BubasDescription("What a ledger holds.")
+    public static final class BalanceOf {
+        public java.math.BigDecimal call(javax0.bubas.api.Context ctx, Ledger ledger) {
+            return java.math.BigDecimal.ZERO;
+        }
+    }
+
     @Test
     void an_undescribed_vocabulary_cannot_be_exported() throws IOException {
         final var undescribed = javax0.bubas.analyser.BubasLanguage.builder()
                 .install(javax0.bubas.support.Standard::register)
-                .defineOpaqueType("Report", Expense.Report.class)
-                .defineFunction("TOTAL_OF", Expense.TotalOf.class)
+                .defineOpaqueType("Ledger", Ledger.class)
+                .defineFunction("BALANCE_OF", BalanceOf.class)
                 .seal();
 
         final var thrown = org.assertj.core.api.Assertions.catchThrowable(

@@ -48,13 +48,13 @@ consumer is a generator rather than a person — chapter 32's subject.
 from: "../../bubas-doc/target/doc-outputs/export-refusal.txt"
 prefix: "```"
 postfix: "```"
-_content_generated_: 198:md5:05fd397b2a13e4b13c27331e9a2baa9b
+_content_generated_: 198:md5:030fd57327bf1e6f4addfc0f6fbb929d
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```
 nothing describes:
-        opaque type Report
+        opaque type Ledger
     An export says what a vocabulary means, so it cannot be built out of things nobody has said anything about. Add @BubasDescription to each.
 ```
 <!--/INCLUDE-->
@@ -69,22 +69,40 @@ fails, and the moment it fails is the commit that added the operation.
 
 <!--INCLUDE
 from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Expense.java"
-start: '// snippet: report-doc'
+start: '// snippet: report-class'
 end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 249:md5:954042cd69ea9d489846e3cb3967cadc
+_content_generated_: 754:md5:83aea2551d757157be61a10d30fb40c3
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
-@BubasDescribes(Report.class)
+/** A value BUBAS holds and passes but cannot look inside. */
 @BubasDescription("""
         One employee's expense claim for a trip or a period.
         A program is given one to decide about; ask TOTAL_OF what it comes to.
         """)
-public interface ReportDoc {
+public static final class Report {
+    final long id;
+    private final String employee;
+    private final List<Item> items;
+
+    Report(long id, String employee, List<Item> items) {
+        this.id = id;
+        this.employee = employee;
+        this.items = items;
+    }
+
+    BigDecimal total() {
+        return items.stream().map(Item::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Override
+    public String toString() {
+        return "report " + id + " (" + employee + ")";
+    }
 }
 ```
 <!--/INCLUDE-->
