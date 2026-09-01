@@ -49,7 +49,11 @@ public static final class Report {
 <!--/INCLUDE-->
 
 An ordinary class. It has fields, methods, a `toString`, and none of that is visible to BUBAS. It
-carries no BUBAS annotations, implements no interface, extends nothing.
+implements no interface, extends nothing, and touches nothing from the BUBAS API.
+
+The one concession is the description, which says what a claim is in the business rather than what
+it holds. It is read when the vocabulary is exported for review — chapter 26 — and ignored the rest
+of the time.
 
 It becomes a type by being registered:
 
@@ -113,61 +117,28 @@ That third one is worth dwelling on. Total opacity is not one design decision; i
 testing story in Part 2 available at all. A vocabulary that exposed a claim's total as a readable
 field would have saved one operation and cost the whole of BUNIT.
 
-## Describing it
+## Describing it, and the one case that cannot
 
-<!--INCLUDE
-from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Expense.java"
-start: '// snippet: report-class'
-end: '// end snippet'
-prefix: "```java"
-postfix: "```"
-margin: 0
-_content_generated_: 754:md5:83aea2551d757157be61a10d30fb40c3
-# ⚠️ MANAGED CONTENT: Edits will be lost.
-# danger zone: Delete _content_generated_ to override.
--->
-```java
-/** A value BUBAS holds and passes but cannot look inside. */
-@BubasDescription("""
-        One employee's expense claim for a trip or a period.
-        A program is given one to decide about; ask TOTAL_OF what it comes to.
-        """)
-public static final class Report {
-    final long id;
-    private final String employee;
-    private final List<Item> items;
+The description goes on the class, and `defineOpaqueType` takes it from there. Nothing else is
+needed, and nothing else is registered.
 
-    Report(long id, String employee, List<Item> items) {
-        this.id = id;
-        this.employee = employee;
-        this.items = items;
-    }
+That is the ordinary case because it is the common one: a class your own team wrote, for a domain
+your own team models, exposed to a language your own team built. Requiring anything more of it
+would make the common case pay for the rare one.
 
-    BigDecimal total() {
-        return items.stream().map(Item::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
+The rare one is real, though. Some types cannot carry the annotation:
 
-    @Override
-    public String toString() {
-        return "report " + id + " (" + employee + ")";
-    }
-}
-```
-<!--/INCLUDE-->
+- a class from a library — a `java.time.LocalDate`, a `BigDecimal` wrapper somebody else ships
+- a domain model shared with consumers that must not depend on BUBAS, where adding the annotation
+  would make your model depend on one of the things that reads it
+- a generated class, where the next generation would drop it
 
-The description lives on a separate empty interface rather than on `Report` itself, and
-`defineOpaqueTypeVia` takes that interface instead of the class.
+For those, describe the type on an empty interface carrying `@BubasDescribes(TheClass.class)`
+alongside its `@BubasDescription`, and register it with `defineOpaqueTypeVia`. The interface exists
+only to hold the words. It costs one file, and it is the escape route rather than the road.
 
-Two reasons. A domain class is usually shared — `Report` may belong to a module that knows nothing
-about BUBAS — and annotating it would make your domain model depend on one of its consumers.
-Describing it at each registration instead would copy the same prose once per language.
-
-An empty interface is neither. It exists only to carry the annotation, it sits beside the language
-that needs it, and it costs one file.
-
-Note what the description says: what a claim *is* in the business, and which operations answer
-questions about it. Not what it contains. Chapter 26 is about writing these well; the shape to aim
-for is visible here.
+Both forms produce the same vocabulary entry. A reader of chapter 11's document cannot tell which
+was used, and should not be able to.
 
 ## When not to make something opaque
 

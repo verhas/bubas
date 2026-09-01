@@ -110,9 +110,12 @@ public static final class Report {
 For a **function or statement**, the annotation goes on the handler class, which you own and which
 exists only for this purpose.
 
-For a **type**, it goes on a separate empty interface, registered with `defineOpaqueTypeVia`. That
-indirection exists because a domain class is usually shared and has no reason to depend on one of
-its consumers. Chapter 22 made the argument; the mechanism is one file per type.
+For a **type**, it goes on the class itself, as above, and `defineOpaqueType` takes it from there.
+
+The exception is a type whose class cannot carry the annotation — one from a library, or a domain
+model shared with consumers that must not depend on BUBAS. Describe those on an empty interface
+carrying `@BubasDescribes(TheClass.class)` and register with `defineOpaqueTypeVia`. Chapter 22 has
+the argument for when that is worth doing; the export cannot tell the difference either way.
 
 ## Writing them
 
