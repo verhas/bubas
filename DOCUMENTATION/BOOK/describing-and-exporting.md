@@ -74,7 +74,7 @@ end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 754:md5:83aea2551d757157be61a10d30fb40c3
+_content_generated_: 850:md5:698bee3d7097515eb522590fabee6284
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
@@ -87,11 +87,13 @@ _content_generated_: 754:md5:83aea2551d757157be61a10d30fb40c3
 public static final class Report {
     final long id;
     private final String employee;
+    private final LocalDate submitted;
     private final List<Item> items;
 
-    Report(long id, String employee, List<Item> items) {
+    Report(long id, String employee, LocalDate submitted, List<Item> items) {
         this.id = id;
         this.employee = employee;
+        this.submitted = submitted;
         this.items = items;
     }
 

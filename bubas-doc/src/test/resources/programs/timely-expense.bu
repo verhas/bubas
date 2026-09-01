@@ -1,0 +1,24 @@
+PROGRAM ApproveTimely(claim Report, today Date, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE filed Date
+    DECLARE age INTEGER
+    DECLARE total DECIMAL
+    DECLARE window INTEGER FINAL = 30
+
+    filed = SUBMITTED_ON(claim)
+    age = DAYS_BETWEEN(filed, today)
+
+    IF age > window THEN
+        REJECT claim, "filed " + age + " days ago, the window is " + window
+        RETURN FALSE
+    END IF
+
+    total = TOTAL_OF(claim)
+
+    IF total > limit THEN
+        ESCALATE claim, "over the " + limit + " limit"
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

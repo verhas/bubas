@@ -1,6 +1,7 @@
 package javax0.bubas.doc.expense;
 
 import javax0.bubas.analyser.BubasLanguage;
+import javax0.bubas.api.BubasDescribes;
 import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.Context;
 import javax0.bubas.api.ExpressionArg;
@@ -10,6 +11,8 @@ import javax0.bubas.api.VariableArg;
 import javax0.bubas.support.Standard;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
@@ -48,11 +51,13 @@ public final class Expense {
     public static final class Report {
         final long id;
         private final String employee;
+        private final LocalDate submitted;
         private final List<Item> items;
 
-        Report(long id, String employee, List<Item> items) {
+        Report(long id, String employee, LocalDate submitted, List<Item> items) {
             this.id = id;
             this.employee = employee;
+            this.submitted = submitted;
             this.items = items;
         }
 
@@ -68,8 +73,15 @@ public final class Expense {
     // end snippet
 
     /** The host constructs claims. The language only ever receives them. */
+    /** A claim filed on the day the examples treat as ordinary. */
+    static final LocalDate FILED_ON = LocalDate.of(2026, 3, 2);
+
     static Report claim(long id, String employee, Item... items) {
-        return new Report(id, employee, List.of(items));
+        return new Report(id, employee, FILED_ON, List.of(items));
+    }
+
+    static Report claim(long id, String employee, LocalDate submitted, Item... items) {
+        return new Report(id, employee, submitted, List.of(items));
     }
 
     static Item item(String category, String merchant, String amount, boolean hasReceipt) {
@@ -375,6 +387,49 @@ public final class Expense {
     }
     // end snippet
 
+    // ---------------------------------------------------------------- stage 8: a borrowed type
+
+    // snippet: date-doc
+    /**
+     * The escape route, and the case it exists for: nobody can put an annotation on
+     * {@code java.time.LocalDate}. An empty interface stands in for it and carries the words.
+     */
+    @BubasDescribes(LocalDate.class)
+    @BubasDescription("""
+            A calendar day, with no time of day and no timezone.
+            Ask DAYS_BETWEEN how far apart two of them are.
+            """)
+    public interface DateDoc {
+    }
+    // end snippet
+
+    @BubasDescription("The day a claim was filed.")
+    public static final class SubmittedOn {
+        public LocalDate call(Context ctx, Report claim) {
+            return claim.submitted;
+        }
+    }
+
+    @BubasDescription("How many days separate two dates. Negative if the second is the earlier.")
+    public static final class DaysBetween {
+        public long call(Context ctx, LocalDate from, LocalDate to) {
+            return ChronoUnit.DAYS.between(from, to);
+        }
+    }
+
+    // snippet: dated-language
+    /**
+     * Stage 8: a type from the standard library, described through an interface because the class
+     * itself cannot be annotated. Everything else here is described on its own class.
+     */
+    static BubasLanguage.Builder dated() {
+        return telling()
+                .defineOpaqueTypeVia("Date", DateDoc.class)
+                .defineFunction("SUBMITTED_ON", SubmittedOn.class)
+                .defineFunction("DAYS_BETWEEN", DaysBetween.class);
+    }
+    // end snippet
+
     // ---------------------------------------------------------------- the sealed stages
 
     public static final BubasLanguage STAGE_1 = core().seal();
@@ -384,4 +439,5 @@ public final class Expense {
     public static final BubasLanguage STAGE_5 = screening().seal();
     public static final BubasLanguage STAGE_6 = routing().seal();
     public static final BubasLanguage STAGE_7 = telling().seal();
+    public static final BubasLanguage STAGE_8 = dated().seal();
 }

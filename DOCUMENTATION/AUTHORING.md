@@ -302,11 +302,13 @@ rather than kept in step.
 
 Planning data that is not part of the book stays here instead, referencing chapters by number:
 
-- **Application stages.** Six exist: 1 core, 2 escalation, 3 line items, 4 category totals,
-  5 the anomaly score, 6 routing. Part 1 uses 1–5 and the tutorials ship 1–3. Part 2 works
-  against stage 6, which exists because the consistency checker needs a command that writes
-  ([D19](#d19-a-command-that-writes-one-variable-should-have-been-a-function)). Stage numbering
-  follows the code rather than a plan made in advance.
+- **Application stages.** Eight exist: 1 core, 2 escalation, 3 line items, 4 category
+  totals, 5 the anomaly score, 6 routing, 7 variadic and wildcard operations, 8 a borrowed
+  type. The tutorials ship 1–3 and Part 1 uses 1–5. Stages 6–8 exist because a Part 3
+  chapter needed something to show: a command that writes
+  ([D19](#d19-a-command-that-writes-one-variable-should-have-been-a-function)), an
+  operation taking any number of arguments, and a type whose class cannot carry its own
+  description. Stage numbering follows the code rather than a plan made in advance.
 - **Merge candidates** if the book runs long: chapters 6 and 7 into one on control flow; 22 and 23
   into one on a vocabulary's nouns and verbs. Neither is merged now, because each carries an
   argument and not only a mechanism.

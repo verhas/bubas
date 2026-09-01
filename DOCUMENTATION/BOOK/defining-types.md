@@ -15,7 +15,7 @@ end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 754:md5:83aea2551d757157be61a10d30fb40c3
+_content_generated_: 850:md5:698bee3d7097515eb522590fabee6284
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
@@ -28,11 +28,13 @@ _content_generated_: 754:md5:83aea2551d757157be61a10d30fb40c3
 public static final class Report {
     final long id;
     private final String employee;
+    private final LocalDate submitted;
     private final List<Item> items;
 
-    Report(long id, String employee, List<Item> items) {
+    Report(long id, String employee, LocalDate submitted, List<Item> items) {
         this.id = id;
         this.employee = employee;
+        this.submitted = submitted;
         this.items = items;
     }
 
@@ -133,9 +135,66 @@ The rare one is real, though. Some types cannot carry the annotation:
   would make your model depend on one of the things that reads it
 - a generated class, where the next generation would drop it
 
-For those, describe the type on an empty interface carrying `@BubasDescribes(TheClass.class)`
-alongside its `@BubasDescription`, and register it with `defineOpaqueTypeVia`. The interface exists
-only to hold the words. It costs one file, and it is the escape route rather than the road.
+For those, describe the type on an empty interface and register it with `defineOpaqueTypeVia`.
+This vocabulary has exactly one, because a claim has a date on it and nobody can annotate
+`java.time.LocalDate`:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Expense.java"
+start: '// snippet: date-doc'
+end: '// end snippet'
+prefix: "```java"
+postfix: "```"
+margin: 0
+_content_generated_: 407:md5:e688c90fb83d57eee367936f9acacfd7
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```java
+/**
+ * The escape route, and the case it exists for: nobody can put an annotation on
+ * {@code java.time.LocalDate}. An empty interface stands in for it and carries the words.
+ */
+@BubasDescribes(LocalDate.class)
+@BubasDescription("""
+        A calendar day, with no time of day and no timezone.
+        Ask DAYS_BETWEEN how far apart two of them are.
+        """)
+public interface DateDoc {
+}
+```
+<!--/INCLUDE-->
+
+`@BubasDescribes` says which class the interface stands in for; the builder reads the class from it,
+so the class is never named at the registration:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Expense.java"
+start: '// snippet: dated-language'
+end: '// end snippet'
+prefix: "```java"
+postfix: "```"
+margin: 0
+_content_generated_: 444:md5:e1ad5be75184d9468a7c7bdfcc44a472
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```java
+/**
+ * Stage 8: a type from the standard library, described through an interface because the class
+ * itself cannot be annotated. Everything else here is described on its own class.
+ */
+static BubasLanguage.Builder dated() {
+    return telling()
+            .defineOpaqueTypeVia("Date", DateDoc.class)
+            .defineFunction("SUBMITTED_ON", SubmittedOn.class)
+            .defineFunction("DAYS_BETWEEN", DaysBetween.class);
+}
+```
+<!--/INCLUDE-->
+
+The interface exists only to hold the words. It costs one file, and it is the escape route rather
+than the road.
 
 Both forms produce the same vocabulary entry. A reader of chapter 11's document cannot tell which
 was used, and should not be able to.
