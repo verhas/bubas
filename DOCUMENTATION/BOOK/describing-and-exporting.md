@@ -24,12 +24,12 @@ end:
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 113:md5:06f14b8b8e6382eb50a93c26d175798a
+_content_generated_: 105:md5:6db5ddcf477752abeafc9e375a26ab54
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
-final var export = VocabularyExport.of(stage.getValue());
+final var export = VocabularyExport.of(language);
 final var document = export.asMarkdown();
 ```
 <!--/INCLUDE-->
@@ -38,7 +38,8 @@ It is built from the sealed language, so it cannot describe an operation that do
 cannot omit one that does. There is no wiki to keep up to date and no comment block to drift.
 
 `asJson()` gives the same content in a form a tool can read, which is what you want when the
-consumer is a generator rather than a person — chapter 32's subject.
+consumer is an LLM being asked to write rules rather than a person reading them — chapter 32's
+subject.
 
 ## It refuses to be built out of nothing
 
@@ -62,8 +63,9 @@ nothing describes:
 That is a deliberate refusal rather than a nicety. A document with holes in it is worse than no
 document, because a reader who finds three operations undescribed stops trusting the other twenty.
 
-The practical consequence: put the export in your build. A vocabulary that cannot describe itself
-fails, and the moment it fails is the commit that added the operation.
+The practical consequence: **write a test that builds the export**. A vocabulary that cannot
+describe itself then fails, and the moment it fails is the commit that added the operation rather
+than the afternoon somebody first wanted the document.
 
 ## Where descriptions live
 
@@ -149,9 +151,76 @@ A description is prose, and prose goes stale silently. There is a mechanism for 
 can be checked mechanically.
 
 `Surface.checksum(Class)` hashes a class's public surface — its methods and their shapes. Recording
-it with `@BubasReviewed` says *somebody read this and agreed with what it said, at this shape*. When
-the shape changes, the recorded checksum no longer matches, and the export tells you which
-descriptions need re-reading.
+it with `@BubasReviewed` says *somebody read this and agreed with what it said, at this shape*.
+
+There are three states, and the difference between them is the whole design.
+
+**No annotation.** Nothing is checked. Reviewing is opt-in per class, so a project that has not
+adopted it pays nothing.
+
+**An empty value**, which is how you start:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/VocabularyTest.java"
+start: '// snippet: reviewed-first-time'
+end: '// end snippet'
+prefix: "```java"
+postfix: "```"
+margin: 0
+_content_generated_: 311:md5:a671250f8cb91d938c177289e5596aa4
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```java
+/** A type whose description has never been reviewed. The empty value asks for a checksum. */
+@javax0.bubas.api.BubasDescription("A cost centre a claim is charged to.")
+@javax0.bubas.api.BubasReviewed("")
+public static final class Budget {
+    public String code() {
+        return "CC-1";
+    }
+}
+```
+<!--/INCLUDE-->
+
+The export refuses, and tells you what to write:
+
+<!--INCLUDE
+from: "../../bubas-doc/target/doc-outputs/reviewed-first-time.txt"
+prefix: "```"
+postfix: "```"
+_content_generated_: 102:md5:6294a4e78e39e78448548fd4c932dcc1
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```
+write E69EB45F13B8D06C into @BubasReviewed on javax0.bubas.doc.expense.VocabularyTest$Budget
+```
+<!--/INCLUDE-->
+
+Note that it *reports* the checksum rather than writing it into your source. A build that edits its
+own files to make itself pass has stopped being a check.
+
+**A value that no longer matches.** Once the class changes shape, the export says so, shows you the
+surface as it now stands, and names what to do:
+
+<!--INCLUDE
+from: "../../bubas-doc/target/doc-outputs/reviewed-changed.txt"
+prefix: "```"
+postfix: "```"
+_content_generated_: 288:md5:5f9772d40508cfa457eed38b2aa88d93
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```
+javax0.bubas.doc.expense.VocabularyTest$Stale has changed since its description was reviewed. Its public surface is now:
+        java.lang.String code()
+    Re-read the description, then write E69EB45F13B8D06C into @BubasReviewed on javax0.bubas.doc.expense.VocabularyTest$Stale
+```
+<!--/INCLUDE-->
+
+Pasting the new checksum in is a two-second edit, and that is exactly the risk: the mechanism only
+works if somebody re-reads the description first. It buys you the prompt, not the review.
 
 What it catches: an operation gaining a parameter, changing its return type, or acquiring a new
 public method. Real changes that plausibly invalidate a sentence somebody wrote.

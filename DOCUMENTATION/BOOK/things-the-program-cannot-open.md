@@ -35,6 +35,16 @@ In other words a domain value behaves like any other value, in every respect exc
 contents are somebody else's business. It is a thing you hold and give to people who know what to
 do with it, like a sealed envelope with a name on the front.
 
+Rosencrantz and Guildenstern carry such an envelope. Hamlet sends them to England with a sealed
+letter; they never read it, they simply deliver it, and it is their own execution order. They are
+the perfect handlers of an opaque value — they hold it, they pass it on, and they cannot look
+inside.
+
+The cautionary half of the analogy is worth keeping too. Everything that went wrong for them was
+decided by whoever wrote the letter, not by anything they did with it. A rule that passes a claim to
+`APPROVE` is exactly as safe, and exactly as dangerous, as whatever `APPROVE` was built to do —
+which is chapter 1's honest limit seen from the inside.
+
 ## What you cannot do
 
 Three refusals, and each one says something different.

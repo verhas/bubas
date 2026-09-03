@@ -11,7 +11,7 @@ are not caught. They are absent.
 
 ## Not caught — absent
 
-Every language has a list of mistakes it catches. What matters more is the list of mistakes it
+Every programming language has a list of mistakes it catches. What matters more is the list of mistakes it
 cannot make.
 
 A rule that reads a total before working it out is not a bug BUBAS finds for you. It is a program

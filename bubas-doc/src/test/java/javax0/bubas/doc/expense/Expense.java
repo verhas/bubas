@@ -430,6 +430,53 @@ public final class Expense {
     }
     // end snippet
 
+    // ---------------------------------------------------------------- stage 9: a real plural
+
+    // snippet: signers
+    /**
+     * A collection the domain owns, rather than one a rule assembled.
+     * <p>
+     * How many people must sign a claim is a fact about the approval policy, so the vocabulary
+     * answers it and fills the array. A rule that built this list itself would be encoding the
+     * policy, which is the thing chapter 9 warns about.
+     */
+    @BubasDescription("How many people have to approve a claim.")
+    public static final class ApproverCount {
+        public long call(Context ctx, Report claim) {
+            return claim.total().compareTo(new BigDecimal("1000")) > 0 ? 3 : 1;
+        }
+    }
+
+    /**
+     * Fills an array, so it is a statement, not a function. A function that mutated its own
+     * argument and then answered nothing would be a write wearing a read's clothes — the call
+     * would sit alone on a line, looking like every other statement-form call in this book, while
+     * hiding the one thing that actually happened: {@code into} was overwritten. The pattern
+     * language exists so a write is visible in the shape of the line, not buried in an argument.
+     */
+    @BubasDescription("Fills an array with everyone who has to approve a claim, in signing order.")
+    public static final class ApproversOf {
+        public void call(StatementContext ctx, ExpressionArg claim, VariableArg into) {
+            claim.evaluate();
+            final var approvers = into.get().as(String[].class);
+            final var all = new String[]{"the line manager", "the finance director", "the board"};
+            for (int i = 0; i < approvers.length && i < all.length; i++) {
+                approvers[i] = all[i];
+            }
+        }
+    }
+    // end snippet
+
+    // snippet: approving-language
+    /** Stage 9: the domain hands over a list, so a rule may hold one. */
+    static BubasLanguage.Builder approving() {
+        return dated()
+                .defineFunction("APPROVER_COUNT", ApproverCount.class)
+                .defineStatement("APPROVERS OF {expression/Report:claim}"
+                        + " INTO {var/ARRAY/STRING:into}", ApproversOf.class);
+    }
+    // end snippet
+
     // ---------------------------------------------------------------- the sealed stages
 
     public static final BubasLanguage STAGE_1 = core().seal();
@@ -440,4 +487,5 @@ public final class Expense {
     public static final BubasLanguage STAGE_6 = routing().seal();
     public static final BubasLanguage STAGE_7 = telling().seal();
     public static final BubasLanguage STAGE_8 = dated().seal();
+    public static final BubasLanguage STAGE_9 = approving().seal();
 }

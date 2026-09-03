@@ -251,8 +251,12 @@ compile.
 
 ## The last line
 
-`END.` closes the program, and the full stop is part of it. It is the one piece of punctuation in the language that exists purely
-so that a truncated file cannot look like a complete one.
+`END` closes the program. The full stop after it is optional — `END` alone is accepted — and it is
+there as a tribute to Niklaus Wirth, whose Pascal ended every program that way. Wirth spent his last
+years in Winterthur, about seven kilometres from where this language was written.
+
+Write it or leave it off. The one habit worth keeping is consistency within a codebase, since a
+reader who sees both starts wondering which one means something.
 
 ## Running it
 
@@ -301,8 +305,7 @@ can see everything this rule is able to do, because it is all on the page.
 
 ## What you can now read
 
-You can read a BUBAS program. That is not a small claim to have earned in thirteen lines, and it is
-most of what this book is for.
+You can read a BUBAS program. That is not a small claim to have earned in thirteen lines.
 
 What you cannot yet do is write one from nothing, or predict what the compiler will refuse. The
 next chapters fill that in — values and types, the two kinds of operation, opaque types, then

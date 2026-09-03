@@ -150,7 +150,7 @@ it. What the tests do is make the decision visible and its consequences checkabl
 this book ever claimed for the arrangement.
 
 **Not whether the operation is safe.** The vocabulary bounds what a rule can *name*, not what a
-named thing *does*, and an operation backed by a service is where that gap is widest. Chapter 32
+named thing *does*, and an operation backed by a service is where that gap is the widest. Chapter 32
 takes it up.
 
 ## The shape this leaves you with

@@ -451,14 +451,14 @@ analysis at sealing time proves no two commands can ever match the same line.
 from: "exposing-a-model.md"
 start: '<!-- abstract'
 end: '<!-- /abstract'
-_content_generated_: 362:md5:a6287209cd0d43d11beaf54ee8060ff2
+_content_generated_: 385:md5:1da864120d3d175b9ebbcc48a70fb53e
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 Putting an LLM behind an operation, and the design rule that decides whether it was worth doing:
 return a score, never a verdict. Advisory outputs leave the decision with the expert; verdict
-outputs move it to the model and reduce your language to glue. Also the honest part — this is the
-one operation whose behaviour can change without any checksum changing.
+outputs move it to the model and reduce your language to glue. And the limit worth stating plainly:
+this is the one operation whose behaviour can change without anybody editing a line of code.
 <!--/INCLUDE-->
 
 ### 26. [Describing and exporting](describing-and-exporting.md)

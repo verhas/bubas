@@ -126,10 +126,13 @@ With a score, the policy — what counts as too unusual — lives in the rule. I
 version-controlled, it is reviewable by someone in finance, and when the auditor asks why this
 claim was flagged and that one was not, the answer is a line somebody wrote on purpose.
 
-With a verdict, the policy lives in the model. It is not visible, not reviewable, and not
-explicable. The auditor's question has no answer beyond "the model said so." And your BUBAS
-program, which existed so that a subject-matter expert could own the rule, has been reduced to
-glue between a model and a database.
+With a verdict, the policy lives behind the operation. It is not invisible — it is in the Java, and
+an engineer can read it, review it and explain it. But the person who owns expense policy cannot,
+and they are the one the auditor will ask. The policy has moved out of the artefact they can hold
+you to and into one they need an interpreter for.
+
+And your BUBAS program, which existed so that a subject-matter expert could own the rule, has been
+reduced to glue between a service and a database.
 
 Generalised, and worth remembering when you are asked to add an operation:
 
@@ -188,7 +191,8 @@ euro a call. The description is what somebody wrote; the behaviour is what someb
 
 This is true of every operation in the book, and it has been said before. It is worth repeating
 here because a model-backed operation is the one where the gap between the description and the
-behaviour is largest, hardest to inspect, and most likely to change without anybody editing a line
+behaviour is the largest, the hardest to inspect, and the most likely to change without anybody
+editing a line
 of code. The review checksum that chapter 11 mentions will not notice. Nothing in BUBAS will.
 
 ## What is coming

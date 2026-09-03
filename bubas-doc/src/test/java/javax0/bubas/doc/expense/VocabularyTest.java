@@ -22,33 +22,29 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class VocabularyTest {
 
-    private static final Map<String, BubasLanguage> STAGES = Map.of(
-            "1", Expense.STAGE_1,
-            "2", Expense.STAGE_2,
-            "3", Expense.STAGE_3,
-            "4", Expense.STAGE_4,
-            "5", Expense.STAGE_5);
+    /** Every stage, in order. The deltas between them are what the chapters show. */
+    private static final List<BubasLanguage> ORDER = List.of(
+            Expense.STAGE_1, Expense.STAGE_2, Expense.STAGE_3, Expense.STAGE_4, Expense.STAGE_5,
+            Expense.STAGE_6, Expense.STAGE_7, Expense.STAGE_8, Expense.STAGE_9);
 
     @Test
     void every_stage_can_describe_itself() throws IOException {
-        for (final var stage : STAGES.entrySet()) {
+        for (int i = 0; i < ORDER.size(); i++) {
+            final var language = ORDER.get(i);
             // snippet: export
-            final var export = VocabularyExport.of(stage.getValue());
+            final var export = VocabularyExport.of(language);
             final var document = export.asMarkdown();
             // end snippet
-            Runs.write("vocabulary-stage-" + stage.getKey() + ".md", document);
+            Runs.write("vocabulary-stage-" + (i + 1) + ".md", document);
         }
     }
 
     /** Each stage adds and none takes away, which is the promise the whole book rests on. */
     @Test
     void each_stage_contains_everything_the_one_before_it_had() {
-        final var order = List.of(Expense.STAGE_1, Expense.STAGE_2, Expense.STAGE_3,
-                Expense.STAGE_4, Expense.STAGE_5);
-
-        for (int i = 1; i < order.size(); i++) {
-            final var earlier = VocabularyExport.of(order.get(i - 1));
-            final var later = VocabularyExport.of(order.get(i));
+        for (int i = 1; i < ORDER.size(); i++) {
+            final var earlier = VocabularyExport.of(ORDER.get(i - 1));
+            final var later = VocabularyExport.of(ORDER.get(i));
 
             assertThat(later.functions()).extracting(VocabularyExport.Function::name)
                     .describedAs("stage %d keeps every function of stage %d", i + 1, i)
@@ -72,12 +68,9 @@ class VocabularyTest {
      */
     @Test
     void what_each_stage_adds_is_written_out() throws IOException {
-        final var order = List.of(Expense.STAGE_1, Expense.STAGE_2, Expense.STAGE_3,
-                Expense.STAGE_4, Expense.STAGE_5);
-
-        for (int i = 1; i < order.size(); i++) {
-            final var before = names(VocabularyExport.of(order.get(i - 1)));
-            final var after = VocabularyExport.of(order.get(i));
+        for (int i = 1; i < ORDER.size(); i++) {
+            final var before = names(VocabularyExport.of(ORDER.get(i - 1)));
+            final var after = VocabularyExport.of(ORDER.get(i));
             final var added = new java.util.LinkedHashSet<>(names(after));
             added.removeAll(before);
 
@@ -152,5 +145,66 @@ class VocabularyTest {
 
         assertThat(thrown).isNotNull();
         Runs.write("export-refusal.txt", thrown.getMessage());
+    }
+
+    // snippet: reviewed-first-time
+    /** A type whose description has never been reviewed. The empty value asks for a checksum. */
+    @javax0.bubas.api.BubasDescription("A cost centre a claim is charged to.")
+    @javax0.bubas.api.BubasReviewed("")
+    public static final class Budget {
+        public String code() {
+            return "CC-1";
+        }
+    }
+    // end snippet
+
+    @javax0.bubas.api.BubasDescription("What a budget has left.")
+    public static final class LeftIn {
+        public java.math.BigDecimal call(javax0.bubas.api.Context ctx, Budget budget) {
+            return java.math.BigDecimal.ZERO;
+        }
+    }
+
+    /** The same type, with a checksum somebody wrote down before its shape moved. */
+    @javax0.bubas.api.BubasDescription("A cost centre a claim is charged to.")
+    @javax0.bubas.api.BubasReviewed("0000000000000000")
+    public static final class Stale {
+        public String code() {
+            return "CC-1";
+        }
+    }
+
+    @javax0.bubas.api.BubasDescription("What a budget has left.")
+    public static final class LeftInStale {
+        public java.math.BigDecimal call(javax0.bubas.api.Context ctx, Stale budget) {
+            return java.math.BigDecimal.ZERO;
+        }
+    }
+
+    private static javax0.bubas.analyser.BubasLanguage over(String name, Class<?> type,
+                                                            Class<?> function) {
+        return javax0.bubas.analyser.BubasLanguage.builder()
+                .install(javax0.bubas.support.Standard::register)
+                .defineOpaqueType(name, type)
+                .defineFunction("LEFT_IN", function)
+                .seal();
+    }
+
+    /**
+     * Chapter 26: what a review checksum says the first time, and what it says once a described
+     * class has changed shape. Both captured, because the wording is the product.
+     */
+    @Test
+    void a_review_checksum_reports_rather_than_writes() throws IOException {
+        final var first = org.assertj.core.api.Assertions.catchThrowable(
+                () -> VocabularyExport.of(over("Budget", Budget.class, LeftIn.class)));
+        final var moved = org.assertj.core.api.Assertions.catchThrowable(
+                () -> VocabularyExport.of(over("Budget", Stale.class, LeftInStale.class)));
+
+        assertThat(first).hasMessageStartingWith("write ");
+        assertThat(moved).hasMessageContaining("has changed since its description was reviewed");
+
+        Runs.write("reviewed-first-time.txt", first.getMessage());
+        Runs.write("reviewed-changed.txt", moved.getMessage());
     }
 }

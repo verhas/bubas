@@ -105,8 +105,38 @@ total against a cap is exact and always will be. Working out an average and comp
 calculation whose last digits depend on a setting somewhere else, which is fine as long as you are
 not deciding a marginal case on the thirtieth decimal place.
 
-An `INTEGER` used where a `DECIMAL` is wanted is widened automatically, which is why `total / days`
-above needed no ceremony despite `days` being a whole number.
+An `INTEGER` used where a `DECIMAL` is wanted is widened automatically. The rule above is declared
+with one of each and divides them without ceremony:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/resources/programs/per-diem.bu"
+start:
+  pattern: 'PROGRAM ApprovePerDiem'
+  include: true
+end:
+  pattern: 'perDay = total / days'
+  include: true
+prefix: "```"
+postfix: "```"
+margin: 0
+_content_generated_: 202:md5:fd5c1c55d4bf0f02274cb9a6c233814a
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```
+PROGRAM ApprovePerDiem(claim Report, dailyCap DECIMAL, days INTEGER) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+    DECLARE perDay DECIMAL
+
+    total = TOTAL_OF(claim)
+    perDay = total / days
+```
+<!--/INCLUDE-->
+
+`days` is an `INTEGER`, `total` is a `DECIMAL`, and `perDay` is a `DECIMAL` because that is what
+the division produces. The widening only goes one way: a `DECIMAL` where an `INTEGER` is wanted is
+an error, because narrowing would have to throw something away and the language will not choose
+what.
 
 ## Text
 
@@ -126,9 +156,11 @@ Numbers render the way you would write them: whole numbers in plain digits, deci
 notation with their scale kept and never in scientific form, and `TRUE` or `FALSE` exactly as you
 would type them.
 
-A domain value cannot be turned into text at all. There is no way to render a `Report`, because
-BUBAS has no idea what one looks like; if a message needs to name the claimant, that is an
-operation somebody has to provide.
+A domain value cannot be turned into text by the language. BUBAS has no idea what a `Report` looks
+like, so `"claim " + claim` is an error. What the domain can do is provide an operation for it —
+something that answers a `STRING` — and then the words are the domain's own rather than a rendering
+BUBAS invented. If your vocabulary has no such operation and a message needs to name the claimant,
+that is an operation to ask for.
 
 ## True and false
 
@@ -142,10 +174,10 @@ than `FALSE` is not a question the language will accept, because it is not a que
 ## Comparing things
 
 All six comparisons — `=`, `<>`, `<`, `>`, `<=`, `>=` — work on numbers, and on text, where they
-order it character by character. Note that `=` is the comparison. There is no `==` in this
-language.
+order it character by character. Note that equality is written `=`; there is no `==` in this
+language, and `<>` rather than `!=` is inequality.
 
-Numbers of different kinds compare fine; the whole number is widened first. And `DECIMAL`
+Numbers of different kinds compare fine; the `INTEGER` is widened to `DECIMAL` first. And `DECIMAL`
 comparison is by *value*, not by how it was written, so `2.0 = 2.00` is `TRUE`. That is worth
 knowing precisely because scale is otherwise preserved so carefully: the language keeps the trailing
 zero when showing you the number, and ignores it when comparing.

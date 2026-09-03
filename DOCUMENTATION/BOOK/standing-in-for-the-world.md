@@ -11,7 +11,7 @@ for is pretended. What that buys, and the one thing it can never tell you.
 ## The problem, stated plainly
 
 A rule is a small thing surrounded by a large world. `APPROVE` moves money. `ROUTE` reads the
-approval policy out of some system. `ANOMALY_SCORE_OF` asks a model. Running a rule for real means
+approval policy out of some system. `ANOMALY_SCORE_OF` asks an LLM. Running a rule for real means
 running all of that for real, which is not a test — it is a payment.
 
 So a test replaces them. The rule itself stays exactly as it is, unmodified and uninstrumented, and

@@ -134,6 +134,26 @@ after the vocabulary was restructured and a marker was renamed. Neither mdship n
 word, and a local gate rehearsal that ran `git add` before `git diff --exit-code` could not have
 failed in any case. **Verify the gate the way CI runs it: update, then diff, with nothing staged.**
 
+There is a second, opposite failure in the same mechanism, found while writing Part 3: a `start:`
+pattern that matches **more than one** line does not error and does not take the first match. It
+spans from the first match to the *last* matching `end:`, silently unioning everything between —
+proven with a minimal, BUBAS-free two-line repro, so this is mdship's behaviour, not a property of
+this content. It bit twice in one file, both times because a short anchor became an accidental
+substring of a name added later: `'// snippet: approve'` inside `'// snippet: approvers'`, then
+`'.defineStatement("APPROVE'` inside `'.defineStatement("APPROVERS'`. Both landed as several hundred
+lines of unrelated code baked into a chapter, silently, because the checksum still matched *some*
+generated content — it just was not the content anyone asked for.
+
+**An anchor pattern must stay a substring match of exactly one line in its target file, for the
+life of that file — not just on the day it was written.** A file this book keeps adding operations
+to will keep growing new lines, and a short prefix that is unique today can stop being unique
+without anyone touching the document that depends on it. Prefer a pattern specific enough that nothing
+plausible could ever be appended after it and still match — a trailing space or an argument list
+fragment, the way `'.defineStatement("APPROVE '` (with the space) cannot also match
+`'.defineStatement("APPROVERS'`. When adding a name to the vocabulary, checking it against every
+existing marker for an accidental substring relationship costs one grep and is cheaper than finding
+out from a silently wrong chapter.
+
 ### D6 — Quoted output is derived, not duplicated
 
 A test that asserts `"3 reports approved"` while the document also contains `"3 reports approved"`
@@ -302,13 +322,15 @@ rather than kept in step.
 
 Planning data that is not part of the book stays here instead, referencing chapters by number:
 
-- **Application stages.** Eight exist: 1 core, 2 escalation, 3 line items, 4 category
+- **Application stages.** Nine exist: 1 core, 2 escalation, 3 line items, 4 category
   totals, 5 the anomaly score, 6 routing, 7 variadic and wildcard operations, 8 a borrowed
-  type. The tutorials ship 1–3 and Part 1 uses 1–5. Stages 6–8 exist because a Part 3
-  chapter needed something to show: a command that writes
+  type, 9 an array the domain hands over. The tutorials ship 1–3 and Part 1 uses 1–5.
+  Stages 6–9 exist because a Part 3 chapter needed something to show: a command that writes
   ([D19](#d19-a-command-that-writes-one-variable-should-have-been-a-function)), an
-  operation taking any number of arguments, and a type whose class cannot carry its own
-  description. Stage numbering follows the code rather than a plan made in advance.
+  operation taking any number of arguments, a type whose class cannot carry its own
+  description, and — added for chapter 9's honest case, D20 below — a statement that fills
+  an array the vocabulary already knows the size of. Stage numbering follows the code
+  rather than a plan made in advance.
 - **Merge candidates** if the book runs long: chapters 6 and 7 into one on control flow; 22 and 23
   into one on a vocabulary's nouns and verbs. Neither is merged now, because each carries an
   argument and not only a mechanism.
@@ -356,13 +378,50 @@ Had it produced only the approver, it should have been `approver = FIND_APPROVER
 writing command with a single target is a function wearing a disguise: harder to read, harder to
 compose, and it declares a variable as a side effect of being called.
 
-So the test for the command form is **more than one answer, decided together**. Not "it writes
-rather than returns"; every function writes something.
+So the test for the command form is **more than one answer, decided together** — not "it writes
+rather than returns". Writing into a variable is only interesting when there is more than one place
+to write to; with one, returning the value says the same thing and reads better.
 
 This is also what makes stage 6 worth having. The consistency checker's central rule concerns
 commands that write, and it treats the two targets differently — an opaque one is given a token
 automatically, a `STRING` must be supplied by the mock or the test is refused before the subject
 runs. One command demonstrates both, which no earlier stage could.
+
+### D20 — A void function that writes its own argument is a statement wearing a disguise
+
+Stage 9's first draft exposed `APPROVERS_OF` as a function: `void call(Context ctx, Report claim,
+String[] into)`, mutating the array it was handed. It compiled — SPEC explicitly allows a bare array
+argument to cross into Java as the interpreter's own backing store, and a function may write its
+elements — and it read, on the page, as `APPROVERS_OF(claim, approvers)`: a call sitting alone on a
+line, its answer (there is none) apparently thrown away, exactly the shape chapter 4 teaches readers
+to be suspicious of for the wrong reason.
+
+The reason to distrust it has nothing to do with `void` being legal for a statement-form call —
+`NOTE` is void and unremarkable, because `NOTE` writes nothing anywhere. `APPROVERS_OF` mutates a
+variable the caller already holds, and that write is invisible in the call's shape: nothing about
+`APPROVERS_OF(claim, approvers)` marks `approvers` as the thing being written, the way
+`{var/ARRAY/STRING:into}` in a statement pattern does. A reader has to know the function's contract
+to know it writes at all.
+
+The fix was to make it a statement: `APPROVERS OF {expression/Report:claim} INTO
+{var/ARRAY/STRING:into}`, receiving a `VariableArg` and calling `into.get().as(String[].class)` for
+the backing store — the mechanism SPEC §10.8.2 describes for a whole-array placeholder. The write is
+now part of the shape of the line, which is the same guarantee chapter 24 already makes for a
+scalar target.
+
+The test, generalising D19: **a void operation earns statement form when it writes a variable the
+caller supplied, whether one target or several.** A void operation that writes nothing — `NOTE`,
+`NOTIFY` — is legitimately a function; the void return means only "asked to happen, not asked
+about." An operation whose whole job is to happen, at a place named in the line, is a command.
+
+Converting it surfaced a second collision, of the same family the language itself teaches. The
+statement's literal keyword `APPROVERS` is now a reserved word, and it happens to be the natural
+name for the array it fills — so the first draft (`DECLARE approvers[...]`) failed to compile with
+exactly chapter 3's "a variable may not be named after its type" diagnostic, one mechanism over.
+The rule generalises past types: **any literal token in the vocabulary is unavailable as a
+variable name**, and a command whose keyword is the obvious domain noun for its own target
+collides with itself. The array was renamed (`signers`) rather than the command, because the
+keyword is what a reader sees repeated across every call site.
 
 ## Mechanics
 

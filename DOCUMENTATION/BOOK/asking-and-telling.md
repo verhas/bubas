@@ -158,10 +158,12 @@ Write whichever reads better. `NOTE "checked the limit"` reads like an instructi
 is; `NOTE("over by " + (total - limit))` puts brackets round a longer expression and is easier to
 scan for it. Nothing depends on the choice.
 
-The reason it is allowed only in this direction is worth a sentence. An asking operation *must*
-have brackets because without them there would be no way to tell `TOTAL_OF` the operation from
-`TOTAL_OF` the variable. A telling operation is a whole line by itself, so nothing is ambiguous
-either way, and the language does not insist.
+The reason it is allowed only in this direction is worth a sentence, and it is not ambiguity.
+BUBAS has one namespace, so `TOTAL_OF` is either an operation or a variable and never both; the
+compiler always knows which. The brackets are for the reader. Inside an expression, where a name
+could as easily be a value somebody stored earlier, `TOTAL_OF(claim)` says *this is being worked
+out here* at a glance. A telling operation is a whole line of its own, so a reader is in no doubt
+about it either way, and the language does not insist.
 
 ## An answer cannot be thrown away
 

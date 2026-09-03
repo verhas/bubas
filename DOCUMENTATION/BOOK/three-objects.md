@@ -22,66 +22,111 @@ which of the three you are holding.
 | `BubasProgram` | once per rule text | moderate | freely, across threads |
 | `Interpreter` | once per execution | trivial | never |
 
+## One whole example first
+
+Everything below is one embedding, small enough to read at once. It has a single type, a single
+question, a single instruction — and it is complete: there is nothing left out to make it fit on
+the page.
+
 ## The language
 
 A `BubasLanguage` is the vocabulary: every type, function and statement a program written against
 it may use. It is built with a builder and then **sealed**.
 
 <!--INCLUDE
-from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Expense.java"
-start: '// snippet: core-language'
+from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/FirstLanguage.java"
+start: '// snippet: first-language'
 end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 548:md5:d327e7f6cfe9db574312eb7419008782
+_content_generated_: 375:md5:faf6d7c5cca792a754163b397223c1d6
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
-/** Stage 1: what the five-minute tutorial shows. */
-static BubasLanguage.Builder core() {
-    return BubasLanguage.builder()
-            .install(Standard::register)
-            .defineOpaqueType("Report", Report.class)
-            .defineFunction("TOTAL_OF", TotalOf.class)
-            .defineFunction("NOTE", Note.class)
-            .defineStatement("APPROVE {expression/Report:claim}", Approve.class)
-            .defineStatement("REJECT {expression/Report:claim}, {expression/STRING:reason}",
-                    Reject.class);
-}
+/** Built once, at startup, and held for the life of the process. */
+static final BubasLanguage LANGUAGE = BubasLanguage.builder()
+        .install(Standard::register)
+        .defineOpaqueType("Claim", Claim.class)
+        .defineFunction("TOTAL_OF", TotalOf.class)
+        .defineStatement("APPROVE {expression/Claim:expense}", Approve.class)
+        .seal();
 ```
 <!--/INCLUDE-->
 
 `install(Standard::register)` brings in declaration and assignment. Chapter 4 made the point from
-the other side: those are ordinary statements, and an embedder who wants different ones simply does
-not install these.
+the other side: those are ordinary statements shipped in a module, and an embedder who wants
+different ones simply does not install these.
 
-Notice this method returns a `Builder` rather than a sealed language. That is how the stages in this
-book are built — `escalating()` calls `core()`, `itemised()` calls `escalating()` — so there is one
-definition of `TOTAL_OF` serving six languages. In a real application you will have one language and
-one method, but the pattern is worth knowing: a builder is a value you can pass around and extend,
-and only sealing ends that.
+Everything after it is this application's own. `Claim` is a Java class of yours; `TOTAL_OF` and
+`APPROVE` are Java classes of yours. The next three chapters are about writing them.
+
+Build this once, in startup, and hold it for the life of the process. It is immutable and
+thread-safe once sealed.
 
 ## Sealing
 
 `seal()` is where the language stops being editable and starts being usable. It is not a formality.
 
-At `seal()` the analysis runs that proves **no two statement patterns can ever match the same line**.
-Chapter 24 covers what that means and how it can fail; what matters here is when it happens. A
-vocabulary with an ambiguity in it fails at startup, with a message naming both patterns — not on
-the first unlucky program six weeks later.
+At `seal()` the analysis runs that proves **no two statement patterns can ever match the same
+line**. Chapter 24 covers what that means and how it can fail; what matters here is when it
+happens. A vocabulary with an ambiguity in it fails at startup, with a message naming both
+patterns — not on the first unlucky program six weeks later.
 
 That is the general shape of the design: expensive checks run once, at the moment the vocabulary is
 fixed, so that everything downstream is cheap and certain.
 
-A sealed language is immutable and thread-safe. Build it once, hold it for the life of the process.
-
 ## The program
 
-`language.compile(source)` produces a `BubasProgram`: a rule that has been lexed, parsed, matched
-against the vocabulary, type-checked and flow-analysed. Everything chapter 8 listed has already
-happened by the time you hold one.
+This is the rule the example runs — an ordinary text file, kept wherever your application keeps
+them:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/resources/programs/first-rule.bu"
+prefix: "```"
+postfix: "```"
+_content_generated_: 238:md5:259e2d50a811783d714e8cfab04f6610
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```
+PROGRAM ApproveSmallClaim(expense Claim, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+
+    total = TOTAL_OF(expense)
+
+    IF total > limit THEN
+        RETURN FALSE
+    END IF
+
+    APPROVE expense
+    RETURN TRUE
+END
+```
+<!--/INCLUDE-->
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/FirstLanguage.java"
+start: '// snippet: first-compile'
+end: '// end snippet'
+prefix: "```java"
+postfix: "```"
+margin: 0
+_content_generated_: 175:md5:a0b8f972a1ceb1f006aa6363e9d0739e
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```java
+/** Compiled once per rule text, then reused for every claim that arrives. */
+static final BubasProgram PROGRAM = LANGUAGE.compile(Runs.source("first-rule.bu"));
+```
+<!--/INCLUDE-->
+
+`Runs.source` there is nothing but a file read, spelt however suits you. `compile` produces a
+`BubasProgram`: a rule that has been lexed, parsed, matched against the
+vocabulary, type-checked and flow-analysed. Everything chapter 8 listed has already happened by the
+time you hold one.
 
 A `BubasProgram` is immutable and thread-safe, and it carries the language it was compiled against.
 Compile a rule once and reuse it for every claim that arrives — compiling per request works, and is
@@ -93,32 +138,31 @@ number, the source line, and a diagnostic. Chapter 30 is about who should see it
 ## The interpreter
 
 <!--INCLUDE
-from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Runs.java"
-start: '// snippet: interpret'
+from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/FirstLanguage.java"
+start: '// snippet: first-run'
 end: '// end snippet'
 prefix: "```java"
 postfix: "```"
 margin: 0
-_content_generated_: 457:md5:4c6cd7bcbe6f359c67bcf52a99ed1116
+_content_generated_: 304:md5:9445a9106f223188950cc2778f13d24e
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
 ```java
-static Outcome run(BubasProgram program, Map<String, Object> arguments) {
-    final var logged = new ArrayList<String>();
-    final var interpreter = Interpreter.of(program);
-    arguments.forEach(interpreter::argument);
-    final var answer = interpreter
-            .logger((level, message) -> logged.add(message))
+/** One interpreter per decision. Cheap to make, used once, thrown away. */
+static boolean decide(Claim claim, BigDecimal limit) {
+    return Interpreter.of(PROGRAM)
+            .argument("expense", claim)
+            .argument("limit", limit)
             .run()
             .asBoolean();
-    return new Outcome(program.name(), arguments, answer, List.copyOf(logged));
 }
 ```
 <!--/INCLUDE-->
 
-An `Interpreter` holds the state of one execution: the variables, the arguments, the services, the
-logger. It is deliberately cheap to make, because you make one per claim.
+An `Interpreter` holds the state of one execution: the variables, the arguments, and whatever the
+application supplies for this run. It is deliberately cheap to make, because you make one per
+claim.
 
 Three rules, and they are absolute.
 
@@ -131,7 +175,7 @@ variables, because they are in different objects. A BUBAS program has one global
 concurrency *within* a program, which means concurrency *between* programs costs nothing to reason
 about.
 
-Note also what `argument` is doing there. It checks the value against the parameter's declared type
+Note what `argument` is doing. It checks the value against the parameter's declared type
 immediately, so a wiring mistake surfaces before the rule runs rather than at the first use.
 
 ## Why it is three and not one

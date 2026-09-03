@@ -47,6 +47,10 @@ from it, quietly.
 The durable question is a different one. It is not how well the rule is written. It is **what the
 thing it is written in is permitted to say.**
 
+Put it as a question about a town. Would you rather live in one where nobody carries a gun, or in
+one where everybody does and your safety rests on each of them being sane and well-intentioned? The
+second town can be perfectly peaceful for years. It is not peaceful for the same reason.
+
 A perfectly competent engineer, writing Java, can still reach the file system. Not because he
 intends to, and not because he is careless, but because that sentence is available in the language
 he was asked to write. Competence and authority are separate axes, and improving one does nothing

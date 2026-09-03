@@ -38,7 +38,7 @@ public static final class Approve {
 <!--INCLUDE
 from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Expense.java"
 start:
-  pattern: '\.defineStatement\("APPROVE'
+  pattern: '\.defineStatement\("APPROVE '
   include: true
 end:
   pattern: '\.defineStatement\("REJECT'
@@ -54,6 +54,10 @@ _content_generated_: 82:md5:07996aa08e66b2dc64fa1b2aad449fad
 .defineStatement("APPROVE {expression/Report:claim}", Approve.class)
 ```
 <!--/INCLUDE-->
+
+That second line is a call on the builder, alongside the `defineFunction` and `defineOpaqueType`
+calls of chapter 21 — a statement is registered exactly like anything else, and the only difference
+is that its name is a shape rather than a word.
 
 Everything outside braces is a keyword the rule must write literally. Everything inside is a
 **placeholder**: a hole, with a kind, usually a type constraint, and a name.
@@ -166,13 +170,27 @@ public static final class Route {
 ```
 <!--/INCLUDE-->
 
+`Route` there is a static nested class, and so is every handler in this book. Nothing requires it
+— a handler may be a top-level class in a file of its own — but a vocabulary of a dozen operations
+is a dozen small classes, and keeping them nested inside the class that registers them puts the
+whole language in one file where it can be read as one thing. The only requirement is that a nested
+handler be **static**: the runtime constructs it with no arguments, so it cannot be an inner class
+needing an enclosing instance.
+
 An `ExpressionArg` is different: it arrives **unevaluated**, and calling `evaluate()` is what runs
 it. That is deliberate, and it is the one power a statement has that a function does not — a
 statement decides *whether* and *when* its arguments run. `APPROVE` evaluates its claim once. A
 conditional statement could evaluate one branch and not the other.
 
-Use it rarely. An operation whose arguments may or may not run is harder to reason about than one
-that always evaluates, and chapter 12's reader has to work out which it is.
+Use it rarely, and only for a reason you can name. An operation whose arguments may or may not run
+is harder to reason about than one that always evaluates, and chapter 12's reader has to work out
+which it is.
+
+`ROUTE` is a case where the choice makes itself. It cannot decide anything without knowing which
+claim it is routing, so it evaluates its expression immediately and unconditionally — and if it did
+not, it would have nothing to write into either of its two targets. The power exists for the
+statement that genuinely needs to skip an argument; a statement that needs all of its arguments
+should just take them.
 
 ## Why this command is a command
 
@@ -183,8 +201,9 @@ only the approver, it should have been `approver = FIND_APPROVER(claim)` — a w
 single target is a function wearing a disguise, harder to read, harder to compose, and it declares
 a variable as a side effect of being called.
 
-**More than one answer, decided together.** That is the test. Not "it writes rather than returns";
-every function writes something.
+**More than one answer, decided together.** That is the test — not "it writes rather than
+returns". Writing into a variable is only interesting when there is more than one place to write
+to; with one, returning the value says the same thing and reads better.
 
 ## Sealing proves the shapes cannot collide
 

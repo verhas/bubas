@@ -216,10 +216,100 @@ chapter 23's subject.
 
 Not never, or the language would not have them.
 
-The honest cases are those where the domain itself is plural and the operations hand you the plural
-thing. If a vocabulary offers an operation that fills an array of approvers, and your rule genuinely
-has to notify each of them, then an array holding approvers is exactly the right shape, and looping
-over it is not a smell. The array is carrying a domain concept, not an invented one.
+The honest case is a domain that is genuinely plural about something, with operations that hand you
+the plural thing. How many people must sign a claim is a fact about the approval policy, not
+something a rule should work out — so the vocabulary answers the count and fills the list. The
+first is a question and is a function; the second writes into a variable and is a statement, for
+the reason chapter 4 gave: a write belongs to the shape of the line, not to an argument whose result
+happens to be thrown away.
+
+<!--INCLUDE
+from: "../../bubas-doc/target/doc-outputs/vocabulary-added-9.md"
+_content_generated_: 267:md5:b51193ee35c845e3862a9d0c66cb1d7f
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+### APPROVER_COUNT(claim Report) -> INTEGER
+
+How many people have to approve a claim.
+
+### APPROVERS OF _ INTO _
+
+```
+APPROVERS OF {expression/Report:claim} INTO {var/ARRAY/STRING:into}
+```
+
+Fills an array with everyone who has to approve a claim, in signing order.
+<!--/INCLUDE-->
+
+`APPROVERS OF claim INTO signers` reads as an instruction because it is one — chapter 24 is
+where statements like this are built. A rule that has to notify each of them then holds an array,
+and loops:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/resources/programs/notify-approvers.bu"
+prefix: "```"
+postfix: "```"
+_content_generated_: 485:md5:90ea86f12f61d9ea5d115b39c8251879
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```
+PROGRAM NotifyApprovers(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE signers[APPROVER_COUNT(claim)] STRING
+    DECLARE i INTEGER
+    DECLARE total DECIMAL
+
+    total = TOTAL_OF(claim)
+
+    IF total <= limit THEN
+        APPROVE claim
+        RETURN TRUE
+    END IF
+
+    APPROVERS OF claim INTO signers
+
+    FOR i = 0 TO LENGTH(signers) - 1
+        NOTIFY signers[i]
+    END FOR
+
+    ESCALATE claim, "needs " + LENGTH(signers) + " signatures"
+    RETURN FALSE
+END.
+```
+<!--/INCLUDE-->
+
+<!--INCLUDE
+from: "../../bubas-doc/target/doc-outputs/stage9-approvers.txt"
+prefix: "```"
+postfix: "```"
+_content_generated_: 314:md5:8a56ba47876699ed4d3ad980a7ad9185
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```
+NotifyApprovers(claim = report 1 (Alice), limit = 200.00)
+    approved report 1 (Alice) for 42.50
+    => TRUE
+
+NotifyApprovers(claim = report 2 (Bob), limit = 200.00)
+    told the line manager
+    told the finance director
+    told the board
+    escalated report 2 (Bob) — needs 3 signatures
+    => FALSE
+```
+<!--/INCLUDE-->
+
+Nothing here is a smell. There is no mapping the rule invented, no positional correspondence held
+together by care, and nothing a reviewer must hold in their head. The array's length came from the
+policy, its contents came from the policy, and the rule's only opinion is that each of them should
+be told.
+
+Notice also how little the rule knows. It never learns why three signatures are needed rather than
+one; that decision stayed where it belongs. Had the rule counted approvers itself — one over a
+thousand, three over ten thousand — the array would have been the same shape and the chapter's
+warning would apply in full.
 
 The distinction is whether the collection came *from* the domain or was assembled *by* your rule.
 The first is fine. The second is the signal.
