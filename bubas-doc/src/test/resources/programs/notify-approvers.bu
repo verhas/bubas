@@ -1,0 +1,21 @@
+PROGRAM NotifyApprovers(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE signers[APPROVER_COUNT(claim)] STRING
+    DECLARE i INTEGER
+    DECLARE total DECIMAL
+
+    total = TOTAL_OF(claim)
+
+    IF total <= limit THEN
+        APPROVE claim
+        RETURN TRUE
+    END IF
+
+    APPROVERS OF claim INTO signers
+
+    FOR i = 0 TO LENGTH(signers) - 1
+        NOTIFY signers[i]
+    END FOR
+
+    ESCALATE claim, "needs " + LENGTH(signers) + " signatures"
+    RETURN FALSE
+END.

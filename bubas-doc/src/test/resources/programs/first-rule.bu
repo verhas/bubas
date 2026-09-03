@@ -1,0 +1,12 @@
+PROGRAM ApproveSmallClaim(expense Claim, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE total DECIMAL
+
+    total = TOTAL_OF(expense)
+
+    IF total > limit THEN
+        RETURN FALSE
+    END IF
+
+    APPROVE expense
+    RETURN TRUE
+END
