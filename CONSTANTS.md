@@ -1,7 +1,9 @@
 # BUBAS Constant Evaluation — Specification
 
-**Version** 1.0 · **Status** Design agreed; not implemented. See [`SPEC.md`](SPEC.md) for the
-language itself and [`CHECKS.md`](CHECKS.md) for domain checks.
+**Version** 1.1 · **Status** Design agreed; not implemented. Its one precursor is: the
+`MathContext` is sealed into the language, which is what makes decimal division evaluable
+([4](#4-decimal-division)). See [`SPEC.md`](SPEC.md) for the language itself and
+[`CHECKS.md`](CHECKS.md) for domain checks.
 
 Every expression whose value is fixed at compile time is evaluated at compile time, and everything
 that fact makes visible is rejected. A branch that cannot be taken, a loop body that cannot run, an
@@ -77,7 +79,7 @@ the order inverts:
 1. lex, parse, match statements against patterns
 2. **symbol collection** — split out of `FlowAnalyser`
 3. lowering to the core tree
-4. **constant evaluation**
+4. **constant evaluation** — reads the language's `MathContext` ([5.2](#52-the-evaluator-reads-the-rounding-policy))
 5. definite assignment and reachability, over the core tree
 6. domain checks ([`CHECKS.md`](CHECKS.md))
 7. `BubasProgram` returned
@@ -161,6 +163,25 @@ Exact decimal multiplication adds scales, so a chain of constant multiplications
 evaluator refuses to fold a result exceeding an implementation-defined precision, leaving the
 expression in place, rather than compiling an unbounded value into the program. The limit exists to
 stop a pathological source from consuming the compiler, not to make a semantic distinction.
+
+Division needs no such limit: a quotient is bounded by the `MathContext`'s precision. The exception
+is `MathContext.UNLIMITED`, where a non-terminating quotient throws rather than growing, which
+[4.1](#41-mathcontextunlimited) covers.
+
+### 5.2. The evaluator reads the rounding policy
+
+Constant evaluation is **not** a function of the core tree alone. Folding `100.00 / 3.0` requires
+the same `MathContext` the interpreter would have used, so the pass takes the `BubasLanguage`
+alongside the program — as `Lowering` already does.
+
+Division is the only operation this applies to. Every other constant result follows from its
+operands.
+
+The consequence is worth stating plainly: **a folded constant is a property of the program and the
+language together, not of the source.** One source compiled against two languages differing only in
+rounding yields two different constants. That is correct — it is exactly what the two interpreters
+would have computed — but it means a test asserting a folded value has to name the language it
+compiled against, and a core tree is not comparable across languages.
 
 ## 6. Rejections
 
@@ -261,6 +282,11 @@ evaluation on and off, must produce identical results and identical failures. Be
 policy is now a property of the language, "under several `MathContext` settings" means compiled
 against several languages that differ only there — which is also the cheapest test that the policy
 really does travel with the program.
+
+Division is what that test is for. Sharing primitives guarantees the *operation* agrees; it does not
+guarantee the evaluator was handed the *same context* the interpreter reads. Folding `1.0 / 3.0`
+against a language at 5 digits and another at 10 catches the plumbing mistake that shared code
+cannot.
 
 Each rejection in [6](#6-rejections) needs a program that triggers it and a neighbouring one that
 does not — particularly [6.2](#62-a-loop-that-cannot-end), where `DO WHILE TRUE` with and without a
