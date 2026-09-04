@@ -121,7 +121,7 @@ public final class ConstantFolding {
             case CoreExpression.Call call -> {
                 final var arguments = expressions(call.arguments());
                 final var values = new ArrayList<>();
-                var known = StaticCall.foldable(call.signature());
+                var known = MemoizedCall.foldable(call.signature());
                 for (final var argument : arguments) {
                     final var value = value(argument);
                     known &= value != null;
@@ -129,7 +129,7 @@ public final class ConstantFolding {
                 }
                 yield known
                         ? trapping(() -> constant(
-                        StaticCall.of(call.signature(), values, mathContext),
+                        MemoizedCall.of(call.signature(), values, mathContext),
                         call.signature().returnType(), call.token()))
                         : new CoreExpression.Call(call.signature(), arguments, call.token());
             }
@@ -236,7 +236,7 @@ public final class ConstantFolding {
             return fold.get();
         } catch (CoreArithmetic.Trap trap) {
             throw new BubasException(trap.getMessage(), current.line(), current.source(), trap);
-        } catch (StaticCall.Refusal refusal) {
+        } catch (MemoizedCall.Refusal refusal) {
             throw new BubasException(refusal.getMessage(), current.line(), current.source(), refusal);
         }
     }

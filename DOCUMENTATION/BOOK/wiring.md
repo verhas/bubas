@@ -90,6 +90,54 @@ The cost is that a service forgotten is discovered when a handler asks for it. R
 set in one place — a small factory that turns a claim into a configured interpreter — is worth doing
 on the first day rather than the fortieth.
 
+## Rounding, which is not per run
+
+One setting deliberately does not go on the interpreter:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/java/javax0/bubas/doc/expense/Wiring.java"
+start:
+  pattern: '// snippet: rounding'
+  include: true
+end:
+  pattern: '// end snippet'
+  include: false
+prefix: "```java"
+postfix: "```"
+margin: 0
+_content_generated_: 395:md5:a4aaa342840108f0c131e3f05b3bffc4
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```java
+// snippet: rounding
+/**
+ * The rounding policy belongs to the language, not to the run. Sixteen significant digits and
+ * banker's rounding, decided once, at startup, for every rule this language ever compiles.
+ */
+static BubasLanguage roundedToTheCent() {
+    return Expense.approving()
+            .mathContext(new MathContext(16, RoundingMode.HALF_EVEN))
+            .seal();
+}
+```
+<!--/INCLUDE-->
+
+Chapter 3 said the application draws the line on division and every rule follows suit. This is where
+it draws it: on the builder, sealed with everything else, before a single rule is compiled.
+
+It could have been per run, and was once. The reason it is not is worth a paragraph, because it is
+the same reason this chapter keeps insisting on immutability. A rounding policy on the interpreter
+means the same rule can settle money one way in your test and another way in production, with
+nothing anywhere comparing the two — and the BUNIT suite of chapter 12 onwards takes the language,
+so it would have inherited the wrong one silently. Rounding is an accounting decision, one rule set
+answers to one, and it belongs where the vocabulary is decided rather than where a request is
+served.
+
+The practical consequence is that a rule needing different rounding for one calculation asks for it
+explicitly, with an operation that says so. That reads better in a rule than an invisible global,
+which is the trade this book keeps making.
+
 ## Logging
 
 `logger(BiConsumer<String, String>)` receives every `ctx.log(level, message)` a handler makes.
@@ -135,6 +183,11 @@ part of the artefact under review, no longer version-controlled with the logic i
 Chapter 6's rule declares `ceiling` as a `FINAL` in the program, where a finance manager reads it.
 That is the right place. If a number varies by tenant or by period, it becomes a **parameter** —
 which is what `limit` is throughout this book — and the application supplies it per run.
+
+One caveat, and chapter 8 is where it bites. A `FINAL` is fine as a *figure* — a cap compared
+against a total nobody has worked out yet is a real comparison. It is not fine as a *switch*: a
+`FINAL` flag read by an `IF` is a test the compiler can answer, and it is refused. Anything the
+rule's behaviour turns on is a parameter, not a constant.
 
 What genuinely belongs in configuration is infrastructure: endpoints, credentials, timeouts, which
 model version chapter 25 told you to pin. Nothing a rule-writer would recognise.

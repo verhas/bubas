@@ -200,6 +200,21 @@ rest still be considered?* Most of the arguments worth having about a business r
 arguments about ordering, and here the ordering is on the page rather than distributed across four
 methods.
 
+## A test has to be a question
+
+One thing an `IF` may not do is ask something the compiler can already answer.
+
+`IF 1 = 1 THEN` is the obvious case and nobody writes it. The case people do write is a test on a
+value the rule worked out a few lines earlier — a flag set at the top, a cap assigned from a figure
+in the source. The compiler follows those values, so it knows the answer, so it refuses the test:
+one of the two branches cannot run, and a branch that cannot run is a mistake rather than a
+formality.
+
+The remedy is nearly always the same, and it is worth knowing now rather than at the diagnostic. A
+value the rule sets for itself is decided; a value the rule is *given* is not. Anything the rule's
+behaviour should turn on belongs in the program's parameters, where the application supplies it and
+a test can set it either way. Chapter 8 works through the shape this takes in practice.
+
 ## What is coming
 
 One test at a time is enough for a claim considered as a single total. The next chapter opens the

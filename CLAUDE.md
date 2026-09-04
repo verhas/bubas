@@ -36,11 +36,12 @@ mistaken for oversights:
   the `MathContext` is sealed into the `BubasLanguage` — which is also why a folded constant
   belongs to the program and the language together, not to the source. See
   [`CONSTANTS.md`](CONSTANTS.md).
-- **Purity is declared, never inferred: `@BubasStatic` is what lets the compiler call a function.**
+- **Purity is declared, never inferred: `@BubasMemoizable` is what lets the compiler call a function.**
   Nothing about a signature says whether it reads a clock or a database, so an unannotated function
-  is opaque however pure it looks. The compiler holds the claim to one part — a static function
-  asking for a service or the log is a compile error — and can check nothing else, so a false
-  declaration silently bakes in an answer a run would not have given. Folding is further limited to
+  is opaque however pure it looks. One part of the claim is a type and not a promise: a static
+  function's method takes `CoreContext`, which has no `service` on it, so reaching an application
+  does not compile, and `seal()` refuses such a function declaring `Context` instead. Nothing can
+  check the rest, so a false declaration silently bakes in an answer a run would not have given. Folding is further limited to
   scalar parameters and results, because arrays, opaque values and wildcards are marshalled by the
   interpreter and the compiler has no marshaller. `ctx.error` while folding is a compile error, and
   meant to be.

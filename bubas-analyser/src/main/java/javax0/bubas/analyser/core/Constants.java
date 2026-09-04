@@ -37,8 +37,8 @@ final class Constants {
             settled &= value != null;
             arguments.add(value);
         }
-        return settled && StaticCall.foldable(call.signature())
-                ? StaticCall.of(call.signature(), arguments, mathContext)
+        return settled && MemoizedCall.foldable(call.signature())
+                ? MemoizedCall.of(call.signature(), arguments, mathContext)
                 : null;
     }
 

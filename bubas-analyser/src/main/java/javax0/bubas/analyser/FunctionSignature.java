@@ -2,7 +2,8 @@ package javax0.bubas.analyser;
 
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasType;
-import javax0.bubas.api.Context;
+import javax0.bubas.api.BubasMemoizable;
+import javax0.bubas.api.CoreContext;
 
 import java.util.List;
 
@@ -49,14 +50,34 @@ public record FunctionSignature(String name, BubasType returnType, List<Paramete
                 + " argument(s) but was given " + given + ": " + this;
     }
 
+    /**
+     * A function that says its answer comes from its arguments alone must be unable to ask for
+     * anything else, and the way to be unable is to be handed an interface without the method on
+     * it. Checked here rather than left for the first fold: a language whose author wrote
+     * {@code Context} by habit is wrong at {@code seal()}, before any program is compiled, rather
+     * than on whichever compilation first happens to know all the arguments.
+     */
+    private static void checkStatic(String where, java.lang.reflect.Method method, Class<?> owner,
+                                    Class<?> first) {
+        if (!owner.isAnnotationPresent(BubasMemoizable.class) || first == CoreContext.class) {
+            return;
+        }
+        throw new BubasDefinitionException(where + ": " + method.getName()
+                + " is @BubasMemoizable, so its first parameter must be CoreContext rather than "
+                + first.getSimpleName() + ". A memoizable function is called while compiling, where"
+                + " there is no application to ask, and CoreContext is the one that cannot ask it.");
+    }
+
     static FunctionSignature derive(String name, Implementation implementation, JavaTypes types) {
         final var where = "function " + name;
         final var method = implementation.method();
         final var javaParameters = method.getParameterTypes();
-        if (javaParameters.length == 0 || !Context.class.isAssignableFrom(javaParameters[0])) {
+        if (javaParameters.length == 0
+                || !CoreContext.class.isAssignableFrom(javaParameters[0])) {
             throw new BubasDefinitionException(where + ": " + method.getName()
                     + " must take a Context as its first parameter");
         }
+        checkStatic(where, method, implementation.owner(), javaParameters[0]);
         final var names = implementation.parameterNames();
         final var varargs = method.isVarArgs();
         final var parameters = new java.util.ArrayList<Parameter>();

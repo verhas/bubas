@@ -118,7 +118,7 @@ final class Environment {
     }
 
     /**
-     * Hands back exactly what it was given, and is deliberately <em>not</em> {@code @BubasStatic}.
+     * Hands back exactly what it was given, and is deliberately <em>not</em> {@code @BubasMemoizable}.
      * <p>
      * It exists so a script can hold a value the compiler may not read off the page. A condition the
      * compiler can answer is dead code and rejected, so a corpus script demonstrating a branch, a
@@ -136,7 +136,7 @@ final class Environment {
         }
     }
 
-    /** {@link Mirror} for text. Not {@code @BubasStatic}, and for the same reason. */
+    /** {@link Mirror} for text. Not {@code @BubasMemoizable}, and for the same reason. */
     @BubasDescription("""
             Hands back the text it was given, unchanged.
             A value that arrives through it is not one the compiler can read off the page.

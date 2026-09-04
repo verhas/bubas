@@ -1,0 +1,17 @@
+PROGRAM ApproveExpense(claim Report, limit DECIMAL, strict BOOLEAN) RETURNS BOOLEAN
+    DECLARE cap DECIMAL
+
+    cap = limit
+
+    IF strict THEN
+        cap = limit - 100.00
+    END IF
+
+    IF TOTAL_OF(claim) > cap THEN
+        REJECT claim, "over the " + cap + " limit"
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.

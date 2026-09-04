@@ -338,6 +338,22 @@ every other, or keeping several running values at once and combining them at the
 at it. What you are writing may be an algorithm that wants to live behind a single operation, asked
 once. Chapter 9 gives that instinct a name and a test.
 
+## A loop has to be able to run, and to stop
+
+Loops carry the same requirement as an `IF`, in two directions.
+
+A loop that cannot run at all is refused: `FOR line = 5 TO 1` counts backwards without being told
+to, and its body is text nobody will ever execute. So is a step of zero, which would never finish.
+So is a `DO WHILE` whose condition is decided before the first pass.
+
+A loop that cannot stop is refused too — a condition that stays true with no `EXIT` anywhere inside
+it. `DO WHILE TRUE` is perfectly good BUBAS as long as something in the body leaves; what is refused
+is the version where nothing does.
+
+Both come from the same idea as the rest of this chapter: the bounds of a loop are the part a
+reviewer checks, and a loop whose bounds settle the matter before the first pass is not a loop. The
+compiler says so rather than running it zero times and moving on.
+
 ## What is coming
 
 You have now seen every way a BUBAS program can be put together. The next chapter is the one that

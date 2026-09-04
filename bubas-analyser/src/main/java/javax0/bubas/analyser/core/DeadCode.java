@@ -271,7 +271,7 @@ public final class DeadCode {
             return Constants.of(expression, known, mathContext);
         } catch (CoreArithmetic.Trap trap) {
             throw new BubasException(trap.getMessage(), line.line(), line.source(), trap);
-        } catch (StaticCall.Refusal refusal) {
+        } catch (MemoizedCall.Refusal refusal) {
             throw new BubasException(refusal.getMessage(), line.line(), line.source(), refusal);
         }
     }

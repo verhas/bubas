@@ -4,8 +4,9 @@ import javax0.bubas.analyser.BubasLanguage;
 import javax0.bubas.api.BubasAssigns;
 import javax0.bubas.api.BubasDefinitionException;
 import javax0.bubas.api.BubasException;
-import javax0.bubas.api.BubasStatic;
+import javax0.bubas.api.BubasMemoizable;
 import javax0.bubas.api.Context;
+import javax0.bubas.api.CoreContext;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
 import javax0.bubas.api.VariableArg;
@@ -61,10 +62,10 @@ class DeadCodeTest {
         }
     }
 
-    /** Answers from its argument alone, and says so. */
-    @BubasStatic
+    /** Answers from its argument alone, and says so. Its context cannot reach an application. */
+    @BubasMemoizable
     public static final class Doubled {
-        public long call(Context ctx, long value) {
+        public long call(CoreContext ctx, long value) {
             return value * 2;
         }
     }
@@ -76,18 +77,31 @@ class DeadCodeTest {
         }
     }
 
-    /** Declares itself static and then asks for something a compiler has not got. */
-    @BubasStatic
+    /**
+     * Says it is memoizable and takes the context that can reach an application. There is no body here
+     * that asks for a service, and there does not need to be: the type is the mistake.
+     */
+    @BubasMemoizable
     public static final class Fibbing {
         public long call(Context ctx, long value) {
-            return ctx.service(java.time.Clock.class) == null ? value : 0;
+            return value;
+        }
+    }
+
+    /** Static, and entitled to log. Logging decides nothing, so it does not stop a fold. */
+    @BubasMemoizable
+    public static final class Talkative {
+        public long call(CoreContext ctx, long value) {
+            ctx.log("INFO", "doubling " + value);
+            ctx.debug("still doubling");
+            return value * 2;
         }
     }
 
     /** Static, and entitled to refuse. */
-    @BubasStatic
+    @BubasMemoizable
     public static final class Positive {
-        public long call(Context ctx, long value) {
+        public long call(CoreContext ctx, long value) {
             if (value <= 0) {
                 ctx.error(value + " is not positive");
             }
@@ -110,7 +124,7 @@ class DeadCodeTest {
                     + " DROPPING {initialized > var/INTEGER:rest > initialized}", Halve.class)
             .defineFunction("DOUBLED", Doubled.class)
             .defineFunction("QUIET", Quiet.class)
-            .defineFunction("FIBBING", Fibbing.class)
+            .defineFunction("TALKATIVE", Talkative.class)
             .defineFunction("POSITIVE", Positive.class)
             .seal();
 
@@ -214,6 +228,19 @@ class DeadCodeTest {
         }
 
         @Test
+        void logging_does_not_stop_a_fold_and_goes_nowhere() {
+            assertThat(reject("""
+                    DECLARE n INTEGER
+                    n = TALKATIVE(3)
+                    IF n > 10 THEN
+                        n = 1
+                    END IF
+                    SHOW n"""))
+                    .as("folded despite the log; the line belongs to a run that has not happened")
+                    .isEqualTo("this condition is always FALSE, so this arm cannot run; delete it");
+        }
+
+        @Test
         void a_static_function_may_refuse_and_that_is_a_compile_error() {
             assertThat(reject("""
                     DECLARE n INTEGER
@@ -223,12 +250,14 @@ class DeadCodeTest {
         }
 
         @Test
-        void one_that_asks_for_a_service_gives_itself_away() {
-            assertThat(reject("""
-                    DECLARE n INTEGER
-                    n = FIBBING(1)
-                    SHOW n"""))
-                    .contains("declared @BubasStatic but asked for Clock");
+        void one_that_could_reach_an_application_is_refused_when_the_language_is_sealed() {
+            final var thrown = catchThrowableOfType(BubasDefinitionException.class,
+                    () -> BubasLanguage.builder().defineFunction("FIBBING", Fibbing.class).seal());
+
+            assertThat(thrown).isNotNull();
+            assertThat(thrown.getMessage())
+                    .as("the mistake is the parameter type, found before any program is compiled")
+                    .contains("first parameter must be CoreContext rather than Context");
         }
     }
 

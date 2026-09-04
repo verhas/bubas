@@ -2,9 +2,8 @@ package javax0.bubas.analyser.core;
 
 import javax0.bubas.analyser.FunctionSignature;
 import javax0.bubas.api.BubasException;
-import javax0.bubas.api.BubasStatic;
-import javax0.bubas.api.BubasType;
-import javax0.bubas.api.Context;
+import javax0.bubas.api.BubasMemoizable;
+import javax0.bubas.api.CoreContext;
 
 import java.lang.reflect.InvocationTargetException;
 import java.math.MathContext;
@@ -14,15 +13,18 @@ import java.util.List;
 /**
  * Calls a function while compiling, when it has said that it may be.
  * <p>
- * A function is opaque to the compiler unless it carries {@link BubasStatic}: purity cannot be
+ * A function is opaque to the compiler unless it carries {@link BubasMemoizable}: purity cannot be
  * inferred, and a function that reads a clock or a database must never answer at compile time. The
  * annotation is the function's own claim, and this is the only thing that acts on it.
+ * <p>
+ * Folding is the extreme case of what the annotation licenses. Memoizing means answering a repeated
+ * call from an earlier one; this answers every call from one made before the program ever ran.
  *
- * @see BubasStatic
+ * @see BubasMemoizable
  */
-final class StaticCall {
+final class MemoizedCall {
 
-    private StaticCall() {
+    private MemoizedCall() {
     }
 
     /**
@@ -34,8 +36,8 @@ final class StaticCall {
      * because their arguments are marshalled into an array, which is that same boundary.
      */
     static boolean foldable(FunctionSignature signature) {
-        if (!signature.implementation().owner().isAnnotationPresent(BubasStatic.class)
-                || signature.varargs()) {
+        final var owner = signature.implementation().owner();
+        if (!owner.isAnnotationPresent(BubasMemoizable.class) || signature.varargs()) {
             return false;
         }
         return Constants.tracked(signature.returnType())
@@ -46,7 +48,7 @@ final class StaticCall {
     /**
      * @param arguments the already-known argument values, in order
      * @return what the function answered
-     * @throws BubasException when the function refuses, or asks for something a compiler has not got
+     * @throws Refusal when the function refuses these arguments
      */
     static Object of(FunctionSignature signature, List<Object> arguments, MathContext mathContext) {
         final var parameters = new ArrayList<Object>(arguments.size() + 1);
@@ -76,22 +78,21 @@ final class StaticCall {
     /**
      * What a function is handed when the compiler calls it.
      * <p>
-     * There is no application here and no run: a service would be an object this program has not got
-     * yet, and a log line would be written while compiling rather than while running. Asking for
-     * either is how a function that is not static gives itself away, so both say so plainly instead
-     * of returning something empty.
+     * There is no application here and no run. A service is not among the things it could ask for,
+     * because {@link CoreContext} has no such method and {@code seal()} has already refused any
+     * memoizable function declaring anything else — the hole is closed by the type rather than
+     * here.
+     * <p>
+     * The log is discarded. Logging does not decide anything, so a function has every right to do
+     * it and none of it belongs to this compilation: the run that would have written the line may
+     * happen a thousand times or never, and neither number is one. Refusing to fold a function
+     * because it logs would punish it for something that cannot affect the answer.
+     * <p>
+     * {@link #error} is the opposite and is not discarded. Such a function answers the same way
+     * every time, so one that refuses these arguments while compiling would refuse them on every
+     * run. Reporting it now is the same answer, earlier.
      */
-    private record CompileTime(String function, MathContext mathContext) implements Context {
-
-        @Override
-        public <T> T service(Class<T> type) {
-            throw refusal(type.getSimpleName());
-        }
-
-        @Override
-        public <T> T service(Class<T> type, String qualifier) {
-            throw refusal(type.getSimpleName() + " '" + qualifier + "'");
-        }
+    private record CompileTime(String function, MathContext mathContext) implements CoreContext {
 
         @Override
         public MathContext mathContext() {
@@ -100,23 +101,16 @@ final class StaticCall {
 
         @Override
         public void log(String level, String message) {
-            throw refusal("the log");
+            // Deliberately nowhere. See the note above the record.
         }
 
         @Override
         public void debug(String message) {
-            throw refusal("the log");
         }
 
         @Override
         public void error(String message) {
             throw new Refusal(function + ": " + message);
-        }
-
-        private Refusal refusal(String what) {
-            return new Refusal(function + " is declared @BubasStatic but asked for " + what
-                    + " while being folded. A static function answers from its arguments alone;"
-                    + " remove the annotation or the dependency.");
         }
     }
 }

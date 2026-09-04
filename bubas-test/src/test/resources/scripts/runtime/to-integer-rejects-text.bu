@@ -1,6 +1,6 @@
 'RUN-TIME-ERROR
 ' Text that is not a number is an error naming the text, not a zero.
-' The text arrives through MIRROR_TEXT, so this really is a run: TO_INTEGER is @BubasStatic and
+' The text arrives through MIRROR_TEXT, so this really is a run: TO_INTEGER is @BubasMemoizable and
 ' a literal would be refused while compiling. See constant/static-function-refuses.bu.
 ' ERROR: is not an INTEGER
 ' LINE: 9

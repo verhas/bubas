@@ -100,6 +100,12 @@ somewhere a line has to be drawn, and the application draws it. An application t
 decimal places and banker's rounding says so when it builds the language, and every division in
 every rule follows suit — in testing exactly as in production.
 
+**Arithmetic on figures written in the rule is worked out while the rule is compiled.** A cap of
+`50.00 * 3` is the number 150.00 in the compiled program, and nothing adds it up again on each run.
+This is invisible while it is only saving work. It stops being invisible when the answer decides
+something: a test on a figure the rule worked out for itself has an answer before the rule runs, and
+chapter 8 explains why that is refused rather than allowed.
+
 The practical consequence for a rule writer: **do not divide unless you mean to**. Comparing a
 total against a cap is exact and always will be. Working out an average and comparing that is a
 calculation whose last digits depend on a setting somewhere else, which is fine as long as you are

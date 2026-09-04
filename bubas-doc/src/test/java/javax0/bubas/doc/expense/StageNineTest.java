@@ -42,4 +42,18 @@ class StageNineTest {
 
         Runs.write("stage9-approvers.txt", Runs.transcript(outcomes));
     }
+
+    /**
+     * Chapter 28's rounding snippet, kept honest: the policy is a property of the language, so the
+     * same rule compiled against a different one divides differently.
+     */
+    @Test
+    void the_rounding_policy_travels_with_the_language() {
+        final var rounded = Wiring.roundedToTheCent();
+
+        assertThat(rounded.mathContext().getPrecision()).isEqualTo(16);
+        assertThat(Expense.STAGE_9.mathContext().getPrecision())
+                .as("the book's own language is left at the default")
+                .isEqualTo(java.math.MathContext.DECIMAL128.getPrecision());
+    }
 }

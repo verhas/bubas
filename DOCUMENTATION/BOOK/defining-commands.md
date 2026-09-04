@@ -192,6 +192,65 @@ not, it would have nothing to write into either of its two targets. The power ex
 statement that genuinely needs to skip an argument; a statement that needs all of its arguments
 should just take them.
 
+## Saying what a command puts there
+
+`ROUTE` writes two variables, and the compiler knows only that. It cannot know *what* — the approver
+comes out of whatever `Route` does with the claim, and there is nothing in the pattern, or in Java,
+that could tell it.
+
+That is the ordinary case and needs nothing. It is worth knowing about the exception, because
+chapter 8's refusals run on it.
+
+A command that does not compute but *copies* can say so. Assignment is such a command — it is an
+ordinary statement in the standard module, not a language built-in — and it declares what lands
+where:
+
+<!--INCLUDE
+from: "../../bubas-support/src/main/java/javax0/bubas/support/Assign.java"
+start:
+  pattern: '^@BubasAssigns'
+  include: true
+end:
+  pattern: '^    public void call'
+  include: false
+prefix: "```java"
+postfix: "```"
+margin: 0
+_content_generated_: 217:md5:889d1899a2f3300f8de2a45ff2d57aa4
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```java
+@BubasAssigns(target = "name", value = "value")
+public final class Assign {
+
+    public static final String PATTERN =
+            "{mutable:declared > var:name > initialized} = {expression/name:value}";
+
+```
+<!--/INCLUDE-->
+
+`target` names the variable placeholder, `value` the expression placeholder whose value it receives.
+That one line is why the compiler knows that after `strict = TRUE` the variable holds `TRUE`, and
+therefore why the `IF` four lines later has an answer.
+
+Three properties of the declaration are worth stating plainly.
+
+**It is optional and it is a claim.** A command that declares nothing is not deficient; it is
+opaque, which is what nearly every command should be. A command that declares this and then writes
+something else has lied to an analysis, and nothing checks it.
+
+**It repeats.** One statement may fill several variables, and each occurrence names one target. A
+command filling two and declaring one is describing itself accurately — the declared variable is
+known afterwards, the other is not. No two occurrences may name the same target; `seal()` refuses
+that, because two claims about one variable cannot both be the story.
+
+**Anything you hand a command is assumed written.** Nothing at run time stops a handler calling
+`set` on a variable its pattern only claimed to read, so the compiler forgets the value of every
+variable a statement touches, and puts back only what was declared. If your command is handed
+something it merely reads, the compiler is being pessimistic about it, and that costs nothing but a
+refusal it will not make.
+
 ## Why this command is a command
 
 Worth restating, because the temptation runs the other way.

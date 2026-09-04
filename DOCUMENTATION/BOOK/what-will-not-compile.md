@@ -128,6 +128,132 @@ floor, a threshold — are the part a reviewer reads most carefully, and `FINAL`
 what they read at the top is what applied at the bottom. A rule that adjusts its own cap partway
 down is one nobody can review by reading it once.
 
+## A decision that is already made
+
+A rule that tests something it has just decided for itself is not testing anything. Here is the
+shape it usually arrives in — a switch, added so the rule could be tightened without touching the
+application:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/resources/programs/switched-expense.bu"
+prefix: "```basic"
+postfix: "```"
+_content_generated_: 386:md5:0f3324616c7531e2661b8cf00d2249f7
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```basic
+PROGRAM ApproveExpense(claim Report, limit DECIMAL) RETURNS BOOLEAN
+    DECLARE strict BOOLEAN
+    DECLARE cap DECIMAL
+
+    strict = TRUE
+    cap = limit
+
+    IF strict THEN
+        cap = limit - 100.00
+    END IF
+
+    IF TOTAL_OF(claim) > cap THEN
+        REJECT claim, "over the " + cap + " limit"
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.
+```
+<!--/INCLUDE-->
+
+<!--INCLUDE
+from: "../../bubas-doc/target/doc-outputs/stage1-switched.txt"
+prefix: "```"
+postfix: "```"
+_content_generated_: 138:md5:18267bb775f7e7a2545ebd97e5a57fc7
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```
+line 8: this condition is always TRUE, so nothing after this arm can run; delete the IF and keep its body
+        IF strict THEN
+```
+<!--/INCLUDE-->
+
+Nothing in that program is written as a constant. `strict` is an ordinary variable, assigned on an
+ordinary line, and read four lines later. The compiler followed the value: at the `IF`, `strict` is
+`TRUE`, so the test has an answer, so the `IF` decides nothing and the `END IF` is decoration.
+
+This is worth refusing rather than allowing, because of what the line looks like six months later. A
+reviewer reading `IF strict THEN` sees a rule with two modes. There is one, and finding out which
+means scrolling up. Worse is the version where the assignment moves — a rule that quietly stopped
+having a strict mode at all still reads as though it has one, and the tests that covered the other
+branch still pass, because the branch they cover is the only one there is.
+
+The compiler is not objecting to the value. It is objecting to a question with no question in it.
+
+The switch belongs where the application can turn it:
+
+<!--INCLUDE
+from: "../../bubas-doc/src/test/resources/programs/switched-expense-fixed.bu"
+prefix: "```basic"
+postfix: "```"
+_content_generated_: 357:md5:578e547a0228823e60ce6ffd02b90f00
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```basic
+PROGRAM ApproveExpense(claim Report, limit DECIMAL, strict BOOLEAN) RETURNS BOOLEAN
+    DECLARE cap DECIMAL
+
+    cap = limit
+
+    IF strict THEN
+        cap = limit - 100.00
+    END IF
+
+    IF TOTAL_OF(claim) > cap THEN
+        REJECT claim, "over the " + cap + " limit"
+        RETURN FALSE
+    END IF
+
+    APPROVE claim
+    RETURN TRUE
+END.
+```
+<!--/INCLUDE-->
+
+<!--INCLUDE
+from: "../../bubas-doc/target/doc-outputs/stage1-switched-parameter.txt"
+prefix: "```"
+postfix: "```"
+_content_generated_: 275:md5:7cd2f18a64d24d2618cc24a7bac69529
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```
+ApproveExpense(claim = report 1 (Alice), limit = 200.00, strict = FALSE)
+    approved report 1 (Alice) for 128.40
+    => TRUE
+
+ApproveExpense(claim = report 1 (Alice), limit = 200.00, strict = TRUE)
+    rejected report 1 (Alice) — over the 100.00 limit
+    => FALSE
+```
+<!--/INCLUDE-->
+
+One program, one claim, two answers. `strict` is now something the program is *told*, which is the
+only thing in a rule the compiler genuinely cannot know — and so the `IF` is a question again, both
+branches are reachable, and a test can cover each.
+
+That is the general answer whenever this refusal appears. A value the rule works out for itself is
+known where it is read; a value handed to the rule is not. If a test has to vary something, it is a
+parameter.
+
+The same reasoning reaches arithmetic that cannot come out. `1 / 0` is refused where it is written,
+whether or not anything could reach the line — a line that cannot succeed is not made acceptable by
+being hard to get to — and so is a total that would overflow, and a cap worked out from figures that
+leave nothing to work out.
+
 ## Every path must answer
 
 <!--INCLUDE

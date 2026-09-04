@@ -1567,19 +1567,29 @@ return type or a constraint.
 
 ### 10.7. Contexts
 
+**A function declared `@BubasMemoizable` takes a `CoreContext`.** The split exists for that one
+purpose: `CoreContext` carries the rounding policy, the log and `error`, and has no `service`
+method, so a function the compiler may call while compiling cannot reach an application — not by
+promising, but by not having the method. `seal()` rejects a memoizable function whose first parameter is
+a `Context`, so the mistake is found at startup rather than on whichever compilation first knows all
+the arguments. See [`CONSTANTS.md`](CONSTANTS.md).
+
 **A function cannot touch the variable store at all.** Its arguments arrive as typed method
 parameters and it returns a value; that is the whole interface. Only a statement handler may read
 or modify variables, and only as its pattern's preconditions and postconditions declare — which is
 why it gets a richer context.
 
 ```java
-public interface Context {
-    <T> T service(Class<T> type);
-    <T> T service(Class<T> type, String qualifier);
+public interface CoreContext {
     MathContext mathContext();
     void log(String level, String message);
     void debug(String message);
     void error(String message);                     // throws BubasException
+}
+
+public interface Context extends CoreContext {
+    <T> T service(Class<T> type);
+    <T> T service(Class<T> type, String qualifier);
 }
 
 public interface StatementContext extends Context {

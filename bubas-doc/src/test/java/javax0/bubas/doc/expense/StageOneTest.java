@@ -63,6 +63,38 @@ class StageOneTest {
     }
 
     /**
+     * A switch the program sets itself is not a switch.
+     * <p>
+     * Chapter 8 uses this pair. The rejection is the interesting half: nothing here is written as a
+     * constant, and the compiler still answers the condition, because it followed the value.
+     */
+    @Test
+    void a_switch_the_program_sets_itself_is_refused() throws IOException {
+        final var thrown = catchThrowableOfType(BubasException.class,
+                () -> Expense.STAGE_1.compile(Runs.source("switched-expense.bu")));
+
+        assertThat(thrown).isNotNull();
+        assertThat(thrown.getMessage()).contains("always TRUE");
+
+        Runs.write("stage1-switched.txt", thrown.getDiagnostic());
+    }
+
+    /** The same rule with the switch where it belongs: one program, two answers. */
+    @Test
+    void the_same_switch_as_a_parameter_compiles_and_decides_both_ways() throws IOException {
+        final var program = Expense.STAGE_1.compile(Runs.source("switched-expense-fixed.bu"));
+
+        final var outcomes = List.of(
+                Runs.run(program, Runs.args("claim", ALICE, "limit", LIMIT, "strict", false)),
+                Runs.run(program, Runs.args("claim", ALICE, "limit", LIMIT, "strict", true)));
+
+        assertThat(outcomes.get(0).answer()).isTrue();
+        assertThat(outcomes.get(1).answer()).isFalse();
+
+        Runs.write("stage1-switched-parameter.txt", Runs.transcript(outcomes));
+    }
+
+    /**
      * One compiled program, one claim, two limits, two answers.
      * <p>
      * Chapter 2 uses this to show that a parameter is what makes a program reusable: nothing is

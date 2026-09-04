@@ -51,9 +51,87 @@ type becomes what the function answers, and `void` makes it a statement-form cal
 application registered, `log`, `debug`, `error`, and `mathContext()` for the division rules of
 chapter 3.
 
+It comes in two pieces. `CoreContext` has everything but the services — the rounding policy, the
+log, and `error` — and `Context` adds `service`. Take `Context` unless you have a reason not to; the
+next section is the reason.
+
 What it does not give you is access to the program. A handler cannot read the rule's variables,
 cannot know which line called it, and cannot change what happens next. It answers the question it
 was asked. That restraint is what makes chapter 21's threading story simple.
+
+## Functions the compiler may call
+
+A function is a black box to the compiler. It might read a database, a clock or a feature flag, and
+nothing about `long call(Context, String)` says which — so a call is never worked out early, however
+arithmetical it looks.
+
+A function that genuinely answers from its arguments alone can say so, and the standard module's
+`TO_INTEGER` does:
+
+<!--INCLUDE
+from: "../../bubas-support/src/main/java/javax0/bubas/support/ToInteger.java"
+start:
+  pattern: '^@BubasMemoizable'
+  include: true
+end:
+  pattern: '^\}'
+  include: false
+prefix: "```java"
+postfix: "```"
+margin: 0
+_content_generated_: 415:md5:8665c3e7fc2dfa6e89bc45fe98e9a7fe
+# ⚠️ MANAGED CONTENT: Edits will be lost.
+# danger zone: Delete _content_generated_ to override.
+-->
+```java
+@BubasMemoizable
+public final class ToInteger {
+
+    public static final String NAME = "TO_INTEGER";
+
+    public long call(CoreContext ctx, String s) {
+        try {
+            return Long.parseLong(s.trim());
+        } catch (NumberFormatException e) {
+            ctx.error("'" + s + "' is not an INTEGER");
+            throw new IllegalStateException("unreachable: error() throws", e);
+        }
+    }
+```
+<!--/INCLUDE-->
+
+The compiler may then call it while compiling, when every argument is a value it already knows.
+`TO_INTEGER("5")` becomes 5, and — since chapter 8's refusals follow values — a test on the result
+is a test with an answer, and refused.
+
+Three things are worth knowing before you reach for it.
+
+**Half of it is not a promise at all.** Look at the first parameter: `CoreContext`, not `Context`.
+It carries the rounding policy, the log and `error`, and it has no `service` method on it — so a
+memoizable function that tries to reach the application does not compile, in Java, in your IDE,
+anything else happens. Writing `Context` there is refused when the language is sealed, at startup,
+rather than on whichever compilation first happens to know all the arguments.
+
+**The other half is a promise, and nothing checks it.** A clock read through a static field, a file,
+a cached lookup: those the compiler cannot see. A function that declares this falsely will answer at
+compile time with a value a run would not have produced, and nothing will say so. When in doubt
+leave it off; all you lose is a fold.
+
+**It only ever applies to plain values.** Every parameter and the result must be `INTEGER`,
+`DECIMAL`, `STRING` or `BOOLEAN`. An array is a store, an opaque value is a Java object, and neither
+is something a compiled program can hold, so a function touching one is never called early however
+pure it is. `TOTAL_OF(claim)` takes a `Report` and would not qualify — which is just as well, since
+it reads one.
+
+**Refusing is allowed, and becomes a compile error.** `ctx.error` during a compile-time call fails
+the compilation at the line of the call. That follows from the promise rather than contradicting it:
+a function that answers the same way every time and refuses these arguments now would refuse them on
+every run, so the compiler is giving the same answer earlier.
+
+Logging is allowed too, and the line is thrown away. It decides nothing, so it is no reason to
+decline the fold — but the run that would have written it may happen a thousand times or never, and
+compiling is not one of them. Do not put anything in such a function's log that you expect to
+count.
 
 ## Any number of arguments
 

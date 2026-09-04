@@ -120,7 +120,7 @@ depends on nothing but its operands.
 ### 3.1. A function is constant only if it says so
 
 A function may read the host, the clock or a database, and nothing about its signature says which.
-Purity is therefore never inferred — it is declared, with `@BubasStatic` on the implementation
+Purity is therefore never inferred — it is declared, with `@BubasMemoizable` on the implementation
 class, and a call is folded only when the function carries it and every argument is known.
 
 Beyond the declaration, everything crossing the boundary has to be a value a compiled program can
@@ -129,15 +129,24 @@ is a store, an opaque value is a Java object, a wildcard is neither, and a varia
 its arguments into an array. A function mentioning any of those is never folded, however pure it is,
 so declaring it static is true and idle.
 
-**The compiler holds a static function to one part of its claim.** It is handed a context with no
-application behind it: asking for a service, or for the log, is a compile error naming the function.
-Everything else — a clock read through a static field, a file, a cache — it cannot check, and a
-function that declares this falsely will answer at compile time with a value a run would not have
-produced. When in doubt, leave the annotation off; nothing is lost but a fold.
+**One part of the claim is a type rather than a promise.** A memoizable function's method takes a
+`CoreContext`, which has no `service` method on it, so a call to one does not compile; `seal()`
+refuses one whose first parameter is anything else, so the mistake surfaces at startup
+rather than on whichever compilation first knows all the arguments. Everything else — a clock read
+through a static field, a file, a cache — nothing can check, and a function that declares this
+falsely will answer at compile time with a value a run would not have produced. When in doubt, leave
+the annotation off; nothing is lost but a fold.
 
 **Refusing is allowed and useful.** `ctx.error` during folding is a compile error at the line of the
-call. `TO_INTEGER("twelve")` is not a number in any run, and saying so while compiling beats waiting
-for the run that reaches it.
+call. Answering the same way every time is what the annotation claims, so a function refusing these
+arguments while compiling would refuse them on every run: reporting it now is the same answer,
+earlier. `TO_INTEGER("twelve")` is not a number in any run, and saying so while compiling beats
+waiting for the run that reaches it.
+
+**Logging is allowed and goes nowhere.** A memoizable function has every right to log — the log does not
+decide anything, so it is no reason to decline a fold. During a fold it is discarded, because the
+run that would have written the line may happen any number of times and a compilation is not one of
+them.
 
 > **Rationale (not normative).** The declaration sits on the class rather than in
 > `defineFunction`, beside `@BubasDescription` and `@BubasCommandName`, for the reason a command is
@@ -388,7 +397,7 @@ preserves scale and is locale-independent, so it is. This is recorded because it
 constant operation whose output is a `STRING` derived from a `DECIMAL`, and any future change to
 decimal rendering would silently change folded values.
 
-**Whether a variadic or wildcard-typed static function should fold.** Both are excluded because
+**Whether a variadic or wildcard-typed memoizable function should fold.** Both are excluded because
 their arguments cross into Java as arrays and `Value` wrappers, which the interpreter marshals and
 the compiler does not. Lifting that would mean moving the marshalling somewhere both can reach, the
 way `CoreArithmetic` already was. No case has asked for it.

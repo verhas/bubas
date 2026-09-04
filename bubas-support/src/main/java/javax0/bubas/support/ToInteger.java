@@ -1,8 +1,8 @@
 package javax0.bubas.support;
 
 import javax0.bubas.api.BubasDescription;
-import javax0.bubas.api.BubasStatic;
-import javax0.bubas.api.Context;
+import javax0.bubas.api.BubasMemoizable;
+import javax0.bubas.api.CoreContext;
 
 /**
  * {@code TO_INTEGER(s) -> INTEGER}
@@ -16,12 +16,12 @@ import javax0.bubas.api.Context;
         Fails, naming the text, when it is not one — there is no silent zero, because a total
         that quietly became nothing is worse than a program that stopped.
         """)
-@BubasStatic
+@BubasMemoizable
 public final class ToInteger {
 
     public static final String NAME = "TO_INTEGER";
 
-    public long call(Context ctx, String s) {
+    public long call(CoreContext ctx, String s) {
         try {
             return Long.parseLong(s.trim());
         } catch (NumberFormatException e) {
