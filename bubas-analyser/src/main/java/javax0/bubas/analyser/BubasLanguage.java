@@ -14,6 +14,7 @@ import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Registrar;
 import javax0.bubas.lexer.Lexer;
 
+import java.math.MathContext;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -38,13 +39,15 @@ public final class BubasLanguage {
     private final List<CommandDefinition> commands;
     private final Map<Class<?>, Map<String, Object>> services;
     private final Map<String, Class<?>> documentedBy;
+    private final MathContext mathContext;
 
     private BubasLanguage(Vocabulary vocabulary, ConstraintResolver constraints,
                           Map<String, BubasType.Opaque> opaqueTypes,
                           Map<String, FunctionSignature> functions, List<CommandDefinition> commands,
                           Map<Class<?>, Map<String, Object>> services,
-                          Map<String, Class<?>> documentedBy) {
+                          Map<String, Class<?>> documentedBy, MathContext mathContext) {
         this.documentedBy = Map.copyOf(documentedBy);
+        this.mathContext = mathContext;
         this.vocabulary = vocabulary;
         this.constraints = constraints;
         // Ordered rather than Map.copyOf: registration order is what enumeration reports, and a
@@ -66,6 +69,17 @@ public final class BubasLanguage {
      */
     public Map<Class<?>, Map<String, Object>> services() {
         return services;
+    }
+
+    /**
+     * The rounding policy every {@code DECIMAL} division in this language reads.
+     * <p>
+     * Fixed at {@link Builder#seal()} and therefore a property of the compiled program rather than
+     * of the run: two interpreters of one program divide identically, and so do a BUNIT test and
+     * the production run of the rule it tests.
+     */
+    public MathContext mathContext() {
+        return mathContext;
     }
 
     public static Builder builder() {
@@ -144,6 +158,7 @@ public final class BubasLanguage {
         private final Map<Class<?>, Map<String, Object>> services = new LinkedHashMap<>();
         /** An opaque type's BUBAS name to the interface holding its documentation. */
         private final Map<String, Class<?>> documentedBy = new LinkedHashMap<>();
+        private MathContext mathContext = MathContext.DECIMAL128;
         private boolean skipOverlapAnalysis;
         private Mode mode = Mode.DEFINE;
 
@@ -345,6 +360,19 @@ public final class BubasLanguage {
         }
 
         /**
+         * The rounding policy for {@code DECIMAL} division, sealed into the language. Defaults to
+         * {@code DECIMAL128} — 34 digits, {@code HALF_EVEN}.
+         * <p>
+         * Not on {@link Registrar}: a library that set the arithmetic policy would be setting it
+         * for every other bundle in the same chain, and for programs that never touch its
+         * vocabulary. Adding vocabulary is additive; changing how every division rounds is not.
+         */
+        public Builder mathContext(MathContext mathContext) {
+            this.mathContext = mathContext;
+            return this;
+        }
+
+        /**
          * Overlap analysis is conservative, so it can reject a pair that would never collide. Skip
          * it for startup cost in production, or for a grammar whose author knows better — not
          * because it complained once.
@@ -391,7 +419,7 @@ public final class BubasLanguage {
                 new OverlapAnalysis(vocabulary).check(patterns);
             }
             return new BubasLanguage(vocabulary, constraints, types, signatures, definitions,
-                    services, documentedBy);
+                    services, documentedBy, mathContext);
         }
 
         /**

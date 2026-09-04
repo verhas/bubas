@@ -84,7 +84,7 @@ class StageOneTest {
 
     /**
      * Chapter 3's demonstration that DECIMAL is exact and keeps its scale, and that division does
-     * not: it goes through the interpreter's MathContext.
+     * not: it goes through the language's MathContext.
      * <p>
      * The amounts are deliberately awkward. Nobody files a thirty-cent claim; the point is that a
      * language handling money has to add these two numbers and get exactly the third.

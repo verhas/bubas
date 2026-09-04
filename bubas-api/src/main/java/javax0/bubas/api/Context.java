@@ -20,7 +20,10 @@ public interface Context {
     /** For the rare case of two services of one type: a read replica and a primary, say. */
     <T> T service(Class<T> type, String qualifier);
 
-    /** The interpreter's rounding policy for {@code DECIMAL} division. It may change during a run. */
+    /**
+     * The rounding policy for {@code DECIMAL} division, sealed into the language. One value for
+     * every run of every program compiled against it.
+     */
     MathContext mathContext();
 
     void log(String level, String message);

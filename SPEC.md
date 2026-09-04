@@ -110,7 +110,7 @@ BUBAS separates definition, compilation and execution into three objects with di
         │  Interpreter.of(program)
         ▼
    Interpreter                    cheap · single-use · single-threaded
-        │  argument() / registerService() / mathContext()
+        │  argument() / registerService() / logger()
         │  run()
         ▼
    Value
@@ -127,7 +127,7 @@ and it is deliberately cheap.
 compiler resolves every call while it analyses: an AST node carries the implementation instance,
 the target method, and the `Class` behind each opaque type it checks. The registries are therefore
 compile-time structures only. What survives into the run is data rather than lookup — the
-language-level services and the default `MathContext` — and it travels with the compiled program.
+language-level services and the `MathContext` — and it travels with the compiled program.
 
 This is why `BubasLanguage` and `BubasProgram` belong to the analyser and `Interpreter` to the
 runtime: the runtime depends on the analyser, never the reverse, and execution is entered through
@@ -482,13 +482,22 @@ All binary operators are left-associative.
 
 ### 6.3. DECIMAL arithmetic
 
-`+`, `-` and `*` are exact. `/` uses the interpreter's `MathContext`, which defaults to
-`MathContext.DECIMAL128` (34 digits, `HALF_EVEN`) and may be changed at runtime by a Java
-function. Consequently:
+`+`, `-` and `*` are exact. `/` uses the `MathContext` sealed into the language, which defaults to
+`MathContext.DECIMAL128` (34 digits, `HALF_EVEN`). It is set on the builder
+([§10.3](#103-building-a-language)) and nothing changes it afterwards — not an interpreter, not a
+Java function during a run. Consequently:
 
-- the same source may produce different results across runs, by design
-- there is **no compile-time constant folding**, of division or of anything else
-- generated Java reads the `MathContext` from the runtime rather than baking it in
+- one compiled program divides identically in every run, on every thread, and in a BUNIT test and
+  the production run of the rule it tests
+- generated Java may bake the policy in rather than reading it from the runtime
+- **no compile-time constant folding is implemented**, of division or of anything else. The reason
+  it was unsound for division is gone; [`CONSTANTS.md`](CONSTANTS.md) records the design that
+  replaces it
+
+> **Why the language and not the run.** Rounding policy is an accounting decision, and one rule set
+> answers to one. Per-run precision let a rule pass its test at 34 digits and settle money at 16,
+> with nothing anywhere comparing the two. Where a single calculation genuinely needs different
+> rounding, an explicit function saying so reads better in a rule than an invisible global.
 
 ### 6.4. Comparison
 
@@ -1268,6 +1277,8 @@ BubasLanguage lang = BubasLanguage.builder()
     .defineStatement("VALIDATE {initialized > var/Order:item} AGAINST {expression:rules}",
                      Validate.class)
 
+    .mathContext(new MathContext(16, RoundingMode.HALF_UP))
+
     .extensions()
         .classloader(pluginClassLoader)
         .filter(e -> e.getClass().getPackageName().startsWith("com.acme."))
@@ -1384,7 +1395,6 @@ for (long id : orderIds) {
         .argument("orderId", id)
         .argument("region", "EU")
         .registerService(Transaction.class, tx)
-        .mathContext(MathContext.DECIMAL128)
         .run();
 
     if (result.asBoolean()) { ... }

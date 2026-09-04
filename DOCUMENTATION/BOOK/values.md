@@ -97,8 +97,8 @@ information — it is the difference between a price and a rounded price — and
 `33.33333333333333333333333333333333`: thirty-four significant digits, which is as far as the
 default settings go. Division cannot be exact — a third has no finite decimal expansion — so
 somewhere a line has to be drawn, and the application draws it. An application that wants two
-decimal places and banker's rounding says so when it sets the interpreter up, and every division in
-every rule follows suit.
+decimal places and banker's rounding says so when it builds the language, and every division in
+every rule follows suit — in testing exactly as in production.
 
 The practical consequence for a rule writer: **do not divide unless you mean to**. Comparing a
 total against a cap is exact and always will be. Working out an average and comparing that is a

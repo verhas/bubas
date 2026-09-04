@@ -19,9 +19,13 @@ mistaken for oversights:
 - **Every literal token of every pattern is a reserved word.** This is not namespace greed. It is
   what makes expression boundaries decidable without backtracking: an expression ends at the
   first reserved token.
-- **There is no constant folding, anywhere.** `DECIMAL` division depends on a `MathContext` that
-  can change at runtime, so folding it is unsound. Folding was dropped everywhere rather than
-  maintaining a per-operator carve-out.
+- **There is no constant folding, anywhere — yet, and it does not arrive piecemeal.** The original
+  reason is gone: the `MathContext` is sealed into the `BubasLanguage`, so `DECIMAL` division is
+  fixed before any program is compiled and folding it would be sound. Nothing is folded today.
+  [`CONSTANTS.md`](CONSTANTS.md) specifies what replaces the rule, and the point of it is not the
+  folding: it is that evaluating constants makes dead branches, dead loop bodies and
+  always-trapping arithmetic visible, and all of those become compile errors. Adding folding
+  without the rejections buys nothing and spends the opportunity.
 - **A function cannot touch the variable store at all** — not even to read. Arguments in, value
   out. Only a statement handler reaches variables, and only as its pattern's pre- and
   postconditions declare. A by-name read would be a use the definite-assignment analysis never

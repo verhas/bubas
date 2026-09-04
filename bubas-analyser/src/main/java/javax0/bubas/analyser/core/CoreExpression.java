@@ -74,8 +74,8 @@ public sealed interface CoreExpression {
     /**
      * Integer arithmetic traps on overflow and on division by zero; division truncates toward zero
      * and {@code MODULO} takes the dividend's sign. Decimal {@code ADD}, {@code SUBTRACT} and
-     * {@code MULTIPLY} are exact, while {@code DIVIDE} reads the interpreter's {@code MathContext}
-     * — which is why it can never be folded.
+     * {@code MULTIPLY} are exact, while {@code DIVIDE} reads the {@code MathContext} sealed into
+     * the language, so it is fixed for every run of a compiled program.
      */
     record Arithmetic(Numeric kind, Operator operator, CoreExpression left, CoreExpression right,
                       Token token) implements CoreExpression {

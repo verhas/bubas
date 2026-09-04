@@ -128,19 +128,33 @@ class InterpreterTest {
         }
 
         @Test
-        void decimal_division_uses_the_math_context() {
-            final var program = LANGUAGE.compile("""
+        void decimal_division_uses_the_languages_math_context() {
+            assertThat(divideOneByThree(new MathContext(5, RoundingMode.HALF_EVEN)))
+                    .isEqualTo("0.33333");
+            assertThat(divideOneByThree(new MathContext(10, RoundingMode.HALF_EVEN)))
+                    .isEqualTo("0.3333333333");
+        }
+
+        /**
+         * The policy belongs to the language, so it is fixed before the program exists and the same
+         * for every run of it. Two languages differing only here are the only way to see two answers.
+         */
+        private String divideOneByThree(MathContext mathContext) {
+            final var language = BubasLanguage.builder()
+                    .install(Standard::register)
+                    .defineFunction("LOG_EVENT", LogEvent.class)
+                    .mathContext(mathContext)
+                    .seal();
+            final var program = language.compile("""
                     PROGRAM P
                         DECLARE d DECIMAL
                         d = 1.0 / 3.0
                         LOG_EVENT "INFO", "" + d
                     END.""");
             final var seen = new ArrayList<String>();
-            Interpreter.of(program)
-                    .mathContext(new MathContext(5, RoundingMode.HALF_EVEN))
-                    .logger((level, message) -> seen.add(message))
-                    .run();
-            assertThat(seen).containsExactly("0.33333");
+            Interpreter.of(program).logger((level, message) -> seen.add(message)).run();
+            assertThat(seen).hasSize(1);
+            return seen.get(0);
         }
 
         @Test

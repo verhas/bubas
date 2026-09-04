@@ -5,7 +5,6 @@ import javax0.bubas.api.BubasException;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.Value;
 
-import java.math.MathContext;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -16,7 +15,10 @@ import java.util.function.BiConsumer;
  * <p>
  * Deliberately cheap and deliberately single-use. Compiling is the expensive part and a
  * {@link BubasProgram} is reusable, so a run gets nothing but a fresh variable store and whatever
- * varies per run — the arguments, the run-scoped services, the rounding policy.
+ * varies per run — the arguments, the run-scoped services, the logger.
+ * <p>
+ * The rounding policy is not among them. It is sealed into the {@code BubasLanguage}, so every run
+ * of a compiled program divides the same way.
  * <p>
  * Not thread-safe, and not meant to be: concurrent orchestration means one interpreter per thread,
  * all sharing one program.
@@ -28,7 +30,6 @@ public final class Interpreter {
     private final Map<Class<?>, Map<String, Object>> services = new HashMap<>();
     private final Map<String, Integer> parameters = new LinkedHashMap<>();
     private final java.util.Set<String> supplied = new java.util.HashSet<>();
-    private MathContext mathContext = MathContext.DECIMAL128;
     private BiConsumer<String, String> logger = (level, message) ->
             System.out.println(level + ": " + message);
     private javax0.bubas.api.BubasCallInterceptor interceptor;
@@ -118,12 +119,6 @@ public final class Interpreter {
         return this;
     }
 
-    /** The rounding policy for {@code DECIMAL} division. Defaults to {@code DECIMAL128}. */
-    public Interpreter mathContext(MathContext mathContext) {
-        this.mathContext = mathContext;
-        return this;
-    }
-
     /** Where {@code ctx.log} goes. Defaults to standard output. */
     public Interpreter logger(BiConsumer<String, String> logger) {
         this.logger = logger;
@@ -148,8 +143,8 @@ public final class Interpreter {
                         0, "");
             }
         }
-        final var result = new Machine(program.core(), slots, services, mathContext, logger,
-                interceptor).run();
+        final var result = new Machine(program.core(), slots, services,
+                program.language().mathContext(), logger, interceptor).run();
         return program.returns() == null ? null : new RuntimeValue(program.returns(), result);
     }
 

@@ -181,7 +181,8 @@ language is sealed, not when a script first runs.
 
 Three objects, three lifetimes. A **Language** is sealed once and shared by everything. A
 **Program** is compiled once and reused. An **Interpreter** is cheap, single-use, and carries
-whatever varies per run — arguments, services, `MathContext`, logger.
+whatever varies per run — arguments, services, logger. The rounding policy is not among them:
+it is sealed into the language, so every run of a program divides the same way.
 
 Services follow that split. Register one on the builder and every interpreter of that language
 shares it, which is what a singleton collaborator wants; register one on the interpreter and it
