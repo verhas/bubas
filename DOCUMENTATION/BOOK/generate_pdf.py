@@ -14,6 +14,7 @@ import os
 import re
 import sys
 
+from reportlab import rl_config
 from reportlab.lib.colors import HexColor
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A5
@@ -435,6 +436,11 @@ def part_divider(number, title, styles):
 
 
 def build():
+    # Pin the creation date and the document id, which ReportLab otherwise stamps with the moment of
+    # the run. Without this, two builds of an unchanged book differ in bytes: every regeneration
+    # shows as a modified file and a diff on the PDF never means anything. With it the bytes are a
+    # function of the chapters — the file moves when the book moves, and not otherwise.
+    rl_config.invariant = 1
     styles = create_styles()
     items = read_order()
     chapters = [i for i in items if i[0] == "chapter"]
