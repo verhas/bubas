@@ -1,0 +1,9 @@
+'NO-COMPILE
+' Overflow is an error, and a constant one need not wait for a run.
+' ERROR: integer overflow
+' LINE: 7
+PROGRAM P
+    DECLARE n INTEGER
+    n = 9223372036854775807 + 1
+    ASSERT "unreachable", n = 0
+END.

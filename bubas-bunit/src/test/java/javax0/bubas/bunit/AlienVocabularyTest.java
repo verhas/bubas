@@ -110,7 +110,18 @@ class AlienVocabularyTest {
             .defineStatement(FillOne.PATTERN, FillOne.class)
             .defineStatement(Perform.PATTERN, Perform.class)
             .defineStatement(Outcome.PATTERN, Outcome.class)
+            .defineFunction("MAYBE", Maybe.class)
             .seal();
+
+    /**
+     * A condition the compiler cannot see through. This language has no variables, so without it
+     * there is no way to write a branch at all: a constant condition is now a compile error.
+     */
+    public static final class Maybe {
+        public boolean call(Context ctx) {
+            return true;
+        }
+    }
 
     // ---------------------------------------------------------------- the subject
 
@@ -213,7 +224,7 @@ class AlienVocabularyTest {
         final var result = run(MAKES, """
                 PROGRAM SuppliedOnOnePathOnly
                     FAKE "MAKE _ AND _"
-                    IF TRUE THEN
+                    IF MAYBE() THEN
                         FILL "MAKE _ AND _" WITH "a" = 3, "b" = 4
                     END IF
                     PERFORM

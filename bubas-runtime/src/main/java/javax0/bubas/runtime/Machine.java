@@ -1,6 +1,7 @@
 package javax0.bubas.runtime;
 
 import javax0.bubas.analyser.core.CoreArgument;
+import javax0.bubas.analyser.core.CoreArithmetic;
 import javax0.bubas.analyser.core.CoreExpression;
 import javax0.bubas.analyser.core.CoreProgram;
 import javax0.bubas.analyser.core.CoreStatement;
@@ -138,8 +139,8 @@ final class Machine implements StatementContext {
         try {
             while (step > 0 ? (Long) slots[loop.slot()] <= to : (Long) slots[loop.slot()] >= to) {
                 execute(loop.body());
-                slots[loop.slot()] = arithmetic(() ->
-                        Math.addExact((Long) slots[loop.slot()], step));
+                slots[loop.slot()] = trapping(() -> CoreArithmetic.integer(
+                        CoreExpression.Operator.ADD, (Long) slots[loop.slot()], step));
             }
         } catch (Signal.Broke leave) {
             if (leave.loopId() != loop.id()) {
@@ -206,7 +207,7 @@ final class Machine implements StatementContext {
             case CoreExpression.Load load -> slots[load.slot()];
             case CoreExpression.Element element -> element(element);
             case CoreExpression.Widen widen -> BigDecimal.valueOf((Long) evaluate(widen.operand()));
-            case CoreExpression.Text text -> text(evaluate(text.operand()));
+            case CoreExpression.Text text -> CoreArithmetic.text(evaluate(text.operand()));
             case CoreExpression.Concat concat -> (String) evaluate(concat.left()) + evaluate(concat.right());
             case CoreExpression.Arithmetic operation -> arithmetic(operation);
             case CoreExpression.Negate negate -> negate(negate);
@@ -224,90 +225,34 @@ final class Machine implements StatementContext {
                 bounds(slots[element.slot()], (Long) evaluate(element.index())));
     }
 
-    /**
-     * Plain digits, plain decimal notation keeping scale, and TRUE/FALSE as the literals read.
-     */
-    private static String text(Object value) {
-        if (value instanceof BigDecimal decimal) {
-            return decimal.toPlainString();
-        }
-        if (value instanceof Boolean flag) {
-            return flag ? "TRUE" : "FALSE";
-        }
-        return String.valueOf(value);
-    }
-
     private Object arithmetic(CoreExpression.Arithmetic operation) {
         final var left = evaluate(operation.left());
         final var right = evaluate(operation.right());
-        return operation.kind() == CoreExpression.Numeric.INTEGER
-                ? integer(operation.operator(), (Long) left, (Long) right)
-                : decimal(operation.operator(), (BigDecimal) left, (BigDecimal) right);
-    }
-
-    /**
-     * Overflow is an error, never a wraparound; division truncates and MOD takes the dividend's sign.
-     */
-    private Object integer(CoreExpression.Operator operator, long left, long right) {
-        return switch (operator) {
-            case ADD -> arithmetic(() -> Math.addExact(left, right));
-            case SUBTRACT -> arithmetic(() -> Math.subtractExact(left, right));
-            case MULTIPLY -> arithmetic(() -> Math.multiplyExact(left, right));
-            case DIVIDE -> divide(left, right, false);
-            case MODULO -> divide(left, right, true);
-        };
-    }
-
-    private long divide(long left, long right, boolean modulo) {
-        if (right == 0) {
-            throw fail(modulo ? "MOD by zero" : "division by zero");
-        }
-        return arithmetic(() -> modulo ? left % right : left / right);
-    }
-
-    private Object decimal(CoreExpression.Operator operator, BigDecimal left, BigDecimal right) {
-        return switch (operator) {
-            case ADD -> left.add(right);
-            case SUBTRACT -> left.subtract(right);
-            case MULTIPLY -> left.multiply(right);
-            case DIVIDE -> {
-                if (right.signum() == 0) {
-                    throw fail("division by zero");
-                }
-                yield left.divide(right, mathContext);
-            }
-            case MODULO -> throw fail("MOD is defined for INTEGER only");
-        };
+        return trapping(() -> operation.kind() == CoreExpression.Numeric.INTEGER
+                ? CoreArithmetic.integer(operation.operator(), (Long) left, (Long) right)
+                : CoreArithmetic.decimal(operation.operator(), (BigDecimal) left,
+                (BigDecimal) right, mathContext));
     }
 
     private Object negate(CoreExpression.Negate negate) {
         final var operand = evaluate(negate.operand());
-        return negate.kind() == CoreExpression.Numeric.INTEGER
-                ? arithmetic(() -> Math.negateExact((Long) operand))
-                : ((BigDecimal) operand).negate();
+        return trapping(() -> negate.kind() == CoreExpression.Numeric.INTEGER
+                ? CoreArithmetic.negate((Long) operand)
+                : ((BigDecimal) operand).negate());
+    }
+
+    /** The operation says what went wrong; this says where. */
+    private Object trapping(java.util.function.Supplier<Object> operation) {
+        try {
+            return operation.get();
+        } catch (CoreArithmetic.Trap trap) {
+            throw new BubasException(trap.getMessage(), current.line(), current.source(), trap);
+        }
     }
 
     private Object compare(CoreExpression.Compare compare) {
-        final var left = evaluate(compare.left());
-        final var right = evaluate(compare.right());
-        if (compare.kind() == CoreExpression.Comparable.BOOLEAN) {
-            final boolean equal = left.equals(right);
-            return compare.relation() == CoreExpression.Relation.EQUAL ? equal : !equal;
-        }
-        final int order = switch (compare.kind()) {
-            case INTEGER -> Long.compare((Long) left, (Long) right);
-            // By value, never by scale: 2.0 and 2.00 are the same number.
-            case DECIMAL -> ((BigDecimal) left).compareTo((BigDecimal) right);
-            default -> ((String) left).compareTo((String) right);
-        };
-        return switch (compare.relation()) {
-            case EQUAL -> order == 0;
-            case NOT_EQUAL -> order != 0;
-            case LESS -> order < 0;
-            case LESS_OR_EQUAL -> order <= 0;
-            case GREATER -> order > 0;
-            case GREATER_OR_EQUAL -> order >= 0;
-        };
+        return CoreArithmetic.compare(compare.kind(), compare.relation(),
+                evaluate(compare.left()), evaluate(compare.right()));
     }
 
     // ------------------------------------------------------------------ dispatch
@@ -440,14 +385,6 @@ final class Machine implements StatementContext {
         return new BubasException(cause instanceof Mistake ? cause.getMessage()
                 : cause.getClass().getSimpleName() + ": " + cause.getMessage(),
                 current.line(), current.source(), cause);
-    }
-
-    private long arithmetic(java.util.function.LongSupplier operation) {
-        try {
-            return operation.getAsLong();
-        } catch (ArithmeticException e) {
-            throw new BubasException("integer overflow", current.line(), current.source(), e);
-        }
     }
 
     private int bounds(Object array, long index) {

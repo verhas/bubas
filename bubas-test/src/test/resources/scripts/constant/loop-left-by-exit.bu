@@ -1,0 +1,22 @@
+'OK
+' A constant loop condition is legal when something in the loop can leave it.
+PROGRAM P
+    DECLARE n INTEGER
+    DECLARE i INTEGER
+    n = 0
+    DO WHILE TRUE
+        n = n + 1
+        IF n > 2 THEN
+            EXIT DO
+        END IF
+    END DO
+    ASSERT "EXIT DO ends a constant loop", n = 3
+    n = 0
+    FOR i = 1 TO 4
+        DO WHILE TRUE
+            EXIT FOR
+        END DO
+        n = n + 1
+    END FOR
+    ASSERT "an EXIT for an outer loop unwinds through the inner one", n = 0
+END.

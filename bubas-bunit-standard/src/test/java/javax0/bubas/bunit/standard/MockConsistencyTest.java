@@ -279,8 +279,9 @@ class MockConsistencyTest {
         final var result = check("""
                 PROGRAM SuppliedInALoop
                     DECLARE i INTEGER
+                    DECLARE last INTEGER FINAL = 0
                     "COUNT ORDERS INTO _ FOR _" IS MOCKED
-                    FOR i = 1 TO 0
+                    FOR i = 1 TO last
                         "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
                     END FOR
                     RUN

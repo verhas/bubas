@@ -1,0 +1,9 @@
+'NO-COMPILE
+' Arithmetic that cannot succeed is wrong where it is written, not where it runs.
+' ERROR: division by zero
+' LINE: 7
+PROGRAM P
+    DECLARE n INTEGER
+    n = 1 / 0
+    ASSERT "unreachable", n = 0
+END.

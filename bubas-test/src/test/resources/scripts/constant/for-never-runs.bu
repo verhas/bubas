@@ -1,0 +1,13 @@
+'NO-COMPILE
+' Constant bounds decide the whole loop before it starts.
+' ERROR: the body cannot run
+' LINE: 9
+PROGRAM P
+    DECLARE i INTEGER
+    DECLARE n INTEGER
+    n = 0
+    FOR i = 5 TO 1
+        n = n + 1
+    END FOR
+    ASSERT "unreachable", n = 0
+END.

@@ -1,0 +1,12 @@
+'NO-COMPILE
+' A branch never taken is code nobody runs; the compiler says so instead of skipping it.
+' ERROR: always FALSE
+' LINE: 8
+PROGRAM P
+    DECLARE n INTEGER
+    n = 0
+    IF 1 = 2 THEN
+        n = 1
+    END IF
+    ASSERT "unreachable", n = 0
+END.

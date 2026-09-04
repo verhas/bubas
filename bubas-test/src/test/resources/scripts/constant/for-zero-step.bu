@@ -1,0 +1,13 @@
+'NO-COMPILE
+' A zero step is a runtime error in general and a compile error when it is constant.
+' ERROR: step of zero
+' LINE: 9
+PROGRAM P
+    DECLARE i INTEGER
+    DECLARE n INTEGER
+    n = 0
+    FOR i = 1 TO 10 STEP 0
+        n = n + 1
+    END FOR
+    ASSERT "unreachable", n = 0
+END.

@@ -3,6 +3,8 @@
 PROGRAM P
     DECLARE i INTEGER
     DECLARE total INTEGER
+    DECLARE past INTEGER FINAL = 5
+    DECLARE behind INTEGER FINAL = 1
     total = 0
     FOR i = 1 TO 4
         total = total + i
@@ -19,7 +21,7 @@ PROGRAM P
     END FOR
     ASSERT "a step may overshoot the end", total = 18
     total = 0
-    FOR i = 5 TO 1
+    FOR i = past TO behind
         total = total + 1
     END FOR
     ASSERT "a loop whose start is past its end never runs", total = 0

@@ -1,0 +1,13 @@
+'NO-COMPILE
+' A loop whose condition is always TRUE and that nothing leaves is the non-terminating
+' loop SPEC 8.3 names.
+' ERROR: never ends
+' LINE: 9
+PROGRAM P
+    DECLARE n INTEGER
+    n = 0
+    DO WHILE TRUE
+        n = n + 1
+    END DO
+    ASSERT "unreachable", n = 0
+END.

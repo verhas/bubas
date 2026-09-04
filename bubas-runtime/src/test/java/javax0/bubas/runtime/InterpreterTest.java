@@ -215,10 +215,14 @@ class InterpreterTest {
 
         @Test
         void a_pre_test_loop_may_never_run() {
+            // The condition has to come from a variable: a constant one is a compile error, since
+            // a loop that provably cannot run is dead code rather than a demonstration.
             assertThat(value("""
                     DECLARE n INTEGER
+                    DECLARE again BOOLEAN
                     n = 0
-                    DO WHILE FALSE
+                    again = FALSE
+                    DO WHILE again
                         n = n + 1
                     END DO
                     RETURN n""")).isEqualTo(0);
@@ -228,10 +232,12 @@ class InterpreterTest {
         void a_post_test_loop_always_runs_once() {
             assertThat(value("""
                     DECLARE n INTEGER
+                    DECLARE done BOOLEAN
                     n = 0
+                    done = TRUE
                     DO
                         n = n + 1
-                    END DO UNTIL TRUE
+                    END DO UNTIL done
                     RETURN n""")).isEqualTo(1);
         }
 

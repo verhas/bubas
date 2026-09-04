@@ -1,5 +1,7 @@
 package javax0.bubas.analyser;
 
+import javax0.bubas.analyser.core.ConstantFolding;
+import javax0.bubas.analyser.core.DeadCode;
 import javax0.bubas.analyser.core.Lowering;
 import javax0.bubas.analyser.flow.FlowAnalyser;
 import javax0.bubas.analyser.match.OverlapAnalysis;
@@ -147,7 +149,9 @@ public final class BubasLanguage {
     public BubasProgram compile(String source) {
         final var program = StatementParser.parse(Lexer.lex(source), this);
         final var symbols = FlowAnalyser.check(program, this);
-        return new BubasProgram(this, Lowering.lower(program, this, symbols));
+        final var core = ConstantFolding.fold(Lowering.lower(program, this, symbols), mathContext);
+        DeadCode.check(core);
+        return new BubasProgram(this, core);
     }
 
     public static final class Builder implements Registrar {

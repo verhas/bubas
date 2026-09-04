@@ -1,0 +1,12 @@
+'NO-COMPILE
+' A pre-tested loop with an always-false condition has a body nobody runs.
+' ERROR: cannot run
+' LINE: 8
+PROGRAM P
+    DECLARE n INTEGER
+    n = 0
+    DO WHILE FALSE
+        n = n + 1
+    END DO
+    ASSERT "unreachable", n = 0
+END.

@@ -1,7 +1,8 @@
 # BUBAS Constant Evaluation — Specification
 
-**Version** 1.1 · **Status** Design agreed; not implemented. Its one precursor is: the
-`MathContext` is sealed into the language, which is what makes decimal division evaluable
+**Version** 1.2 · **Status** Implemented — `CoreArithmetic`, `ConstantFolding` and `DeadCode` in
+`bubas-analyser.core`, with the corpus under `bubas-test/…/scripts/constant`. Its precursor, the
+`MathContext` sealed into the language, is what makes decimal division evaluable
 ([4](#4-decimal-division)). See [`SPEC.md`](SPEC.md) for the language itself and
 [`CHECKS.md`](CHECKS.md) for domain checks.
 
@@ -64,37 +65,38 @@ deletes it. A compiler that silently removed the branch would be hiding the mist
 Constant evaluation needs types: knowing that `1 + 2` is integer addition rather than concatenation
 is what makes it evaluable. Types are computed in `Lowering` and nowhere else.
 
-Flow analysis today runs **before** lowering, on the untyped tree, and produces the symbol table
-lowering consumes:
-
-```java
-final var symbols = FlowAnalyser.check(program, this);
-return new BubasProgram(this, Lowering.lower(program, this, symbols));
-```
-
-Since the new rejections belong with the dead-code rejections flow analysis already makes
-([`SPEC.md` §8.3](SPEC.md#83-rejected-at-compile-time)), and those now depend on constant values,
-the order inverts:
+The new rejections therefore come after lowering. Everything the compiler already did stays where
+it was:
 
 1. lex, parse, match statements against patterns
-2. **symbol collection** — split out of `FlowAnalyser`
+2. definite assignment and reachability (`FlowAnalyser`), which also builds the symbol table
 3. lowering to the core tree
-4. **constant evaluation** — reads the language's `MathContext` ([5.2](#52-the-evaluator-reads-the-rounding-policy))
-5. definite assignment and reachability, over the core tree
+4. **constant evaluation** (`ConstantFolding`) — reads the language's `MathContext`
+   ([5.2](#52-the-evaluator-reads-the-rounding-policy))
+5. **dead-code rejection** (`DeadCode`)
 6. domain checks ([`CHECKS.md`](CHECKS.md))
 7. `BubasProgram` returned
 
-> **Rationale (not normative).** The alternative is a second type inference over the AST so that
-> constants can be folded before flow analysis. That is precisely the divergence the core tree
-> exists to prevent — `Lowering`'s own documentation says a separate type checker would compute
-> the knowledge, throw it away and leave lowering to derive it again.
+> **Rationale (not normative).** An earlier draft moved flow analysis after lowering so that every
+> dead-code rejection — the ones [`SPEC.md` §8.3](SPEC.md#83-rejected-at-compile-time) already made
+> and the ones added here — would live in one pass. Building it showed the move was unnecessary,
+> and it was dropped.
 >
-> The inversion pays for itself elsewhere. `FlowAnalyser` keeps a stack of enclosing loops to
-> validate `EXIT FOR` and `EXIT DO`, and `Lowering` separately assigns loop identities and
-> resolves `Break(loopId)`. Analysing the core tree leaves one mechanism where there were two.
+> Two things removed the need. Definite assignment needs no constant knowledge, because a constant
+> condition is an *error* rather than a branch to be reasoned about
+> ([6.5](#65-reachability-is-unchanged-by-constants)) — the rule that looks like extra strictness is
+> what keeps the existing analysis untouched. And the one new rule that sounded like reachability,
+> "a loop nothing leaves" ([6.2](#62-a-loop-that-cannot-end)), is a structural query rather than an
+> analysis: lowering has already resolved every `EXIT` to a loop identity, so it is a lookup on the
+> folded tree.
 >
-> Lowering does not read flow results — only the symbol table — so splitting symbol collection out
-> is the whole cost of the move.
+> The second prize claimed for the inversion is therefore not collected. `FlowAnalyser` still keeps
+> its own stack of enclosing loops to validate `EXIT FOR` and `EXIT DO` while `Lowering` separately
+> assigns loop identities — two mechanisms for one fact, as before. Unifying them is a refactoring
+> on its own merits, not something this work needs.
+>
+> What the order costs is diagnostic precedence: a program with both an uninitialised read and a
+> constant condition reports the read. Both are errors, and the program is rejected either way.
 
 ## 3. What is constant
 
@@ -200,8 +202,21 @@ The remedy is in the diagnostic: delete the arm, or delete the `IF` and keep its
 
 Unlike a branch, a loop with a constant condition is not automatically wrong: `DO WHILE TRUE` with
 an `EXIT DO` in the body is how a loop with a computed exit is written. The error is a constant
-condition that keeps the loop running with **no reachable `EXIT`** for it — which is exactly the
-"provably non-terminating loop" §8.3 already names and could not previously detect.
+condition that keeps the loop running with **nothing that can leave it** — exactly the "provably
+non-terminating loop" §8.3 already names and could not previously detect.
+
+Leaving it means more than an `EXIT` naming the loop itself. An `EXIT` naming a loop further out
+unwinds through this one, and a `RETURN` leaves the program; each ends the loop, and each makes it
+legal. Only an `EXIT` belonging to a loop nested *inside* the body fails to help. So this is
+accepted, the `EXIT FOR` ending the inner loop on its first pass:
+
+```basic
+FOR i = 1 TO 4
+    DO WHILE TRUE
+        EXIT FOR
+    END DO
+END FOR
+```
 
 A constant condition that stops the loop is dead in the other direction: `DO WHILE FALSE` never
 runs its body, and `DO … END DO UNTIL TRUE` runs it exactly once. Both are errors.

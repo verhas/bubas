@@ -19,13 +19,18 @@ mistaken for oversights:
 - **Every literal token of every pattern is a reserved word.** This is not namespace greed. It is
   what makes expression boundaries decidable without backtracking: an expression ends at the
   first reserved token.
-- **There is no constant folding, anywhere — yet, and it does not arrive piecemeal.** The original
-  reason is gone: the `MathContext` is sealed into the `BubasLanguage`, so `DECIMAL` division is
-  fixed before any program is compiled and folding it would be sound. Nothing is folded today.
-  [`CONSTANTS.md`](CONSTANTS.md) specifies what replaces the rule, and the point of it is not the
-  folding: it is that evaluating constants makes dead branches, dead loop bodies and
-  always-trapping arithmetic visible, and all of those become compile errors. Adding folding
-  without the rejections buys nothing and spends the opportunity.
+- **Constants are folded, and the folding is not the point — the rejections are.** Evaluating what
+  is fixed at compile time makes dead branches, dead loop bodies and always-trapping arithmetic
+  visible, and [`SPEC.md` §8.3](SPEC.md#83-rejected-at-compile-time) rejects every one of them.
+  Nothing is deleted: a compiler that quietly dropped the dead branch would hide the mistake it
+  just found, so `IF FALSE` is an error rather than a no-op. Decimal *division* folds too, because
+  the `MathContext` is sealed into the `BubasLanguage` — which is also why a folded constant
+  belongs to the program and the language together, not to the source. See
+  [`CONSTANTS.md`](CONSTANTS.md).
+- **`CoreArithmetic` has one implementation of every operation and both callers reach it.** The
+  interpreter executes them and `ConstantFolding` evaluates them at compile time. Two copies would
+  agree on everything but the edge cases and disagree invisibly, which is the characteristic bug of
+  having a folder at all. Do not inline an operation into either caller.
 - **A function cannot touch the variable store at all** — not even to read. Arguments in, value
   out. Only a statement handler reaches variables, and only as its pattern's pre- and
   postconditions declare. A by-name read would be a use the definite-assignment analysis never

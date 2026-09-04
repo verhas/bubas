@@ -1,0 +1,12 @@
+'NO-COMPILE
+' A branch always taken makes everything after it dead; delete the IF, keep the body.
+' ERROR: always TRUE
+' LINE: 8
+PROGRAM P
+    DECLARE n INTEGER
+    n = 0
+    IF 1 = 1 THEN
+        n = 1
+    END IF
+    ASSERT "unreachable", n = 1
+END.

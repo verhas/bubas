@@ -490,9 +490,8 @@ Java function during a run. Consequently:
 - one compiled program divides identically in every run, on every thread, and in a BUNIT test and
   the production run of the rule it tests
 - generated Java may bake the policy in rather than reading it from the runtime
-- **no compile-time constant folding is implemented**, of division or of anything else. The reason
-  it was unsound for division is gone; [`CONSTANTS.md`](CONSTANTS.md) records the design that
-  replaces it
+- constant division is evaluated at compile time like every other constant arithmetic, since the
+  policy is fixed before a program is compiled ([`CONSTANTS.md`](CONSTANTS.md))
 
 > **Why the language and not the run.** Rounding policy is an accounting decision, and one rule set
 > answers to one. Per-run precision let a rule pass its test at 34 digits and settle money at 16,
@@ -759,6 +758,13 @@ Reading a variable requires it to be `INITIALIZED` on every path reaching that p
 - assigning a `FINAL` variable, or a program parameter
 - redeclaring an existing name, or declaring one that collides case-insensitively
 - unreachable code: after `RETURN`, after `EXIT`, or after a provably non-terminating loop
+- a constant condition on an `IF` or an `ELSEIF`: one arm is dead either way
+- a loop whose constant condition keeps it running and that nothing can leave — an `EXIT` for it or
+  for an enclosing loop, or a `RETURN`
+- a loop whose constant condition stops it: a body that never runs, or runs exactly once
+- a `FOR` whose constant bounds and step cannot iterate, or whose constant step is zero
+- a constant expression that cannot be computed: overflow, division or `MOD` by zero — wherever it
+  is written, whether or not control could reach it
 - a declared variable that is never read
 - a path that reaches the end of a program declaring `RETURNS` without returning a value
 - any type or assignability violation

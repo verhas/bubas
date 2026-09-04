@@ -1,0 +1,12 @@
+'NO-COMPILE
+' A post-tested loop that always stops on the first pass is a block, not a loop.
+' ERROR: runs exactly once
+' LINE: 8
+PROGRAM P
+    DECLARE n INTEGER
+    n = 0
+    DO
+        n = n + 1
+    END DO UNTIL TRUE
+    ASSERT "unreachable", n = 1
+END.

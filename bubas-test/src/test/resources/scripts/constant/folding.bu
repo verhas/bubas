@@ -1,0 +1,19 @@
+'OK
+' Constants are evaluated at compile time and mean exactly what they meant before.
+PROGRAM P
+    DECLARE n INTEGER
+    DECLARE d DECIMAL
+    DECLARE s STRING
+    n = 2 + 3 * 4
+    ASSERT "integer arithmetic folds", n = 14
+    n = -(3 - 10)
+    ASSERT "negation folds", n = 7
+    d = 0.1 + 0.2
+    ASSERT "decimal addition folds and keeps scale", d = 0.3
+    d = 1.5 * 2
+    ASSERT "a widened literal folds", d = 3.0
+    s = "a" + "b" + "c"
+    ASSERT "concatenation folds", s = "abc"
+    s = "" + 42 + " " + 2.50 + " " + TRUE
+    ASSERT "text conversion folds and keeps scale", s = "42 2.50 TRUE"
+END.
