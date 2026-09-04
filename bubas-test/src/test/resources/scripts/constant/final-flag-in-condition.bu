@@ -1,0 +1,14 @@
+'NO-COMPILE
+' A FINAL flag read by a condition is the debug-switch antipattern. A rule whose behaviour
+' depends on a flag takes it as a program parameter, where a test can set it.
+' ERROR: always TRUE
+' LINE: 10
+PROGRAM P
+    DECLARE big BOOLEAN FINAL = TRUE
+    DECLARE n INTEGER
+    n = 0
+    IF big THEN
+        n = 1
+    END IF
+    ASSERT "unreachable", n = 1
+END.

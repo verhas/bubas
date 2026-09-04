@@ -1,0 +1,18 @@
+'NO-COMPILE
+' When every arm leaves the same value the variable is settled at the join, so a condition
+' reading it afterwards is decided even though the branch above it was not.
+' ERROR: always TRUE
+' LINE: 15
+PROGRAM P
+    DECLARE n INTEGER
+    DECLARE seed INTEGER
+    seed = MIRROR(1)
+    IF seed = 1 THEN
+        n = 7
+    ELSE
+        n = 7
+    END IF
+    IF n = 7 THEN
+        ASSERT "unreachable", TRUE
+    END IF
+END.

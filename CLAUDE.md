@@ -19,6 +19,15 @@ mistaken for oversights:
 - **Every literal token of every pattern is a reserved word.** This is not namespace greed. It is
   what makes expression boundaries decidable without backtracking: an expression ends at the
   first reserved token.
+- **A condition the compiler can answer is an error, and "can answer" is flow-sensitive.** `n = 5`
+  followed by `IF n > 10` is rejected: the variable is not constant, but it is settled where the
+  condition reads it, and almost nobody writes `IF FALSE` — the literal case alone would be a
+  formality. What the analysis learns about a variable comes only from a command declaring
+  `@BubasAssigns` — repeatable, since one statement may fill several variables and may declare only
+  some of them — and anything else handed to a command is assumed written, because `set` is not
+  guarded. A value believed and not held rejects a correct program; a value forgotten only lets a
+  mistake through, so the analysis is deliberately timid. A program parameter is the one value it
+  can never know, and is the answer for anything a test has to vary.
 - **Constants are folded, and the folding is not the point — the rejections are.** Evaluating what
   is fixed at compile time makes dead branches, dead loop bodies and always-trapping arithmetic
   visible, and [`SPEC.md` §8.3](SPEC.md#83-rejected-at-compile-time) rejects every one of them.
@@ -27,6 +36,14 @@ mistaken for oversights:
   the `MathContext` is sealed into the `BubasLanguage` — which is also why a folded constant
   belongs to the program and the language together, not to the source. See
   [`CONSTANTS.md`](CONSTANTS.md).
+- **Purity is declared, never inferred: `@BubasStatic` is what lets the compiler call a function.**
+  Nothing about a signature says whether it reads a clock or a database, so an unannotated function
+  is opaque however pure it looks. The compiler holds the claim to one part — a static function
+  asking for a service or the log is a compile error — and can check nothing else, so a false
+  declaration silently bakes in an answer a run would not have given. Folding is further limited to
+  scalar parameters and results, because arrays, opaque values and wildcards are marshalled by the
+  interpreter and the compiler has no marshaller. `ctx.error` while folding is a compile error, and
+  meant to be.
 - **`CoreArithmetic` has one implementation of every operation and both callers reach it.** The
   interpreter executes them and `ConstantFolding` evaluates them at compile time. Two copies would
   agree on everything but the edge cases and disagree invisibly, which is the characteristic bug of

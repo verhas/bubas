@@ -3,8 +3,8 @@
 PROGRAM P
     DECLARE i INTEGER
     DECLARE total INTEGER
-    DECLARE past INTEGER FINAL = 5
-    DECLARE behind INTEGER FINAL = 1
+    DECLARE past INTEGER
+    DECLARE behind INTEGER
     total = 0
     FOR i = 1 TO 4
         total = total + i
@@ -20,6 +20,8 @@ PROGRAM P
         total = total + i
     END FOR
     ASSERT "a step may overshoot the end", total = 18
+    past = MIRROR(5)
+    behind = MIRROR(1)
     total = 0
     FOR i = past TO behind
         total = total + 1

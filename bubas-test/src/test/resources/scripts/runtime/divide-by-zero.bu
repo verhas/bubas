@@ -5,7 +5,7 @@
 PROGRAM P
     DECLARE n INTEGER
     DECLARE z INTEGER
-    z = 0
+    z = MIRROR(0)
     n = 1 / z
     ASSERT "unreachable", n = 0
 END.

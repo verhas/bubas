@@ -94,7 +94,8 @@ public final class Lowering {
     private CoreStatement branch(Statement.If branch) {
         final var arms = branch.branches().stream()
                 .map(arm -> new CoreStatement.Arm(
-                        condition(arm.line(), arm.condition(), "IF"), block(arm.body())))
+                        condition(arm.line(), arm.condition(), "IF"), block(arm.body()),
+                        arm.line()))
                 .toList();
         return new CoreStatement.Branch(arms,
                 branch.otherwise() == null ? null : block(branch.otherwise()), branch.line());

@@ -93,6 +93,21 @@ class InterpreterTest {
                 .run().asLong();
     }
 
+    /**
+     * A body whose values arrive as arguments, so the compiler cannot decide its conditions. A
+     * parameter is the honest way to hold something the program does not know: anything set in the
+     * source is known where it is read, and a condition reading it is dead code.
+     */
+    private long valueGiven(String header, String body, Object... arguments) {
+        final var interpreter = Interpreter.of(
+                LANGUAGE.compile("PROGRAM P(" + header + ") RETURNS INTEGER\n" + body + "\nEND."));
+        for (int i = 0; i < arguments.length; i += 2) {
+            interpreter.argument((String) arguments[i], arguments[i + 1]);
+        }
+        return interpreter.logger((level, message) -> logged.add(level + ": " + message))
+                .run().asLong();
+    }
+
     private String rejection(String body) {
         return catchThrowableOfType(BubasException.class, () -> run(body)).getMessage();
     }
@@ -176,22 +191,20 @@ class InterpreterTest {
 
         @Test
         void decimals_compare_by_value_not_by_scale() {
-            assertThat(value("""
-                    DECLARE a DECIMAL
-                    DECLARE b DECIMAL
-                    a = 2.0
-                    b = 2.00
+            assertThat(valueGiven("a DECIMAL, b DECIMAL", """
                     IF a = b THEN
                         RETURN 1
                     END IF
-                    RETURN 0""")).isEqualTo(1);
+                    RETURN 0""",
+                    "a", new BigDecimal("2.0"), "b", new BigDecimal("2.00"))).isEqualTo(1);
         }
 
         @Test
         void AND_and_OR_short_circuit() {
             // The second operand would divide by zero if it were evaluated.
-            assertThat(value("DECLARE n INTEGER\nn = 0\nIF n <> 0 AND 1 / n > 0 THEN\n"
-                    + "    RETURN 1\nEND IF\nRETURN 0")).isEqualTo(0);
+            assertThat(valueGiven("n INTEGER",
+                    "IF n <> 0 AND 1 / n > 0 THEN\n    RETURN 1\nEND IF\nRETURN 0",
+                    "n", 0L)).isEqualTo(0);
         }
     }
 
@@ -201,44 +214,36 @@ class InterpreterTest {
 
         @Test
         void an_if_chain_takes_the_first_matching_arm() {
-            assertThat(value("""
-                    DECLARE n INTEGER
-                    n = 5
+            assertThat(valueGiven("n INTEGER", """
                     IF n > 10 THEN
                         RETURN 1
                     ELSEIF n > 3 THEN
                         RETURN 2
                     ELSE
                         RETURN 3
-                    END IF""")).isEqualTo(2);
+                    END IF""", "n", 5L)).isEqualTo(2);
         }
 
         @Test
         void a_pre_test_loop_may_never_run() {
-            // The condition has to come from a variable: a constant one is a compile error, since
-            // a loop that provably cannot run is dead code rather than a demonstration.
-            assertThat(value("""
+            assertThat(valueGiven("again BOOLEAN", """
                     DECLARE n INTEGER
-                    DECLARE again BOOLEAN
                     n = 0
-                    again = FALSE
                     DO WHILE again
                         n = n + 1
                     END DO
-                    RETURN n""")).isEqualTo(0);
+                    RETURN n""", "again", false)).isEqualTo(0);
         }
 
         @Test
         void a_post_test_loop_always_runs_once() {
-            assertThat(value("""
+            assertThat(valueGiven("done BOOLEAN", """
                     DECLARE n INTEGER
-                    DECLARE done BOOLEAN
                     n = 0
-                    done = TRUE
                     DO
                         n = n + 1
                     END DO UNTIL done
-                    RETURN n""")).isEqualTo(1);
+                    RETURN n""", "done", true)).isEqualTo(1);
         }
 
         @Test

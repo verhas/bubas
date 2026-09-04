@@ -3,7 +3,7 @@
 ' Variable names are the opposite: see flow/spelled-differently.bu.
 PROGRAM P
     declare total INTEGER
-    total = 1
+    total = MIRROR(1)
     if total = 1 then
         total = total + 1
     End If

@@ -150,7 +150,7 @@ public final class BubasLanguage {
         final var program = StatementParser.parse(Lexer.lex(source), this);
         final var symbols = FlowAnalyser.check(program, this);
         final var core = ConstantFolding.fold(Lowering.lower(program, this, symbols), mathContext);
-        DeadCode.check(core);
+        DeadCode.check(core, mathContext);
         return new BubasProgram(this, core);
     }
 

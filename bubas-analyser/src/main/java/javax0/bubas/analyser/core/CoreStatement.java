@@ -27,7 +27,11 @@ public sealed interface CoreStatement {
 
     LogicalLine line();
 
-    record Arm(CoreExpression condition, List<CoreStatement> body) {
+    /**
+     * One {@code IF} or {@code ELSEIF} of a chain. It keeps its own line, so a diagnostic about the
+     * third arm names the third arm rather than the {@code IF} it hangs from.
+     */
+    record Arm(CoreExpression condition, List<CoreStatement> body, LogicalLine line) {
     }
 
     /** @param otherwise {@code null} without an {@code ELSE} */

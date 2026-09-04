@@ -54,9 +54,9 @@ public final class ConstantFolding {
             case CoreStatement.Branch branch -> {
                 final var arms = new ArrayList<CoreStatement.Arm>(branch.arms().size());
                 for (final var arm : branch.arms()) {
-                    current = branch.line();
+                    current = arm.line();
                     final var condition = expression(arm.condition());
-                    arms.add(new CoreStatement.Arm(condition, statements(arm.body())));
+                    arms.add(new CoreStatement.Arm(condition, statements(arm.body()), arm.line()));
                 }
                 yield new CoreStatement.Branch(List.copyOf(arms),
                         branch.otherwise() == null ? null : statements(branch.otherwise()),
@@ -118,8 +118,21 @@ public final class ConstantFolding {
             case CoreExpression.Load load -> load;
             case CoreExpression.Element element -> new CoreExpression.Element(element.slot(),
                     expression(element.index()), element.type(), element.token());
-            case CoreExpression.Call call -> new CoreExpression.Call(call.signature(),
-                    expressions(call.arguments()), call.token());
+            case CoreExpression.Call call -> {
+                final var arguments = expressions(call.arguments());
+                final var values = new ArrayList<>();
+                var known = StaticCall.foldable(call.signature());
+                for (final var argument : arguments) {
+                    final var value = value(argument);
+                    known &= value != null;
+                    values.add(value);
+                }
+                yield known
+                        ? trapping(() -> constant(
+                        StaticCall.of(call.signature(), values, mathContext),
+                        call.signature().returnType(), call.token()))
+                        : new CoreExpression.Call(call.signature(), arguments, call.token());
+            }
 
             case CoreExpression.Widen widen -> {
                 final var operand = expression(widen.operand());
@@ -223,6 +236,8 @@ public final class ConstantFolding {
             return fold.get();
         } catch (CoreArithmetic.Trap trap) {
             throw new BubasException(trap.getMessage(), current.line(), current.source(), trap);
+        } catch (StaticCall.Refusal refusal) {
+            throw new BubasException(refusal.getMessage(), current.line(), current.source(), refusal);
         }
     }
 }

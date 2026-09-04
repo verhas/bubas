@@ -3,6 +3,7 @@ package javax0.bubas.analyser;
 import javax0.bubas.analyser.pattern.ConstraintResolver;
 import javax0.bubas.analyser.pattern.Kind;
 import javax0.bubas.analyser.pattern.Placeholder;
+import javax0.bubas.analyser.pattern.Postcondition;
 import javax0.bubas.analyser.pattern.ResolvedConstraint;
 import javax0.bubas.analyser.pattern.StatementPattern;
 import javax0.bubas.api.BubasDefinitionException;
@@ -30,6 +31,17 @@ public record CommandDefinition(StatementPattern pattern, Implementation impleme
     /** True when the name came from an annotation rather than from the pattern. */
     public boolean isNamed() {
         return declaredName(implementation.owner()) != null;
+    }
+
+    /**
+     * What this command copies into what, empty when it does not say. Optional, and one entry per
+     * variable written: a command that declares nothing, or that declares one of the two variables
+     * it fills and stays silent about the other, is describing itself accurately. What is not
+     * declared is simply not known.
+     */
+    public java.util.List<javax0.bubas.api.BubasAssigns> assigns() {
+        return java.util.List.of(implementation.owner()
+                .getAnnotationsByType(javax0.bubas.api.BubasAssigns.class));
     }
 
     static String declaredName(Class<?> owner) {
@@ -72,7 +84,61 @@ public record CommandDefinition(StatementPattern pattern, Implementation impleme
         for (int i = 0; i < placeholders.size(); i++) {
             check(where, pattern, placeholders.get(i), javaParameters[i + 1], constraints);
         }
+        checkAssigns(where, pattern, implementation);
         return new CommandDefinition(pattern, implementation);
+    }
+
+    /**
+     * A claim about placeholders has to name placeholders that exist and are of the right kind.
+     * Checked here so a mistyped name fails at {@code seal()} rather than quietly teaching the
+     * compiler nothing.
+     */
+    private static void checkAssigns(String where, StatementPattern pattern,
+                                     Implementation implementation) {
+        final var claimed = new java.util.HashSet<String>();
+        for (final var assigns : implementation.owner()
+                .getAnnotationsByType(javax0.bubas.api.BubasAssigns.class)) {
+            checkOneAssignment(where, pattern, assigns);
+            if (!claimed.add(assigns.target())) {
+                throw new BubasDefinitionException(where + ": @BubasAssigns names '"
+                        + assigns.target() + "' as its target twice, and the two say different"
+                        + " things about the same variable");
+            }
+        }
+    }
+
+    private static void checkOneAssignment(String where, StatementPattern pattern,
+                                           javax0.bubas.api.BubasAssigns assigns) {
+        final var target = named(pattern, assigns.target());
+        final var value = named(pattern, assigns.value());
+        if (target == null) {
+            throw new BubasDefinitionException(where + ": @BubasAssigns names '" + assigns.target()
+                    + "' as its target, but the pattern has no such placeholder");
+        }
+        if (value == null) {
+            throw new BubasDefinitionException(where + ": @BubasAssigns names '" + assigns.value()
+                    + "' as its value, but the pattern has no such placeholder");
+        }
+        if (target.kind() != Kind.VAR && target.kind() != Kind.IDENTIFIER) {
+            throw new BubasDefinitionException(where + ": @BubasAssigns target '" + assigns.target()
+                    + "' is " + target.kind().spelling() + ", and only a variable can be assigned");
+        }
+        if (!target.postconditions().contains(Postcondition.INITIALIZED)
+                && !target.postconditions().contains(Postcondition.FINAL)) {
+            throw new BubasDefinitionException(where + ": @BubasAssigns target '" + assigns.target()
+                    + "' is not declared initialized by the pattern, so the pattern and the"
+                    + " annotation disagree about whether it is written");
+        }
+        if (value.kind() != Kind.EXPRESSION && value.kind() != Kind.LITERAL) {
+            throw new BubasDefinitionException(where + ": @BubasAssigns value '" + assigns.value()
+                    + "' is " + value.kind().spelling() + ", which carries no value to assign");
+        }
+    }
+
+    private static Placeholder named(StatementPattern pattern, String name) {
+        return pattern.placeholders().stream()
+                .filter(placeholder -> placeholder.name().equals(name))
+                .findFirst().orElse(null);
     }
 
     /**

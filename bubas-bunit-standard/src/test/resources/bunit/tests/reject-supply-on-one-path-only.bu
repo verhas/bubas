@@ -3,11 +3,14 @@
 ' A test written this way passes on some runs and fails on others.
 ' SUBJECT: counting.bu
 ' ERROR: nothing supplies it on every path
+' The condition has to be one the compiler cannot answer: a decided condition is dead code, and
+' this fixture needs a branch, not an outcome. An array's length is never constant because an
+' array never is.
 PROGRAM SuppliedOnOnePath
-    DECLARE big BOOLEAN FINAL = TRUE
+    DECLARE once[1] INTEGER
 
     "COUNT ORDERS INTO _ FOR _" IS MOCKED
-    IF big THEN
+    IF LENGTH(once) = 1 THEN
         "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
     END IF
 

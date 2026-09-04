@@ -2,7 +2,7 @@
 ' A program that returns a value must do so on every path, and RETURN ends the run.
 PROGRAM P RETURNS BOOLEAN
     DECLARE n INTEGER
-    n = 3
+    n = MIRROR(3)
     IF n > 2 THEN
         ASSERT "reached the returning arm", TRUE
         RETURN TRUE

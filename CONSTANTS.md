@@ -1,7 +1,7 @@
 # BUBAS Constant Evaluation — Specification
 
-**Version** 1.2 · **Status** Implemented — `CoreArithmetic`, `ConstantFolding` and `DeadCode` in
-`bubas-analyser.core`, with the corpus under `bubas-test/…/scripts/constant`. Its precursor, the
+**Version** 1.3 · **Status** Implemented — `CoreArithmetic`, `ConstantFolding`, `Constants` and
+`DeadCode` in `bubas-analyser.core`, with the corpus under `bubas-test/…/scripts/constant`. Its precursor, the
 `MathContext` sealed into the language, is what makes decimal division evaluable
 ([4](#4-decimal-division)). See [`SPEC.md`](SPEC.md) for the language itself and
 [`CHECKS.md`](CHECKS.md) for domain checks.
@@ -23,7 +23,7 @@ is the intent, not a side effect.
 
 <!--TOC min-level: 2
 max-level: 2
-_content_generated_: 474:md5:196aa579f05c39a9df6c0da34cdb86fb
+_content_generated_: 468:md5:8f1f05a55602c046354af9f96731b289
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
@@ -35,7 +35,7 @@ _content_generated_: 474:md5:196aa579f05c39a9df6c0da34cdb86fb
 - [6. Rejections](#6-rejections)
 - [7. Diagnostics](#7-diagnostics)
 - [8. Interaction with domain checks](#8-interaction-with-domain-checks)
-- [9. Constant propagation](#9-constant-propagation)
+- [9. Settled variables](#9-settled-variables)
 - [10. Testing](#10-testing)
 - [11. Open questions](#11-open-questions)
 <!--/TOC-->
@@ -55,7 +55,7 @@ The first is an optimisation nobody would notice. The second is the reason to do
 ### 1.1. What this is not
 
 It is not constant *propagation*. A variable holding a constant is not a constant here; see
-[9](#9-constant-propagation).
+[9](#9-settled-variables).
 
 It is not dead-code *elimination*. Nothing is deleted. Unreachable code is reported, and the author
 deletes it. A compiler that silently removed the branch would be hiding the mistake it just found.
@@ -115,16 +115,34 @@ depends on nothing but its operands.
 | `Concat`, `Text` | yes | |
 | `Widen` | yes | |
 | `Load`, `Element` | no | |
-| `Call` | no | see [3.1](#31-functions-are-never-constant) |
+| `Call` | only if declared | see [3.1](#31-a-function-is-constant-only-if-it-says-so) |
 
-### 3.1. Functions are never constant
+### 3.1. A function is constant only if it says so
 
-A function may read the host, the clock or a database, and BUBAS has no way to say that one does
-not. Purity is not expressible, so it is not assumed. `LENGTH("abc")` stays a call.
+A function may read the host, the clock or a database, and nothing about its signature says which.
+Purity is therefore never inferred — it is declared, with `@BubasStatic` on the implementation
+class, and a call is folded only when the function carries it and every argument is known.
 
-> **Rationale (not normative).** A purity declaration is addable later — it would be an argument to
-> `defineFunction`, not a change to this pass. It is left out because the embedder would have to be
-> right about it, and being wrong would produce a program that computes a stale answer forever.
+Beyond the declaration, everything crossing the boundary has to be a value a compiled program can
+hold: every parameter and the result must be `INTEGER`, `DECIMAL`, `STRING` or `BOOLEAN`. An array
+is a store, an opaque value is a Java object, a wildcard is neither, and a variadic call marshals
+its arguments into an array. A function mentioning any of those is never folded, however pure it is,
+so declaring it static is true and idle.
+
+**The compiler holds a static function to one part of its claim.** It is handed a context with no
+application behind it: asking for a service, or for the log, is a compile error naming the function.
+Everything else — a clock read through a static field, a file, a cache — it cannot check, and a
+function that declares this falsely will answer at compile time with a value a run would not have
+produced. When in doubt, leave the annotation off; nothing is lost but a fold.
+
+**Refusing is allowed and useful.** `ctx.error` during folding is a compile error at the line of the
+call. `TO_INTEGER("twelve")` is not a number in any run, and saying so while compiling beats waiting
+for the run that reaches it.
+
+> **Rationale (not normative).** The declaration sits on the class rather than in
+> `defineFunction`, beside `@BubasDescription` and `@BubasCommandName`, for the reason a command is
+> identified by class: the claim belongs to the implementation, travels with it into whatever
+> language registers it, and cannot drift away from the code it is about.
 
 ## 4. Decimal division
 
@@ -237,7 +255,7 @@ mistakes, and both are reported.
 
 ### 6.5. Reachability is unchanged by constants
 
-Because a constant condition is an error, no arm is ever known-unreachable *because of* its
+Because a decided condition is an error, no arm is ever known-unreachable *because of* its
 condition. Definite assignment and reachability continue to treat every arm as possible, and need
 no constant reasoning of their own.
 
@@ -269,14 +287,68 @@ nodes, but both its examples already coerce a *variable* — `Widen(Load(days))`
 calculation", is about integer variables entering decimal arithmetic; a widened literal is the case
 it does not care about. No change to `CHECKS.md` is required.
 
-## 9. Constant propagation
+## 9. Settled variables
 
-A `FINAL` variable initialised with a constant expression is itself constant, and propagating it
-would extend every rule in [6](#6-rejections) to reach through such variables. It is a separate
-development, and a wanted one.
+Almost nobody writes `IF FALSE`. What people write is a variable set two lines earlier, and the
+rules above would be a formality if they stopped at literals:
 
-It is not a hazard for [6.1](#61-a-constant-branch-condition), because the idiom it would newly
-reject is one BUBAS does not want:
+```basic
+n = 5
+IF n > 10 THEN
+```
+
+`n` is not constant — the next line may assign it again — but *where the condition reads it* it
+holds 5, and the condition is answered before the program runs. Every rule in
+[6](#6-rejections) therefore applies to what is **settled at that point**, not only to what is
+constant throughout.
+
+### 9.1. What is carried
+
+The analysis walks the program carrying a value for each variable whose value is certain there.
+
+- **A branch** tests every arm in the state it was entered with; a condition cannot change a
+  variable, since a function may not reach the store. At the join a value survives only if every
+  path arrives with the same one — including the path through a missing `ELSE`.
+- **A loop** forgets everything its body writes, before the condition and for good. The body may run
+  any number of times, so nothing it touches is certain in the condition, inside the body on the
+  second pass, or after the loop.
+- **A `FOR`** forgets its loop variable too, and evaluates its bounds in the state on entry, which
+  is when they are evaluated for real.
+- **`RETURN` and `EXIT`** leave nothing behind that anything reads. A path that ends in one still
+  contributes to a join, which loses precision and never gains it.
+
+### 9.2. What is learned
+
+Only from a command that says so, with `@BubasAssigns(target, value)` naming two of its
+placeholders. `Assign`, `DeclareInitialized` and `DeclareFinal` declare it; anything else writes a
+value the compiler cannot predict.
+
+The declaration is optional and nothing needs it. Without it the analysis simply learns nothing from
+that command, which is also how an embedder's own assignment syntax joins in: it declares the same
+thing, and the analyser goes on knowing no vocabulary.
+
+**It repeats, because one statement may write several variables.** `SPLIT name INTO first AND last`
+fills two, and each occurrence names one target:
+
+```java
+@BubasAssigns(target = "low", value = "from")
+@BubasAssigns(target = "high", value = "to")
+```
+
+Partial is meaningful and correct. A command that fills two variables and declares one of them is
+describing itself accurately: the declared one is learned, the other is forgotten like anything
+else. Several targets may draw on the same value; no two may name the same target, which would be
+two claims about one variable, and `seal()` refuses it.
+
+**Anything handed to a command is assumed written.** `set` is not guarded at run time, so a handler
+can write a variable its pattern only claimed to read, and an analysis trusting the postcondition
+would be trusting something nothing enforces.
+
+> **Rationale (not normative).** Being wrong in that direction is the only safe way to be wrong. A
+> value believed and not held rejects a correct program; a value forgotten only lets a mistake
+> through. The rules here refuse programs, so the analysis has to be timid.
+
+### 9.3. The flag this rejects
 
 ```basic
 DECLARE debug BOOLEAN FINAL = FALSE
@@ -284,10 +356,12 @@ DECLARE debug BOOLEAN FINAL = FALSE
 IF debug THEN
 ```
 
-A flag a program's behaviour depends on belongs in the program's parameters, where the embedder
-supplies it and a BUNIT test can set it — at which point it is not constant and the code is not
-dead. The rule therefore keys on **any provably constant condition**, not merely a literal one, and
-propagation may be added without revisiting this document.
+This is now an error, and deliberately. A flag a program's behaviour depends on belongs in the
+program's parameters, where the embedder supplies it and a BUNIT test can set it — at which point
+it is not settled, and the code under it is not dead.
+
+A parameter is the general answer: it is the one thing in a program whose value the compiler cannot
+know. Anything written into the source is known where it is read.
 
 ## 10. Testing
 
@@ -314,7 +388,10 @@ preserves scale and is locale-independent, so it is. This is recorded because it
 constant operation whose output is a `STRING` derived from a `DECIMAL`, and any future change to
 decimal rendering would silently change folded values.
 
-**Whether a function may declare itself pure.** See [3.1](#31-functions-are-never-constant).
+**Whether a variadic or wildcard-typed static function should fold.** Both are excluded because
+their arguments cross into Java as arrays and `Value` wrappers, which the interpreter marshals and
+the compiler does not. Lifting that would mean moving the marshalling somewhere both can reach, the
+way `CoreArithmetic` already was. No case has asked for it.
 
 **Where this belongs in `SPEC.md`.** The rejections are §8.3's and should move there once
 implemented, leaving this file to hold the rationale.

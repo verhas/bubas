@@ -1,0 +1,10 @@
+'NO-COMPILE
+' A static function may refuse, and refusing while compiling is better than refusing on the run
+' that finally reaches the line. 'twelve' is not a number in any run.
+' ERROR: is not an INTEGER
+' LINE: 8
+PROGRAM P
+    DECLARE n INTEGER
+    n = TO_INTEGER("twelve")
+    ASSERT "unreachable", n = 0
+END.

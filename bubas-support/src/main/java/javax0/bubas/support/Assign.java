@@ -1,5 +1,6 @@
 package javax0.bubas.support;
 
+import javax0.bubas.api.BubasAssigns;
 import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.ExpressionArg;
 import javax0.bubas.api.StatementContext;
@@ -20,6 +21,7 @@ import javax0.bubas.api.VariableArg;
         The only way a script changes anything it holds. The value must be of the variable's type,
         except that a whole number may go into a DECIMAL.
         """)
+@BubasAssigns(target = "name", value = "value")
 public final class Assign {
 
     public static final String PATTERN =

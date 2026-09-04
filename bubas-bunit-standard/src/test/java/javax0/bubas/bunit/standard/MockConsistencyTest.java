@@ -77,9 +77,9 @@ class MockConsistencyTest {
     void a_supply_in_only_one_branch_is_not_a_supply() {
         final var result = check("""
                 PROGRAM SuppliedOnOnePathOnly
-                    DECLARE big BOOLEAN FINAL = TRUE
+                    DECLARE once[1] INTEGER
                     "COUNT ORDERS INTO _ FOR _" IS MOCKED
-                    IF big THEN
+                    IF LENGTH(once) = 1 THEN
                         "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
                     END IF
                     RUN
@@ -94,9 +94,9 @@ class MockConsistencyTest {
     void a_supply_in_every_branch_is_a_supply() {
         final var result = check("""
                 PROGRAM SuppliedEverywhere
-                    DECLARE big BOOLEAN FINAL = TRUE
+                    DECLARE once[1] INTEGER
                     "COUNT ORDERS INTO _ FOR _" IS MOCKED
-                    IF big THEN
+                    IF LENGTH(once) = 1 THEN
                         "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
                     ELSE
                         "COUNT ORDERS INTO _ FOR _" SETS "total" TO 7
@@ -279,9 +279,9 @@ class MockConsistencyTest {
         final var result = check("""
                 PROGRAM SuppliedInALoop
                     DECLARE i INTEGER
-                    DECLARE last INTEGER FINAL = 0
+                    DECLARE none[0] INTEGER
                     "COUNT ORDERS INTO _ FOR _" IS MOCKED
-                    FOR i = 1 TO last
+                    FOR i = 1 TO LENGTH(none)
                         "COUNT ORDERS INTO _ FOR _" SETS "total" TO 42
                     END FOR
                     RUN

@@ -1,0 +1,16 @@
+'OK
+' A value survives a join only when every path arrives with the same one. Two arms that differ
+' leave the variable unknown, and a condition reading it is a real question again.
+PROGRAM P
+    DECLARE n INTEGER
+    DECLARE seed INTEGER
+    seed = MIRROR(1)
+    IF seed = 1 THEN
+        n = 1
+    ELSE
+        n = 2
+    END IF
+    IF n = 1 THEN
+        ASSERT "the first arm ran", TRUE
+    END IF
+END.

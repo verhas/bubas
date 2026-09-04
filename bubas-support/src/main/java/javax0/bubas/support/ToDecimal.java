@@ -1,6 +1,7 @@
 package javax0.bubas.support;
 
 import javax0.bubas.api.BubasDescription;
+import javax0.bubas.api.BubasStatic;
 import javax0.bubas.api.Context;
 
 import java.math.BigDecimal;
@@ -9,6 +10,7 @@ import java.math.BigDecimal;
 @BubasDescription("""
         Reads text as an exact decimal number, keeping the scale it was written with.
         """)
+@BubasStatic
 public final class ToDecimal {
 
     public static final String NAME = "TO_DECIMAL";

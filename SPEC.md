@@ -758,12 +758,14 @@ Reading a variable requires it to be `INITIALIZED` on every path reaching that p
 - assigning a `FINAL` variable, or a program parameter
 - redeclaring an existing name, or declaring one that collides case-insensitively
 - unreachable code: after `RETURN`, after `EXIT`, or after a provably non-terminating loop
-- a constant condition on an `IF` or an `ELSEIF`: one arm is dead either way
-- a loop whose constant condition keeps it running and that nothing can leave — an `EXIT` for it or
+- a decided condition on an `IF` or an `ELSEIF`: one arm is dead either way. A condition counts as
+  decided when its value follows from the program so far, not only when it is written as a literal —
+  `n = 5` two lines above settles `IF n > 10`
+- a loop whose decided condition keeps it running and that nothing can leave — an `EXIT` for it or
   for an enclosing loop, or a `RETURN`
-- a loop whose constant condition stops it: a body that never runs, or runs exactly once
-- a `FOR` whose constant bounds and step cannot iterate, or whose constant step is zero
-- a constant expression that cannot be computed: overflow, division or `MOD` by zero — wherever it
+- a loop whose decided condition stops it: a body that never runs, or runs exactly once
+- a `FOR` whose decided bounds and step cannot iterate, or whose decided step is zero
+- a decided expression that cannot be computed: overflow, division or `MOD` by zero — wherever it
   is written, whether or not control could reach it
 - a declared variable that is never read
 - a path that reaches the end of a program declaring `RETURNS` without returning a value

@@ -1,5 +1,6 @@
 package javax0.bubas.support;
 
+import javax0.bubas.api.BubasAssigns;
 import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.ExpressionArg;
@@ -17,6 +18,7 @@ import javax0.bubas.api.VariableArg;
         What is final is final from its declaration: there is no later moment at which a variable
         becomes constant, and assigning to one is refused before the program runs.
         """)
+@BubasAssigns(target = "name", value = "init")
 public final class DeclareFinal {
 
     public static final String PATTERN =

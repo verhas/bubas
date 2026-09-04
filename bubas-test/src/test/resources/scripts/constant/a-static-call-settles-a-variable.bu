@@ -1,0 +1,13 @@
+'NO-COMPILE
+' A function that says its answer comes from its arguments alone is called while compiling, so
+' everything downstream of it is settled too.
+' ERROR: always FALSE
+' LINE: 9
+PROGRAM P
+    DECLARE n INTEGER
+    n = TO_INTEGER("5")
+    IF n > 10 THEN
+        n = 1
+    END IF
+    ASSERT "unreachable", n = 1
+END.

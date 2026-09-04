@@ -1,5 +1,6 @@
 package javax0.bubas.support;
 
+import javax0.bubas.api.BubasAssigns;
 import javax0.bubas.api.BubasDescription;
 import javax0.bubas.api.BubasType;
 import javax0.bubas.api.ExpressionArg;
@@ -12,6 +13,7 @@ import javax0.bubas.api.VariableArg;
         The ordinary way to declare something whose starting value is known, and the only way to
         avoid the analyser complaining that a later read might come before the first assignment.
         """)
+@BubasAssigns(target = "name", value = "init")
 public final class DeclareInitialized {
 
     public static final String PATTERN =

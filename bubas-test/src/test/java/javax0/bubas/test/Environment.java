@@ -117,6 +117,36 @@ final class Environment {
         }
     }
 
+    /**
+     * Hands back exactly what it was given, and is deliberately <em>not</em> {@code @BubasStatic}.
+     * <p>
+     * It exists so a script can hold a value the compiler may not read off the page. A condition the
+     * compiler can answer is dead code and rejected, so a corpus script demonstrating a branch, a
+     * loop that runs no times, or a division by zero at run time needs one value that arrives from
+     * outside the text. A program parameter is how a real program does this; the corpus has none, so
+     * it has this.
+     */
+    @BubasDescription("""
+            Hands back the number it was given, unchanged.
+            A value that arrives through it is not one the compiler can read off the page.
+            """)
+    public static final class Mirror {
+        public long call(Context ctx, long value) {
+            return value;
+        }
+    }
+
+    /** {@link Mirror} for text. Not {@code @BubasStatic}, and for the same reason. */
+    @BubasDescription("""
+            Hands back the text it was given, unchanged.
+            A value that arrives through it is not one the compiler can read off the page.
+            """)
+    public static final class MirrorText {
+        public String call(Context ctx, String value) {
+            return value;
+        }
+    }
+
     static final String ASSERT_PATTERN =
             "ASSERT {literal/STRING:message}, {expression/BOOLEAN:condition}";
 
@@ -128,6 +158,8 @@ final class Environment {
                 .defineFunction("CONCAT", Concat.class)
                 .defineFunction("SHOW", Show.class)
                 .defineFunction("PRINT", Print.class)
+                .defineFunction("MIRROR", Mirror.class)
+                .defineFunction("MIRROR_TEXT", MirrorText.class)
                 .defineStatement(ASSERT_PATTERN, Assert.class)
                 .install(Standard::register);
         return builder.seal();

@@ -3,7 +3,7 @@
 PROGRAM P
     DECLARE score INTEGER
     DECLARE grade STRING
-    score = 85
+    score = MIRROR(85)
     IF score >= 90 THEN
         grade = "A"
     ELSEIF score >= 80 THEN
@@ -12,7 +12,7 @@ PROGRAM P
         grade = "C"
     END IF
     ASSERT "the first matching arm wins", grade = "B"
-    score = 50
+    score = MIRROR(50)
     IF score >= 90 THEN
         grade = "A"
     ELSEIF score >= 80 THEN
