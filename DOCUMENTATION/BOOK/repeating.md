@@ -346,6 +346,13 @@ A loop that cannot run at all is refused: `FOR line = 5 TO 1` counts backwards w
 to, and its body is text nobody will ever execute. So is a step of zero, which would never finish.
 So is a `DO WHILE` whose condition is decided before the first pass.
 
+There is a subtler consequence of the same idea. If the compiler can see every value a loop turns
+on, it works the loop out rather than guessing — a loop counting from five up to seven leaves seven,
+and a test on that afterwards is a test with an answer, and refused like any other. This is only
+ever true of a loop whose values are all written in the rule itself. The moment one of them comes
+from outside — a parameter, an operation, anything the compiler cannot read off the page — the loop
+becomes opaque again and everything after it is a real question.
+
 So is a loop with nothing in it. A body you have emptied out is a shape left behind after the
 contents were deleted, and the only reading under which it means anything is one where the work
 happens inside the condition — which is the kind of cleverness a rule should never contain. The same

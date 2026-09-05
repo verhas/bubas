@@ -1,0 +1,24 @@
+'NO-COMPILE
+' Following a loop is not all or nothing. This body also fills k from a call the compiler may not
+' make, so k is unknown once the loop ends — but n never was, and the test under the loop is still
+' answered. One value it cannot work out does not cost it the ones it can.
+'
+' The loop tests at the bottom so that k needs no initialiser. Definite assignment runs long
+' before any of this and judges a loop by its shape, so a top-tested loop guarantees nothing
+' whatever the compiler later works out about it. See SPEC 7.5.
+' ERROR: always TRUE
+' LINE: 21
+PROGRAM P
+    DECLARE n INTEGER
+    DECLARE limit INTEGER
+    DECLARE k INTEGER
+    n = 5
+    limit = 7
+    DO
+        k = MIRROR(n)
+        n = n + 1
+    END DO WHILE n < limit
+    IF n = 7 THEN
+        ASSERT "unreachable", k >= 0
+    END IF
+END.

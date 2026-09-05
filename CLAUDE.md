@@ -19,6 +19,14 @@ mistaken for oversights:
 - **Every literal token of every pattern is a reserved word.** This is not namespace greed. It is
   what makes expression boundaries decidable without backtracking: an expression ends at the
   first reserved token.
+- **The analysis follows a loop when it can, and the walk that follows is not the walk that
+  refuses.** A loop whose every value is already known is run at compile time, so `n = 5` above a
+  loop that counts to seven settles the `IF n = 7` below it. The two walks cannot be one: inside a
+  followed loop every condition is decided on every pass but differently between passes, so
+  rejecting them would refuse nearly every loop containing an `IF`. Rejecting is done once,
+  conservatively, with the body's writes forgotten; following is separate and refuses nothing. It
+  gives up — on `EXIT`, on a trap, on an undecidable value, on a budget — and giving up costs only
+  precision that was never there.
 - **A condition the compiler can answer is an error, and "can answer" is flow-sensitive.** `n = 5`
   followed by `IF n > 10` is rejected: the variable is not constant, but it is settled where the
   condition reads it, and almost nobody writes `IF FALSE` — the literal case alone would be a

@@ -40,10 +40,38 @@ import java.util.Set;
  */
 public final class DeadCode {
 
+    /**
+     * How much walking a program's loops may cost before the analysis gives up on all of them.
+     * <p>
+     * Not a property of the program and not something an author can raise: it exists so a loop the
+     * analysis can follow but that runs a hundred million times cannot hang a compilation. When a
+     * language gains a budget of its own this is where it will be read from — the accessor is
+     * already on {@code CoreContext}.
+     */
+    private static final long WALKING_BUDGET = 100_000;
+
     private final MathContext mathContext;
+
+    /**
+     * True while this is the walk that refuses things, false while it is following a loop to find
+     * out where it ends.
+     * <p>
+     * The two cannot be one walk. Inside a loop being followed every condition is decided on every
+     * pass — {@code IF n = 6} has an answer each time round — but the answer differs between
+     * passes, so it is not the dead code the rejections are about. Rejecting is therefore done
+     * once, conservatively, with everything the body writes forgotten; following is done
+     * separately and refuses nothing.
+     */
+    private boolean rejecting = true;
+
+    private long budget = WALKING_BUDGET;
 
     private DeadCode(MathContext mathContext) {
         this.mathContext = mathContext;
+    }
+
+    /** Thrown to give up on following a loop. Never leaves a {@code walk}. */
+    private static final class Abandon extends RuntimeException {
     }
 
     public static void check(CoreProgram program, MathContext mathContext) {
@@ -89,17 +117,28 @@ public final class DeadCode {
         for (final var arm : branch.arms()) {
             // A condition cannot change a variable — a function may not reach the store — so every
             // arm is tested in the state the branch was entered with.
-            if (value(arm.condition(), known, arm.line()) instanceof Boolean always) {
-                throw error(arm.line(), always
-                        ? "this condition is always TRUE, so nothing after this arm can run; "
-                        + "delete the IF and keep its body"
-                        : "this condition is always FALSE, so this arm cannot run; delete it");
+            final var decided = value(arm.condition(), known, arm.line());
+            if (rejecting) {
+                if (decided instanceof Boolean always) {
+                    throw error(arm.line(), always
+                            ? "this condition is always TRUE, so nothing after this arm can run; "
+                            + "delete the IF and keep its body"
+                            : "this condition is always FALSE, so this arm cannot run; delete it");
+                }
+                empty(arm.body(), arm.line(), "this arm is empty, so the test above it decides "
+                        + "nothing; delete the arm, or write what belongs in it");
+                exits.add(statements(arm.body(), known));
+                continue;
             }
-            empty(arm.body(), arm.line(), "this arm is empty, so the test above it decides "
-                    + "nothing; delete the arm, or write what belongs in it");
-            exits.add(statements(arm.body(), known));
+            // Following a loop: a decided arm is not a fault, it is which way this pass went.
+            if (Boolean.TRUE.equals(decided)) {
+                return statements(arm.body(), known);
+            }
+            if (!Boolean.FALSE.equals(decided)) {
+                exits.add(statements(arm.body(), known));
+            }
         }
-        if (branch.otherwise() != null) {
+        if (rejecting && branch.otherwise() != null) {
             empty(branch.otherwise(), branch.line(), "this ELSE is empty, so it says only that "
                     + "the author stopped; delete it, or write what belongs in it");
         }
@@ -111,23 +150,94 @@ public final class DeadCode {
         // The body may run any number of times, so nothing it writes survives as knowledge — not
         // into the body, not into the condition, not past the loop.
         final var inside = forget(known, writes(loop.body()));
-        if (value(loop.condition(), inside, loop.line()) instanceof Boolean always) {
-            if (always) {
-                if (!leaves(loop.body(), Set.of())) {
-                    throw error(loop.line(), "this loop never ends: its condition is always TRUE "
-                            + "and nothing in it exits");
+        if (rejecting) {
+            if (value(loop.condition(), inside, loop.line()) instanceof Boolean always) {
+                if (always) {
+                    if (!leaves(loop.body(), Set.of())) {
+                        throw error(loop.line(), "this loop never ends: its condition is always "
+                                + "TRUE and nothing in it exits");
+                    }
+                } else {
+                    throw error(loop.line(), loop.testAtEnd()
+                            ? "this condition is always FALSE, so the body runs exactly once; "
+                            + "delete the loop and keep its body"
+                            : "this condition is always FALSE, so the body cannot run; delete "
+                            + "the loop");
                 }
-            } else {
-                throw error(loop.line(), loop.testAtEnd()
-                        ? "this condition is always FALSE, so the body runs exactly once; delete "
-                        + "the loop and keep its body"
-                        : "this condition is always FALSE, so the body cannot run; delete the loop");
             }
+            empty(loop.body(), loop.line(), "this loop has an empty body, so every pass does "
+                    + "nothing but test the condition again; delete the loop, or write what it "
+                    + "is for");
         }
-        empty(loop.body(), loop.line(), "this loop has an empty body, so every pass does nothing "
-                + "but test the condition again; delete the loop, or write what it is for");
         statements(loop.body(), inside);
-        return inside;
+        final var walked = walk(loop, known);
+        return walked == null ? inside : walked;
+    }
+
+    /**
+     * Runs the loop, when every value it turns on is one the analysis already holds.
+     * <p>
+     * This is the difference between knowing that a loop writes {@code n} and knowing what it
+     * leaves in it. {@code n = 5} above a loop that adds one until {@code n} reaches seven leaves
+     * seven, and the {@code IF n = 7} below is then a question with an answer — which is the whole
+     * reason for doing this.
+     * <p>
+     * It gives up rather than guesses, and says so with {@code null}: a condition it cannot decide,
+     * a statement whose effect nothing declared, arithmetic that traps, a body that can
+     * {@code EXIT} or {@code RETURN} — an abrupt exit is a path this does not model — or a budget
+     * spent. Giving up costs only precision that was never there before.
+     *
+     * @return where the loop ends, or {@code null} when it could not be followed
+     */
+    private Map<Integer, Object> walk(CoreStatement.Loop loop, Map<Integer, Object> known) {
+        if (leaves(loop.body(), Set.of())) {
+            return null;
+        }
+        final var wasRejecting = rejecting;
+        rejecting = false;
+        try {
+            var state = known;
+            while (true) {
+                if (!loop.testAtEnd()) {
+                    final var decided = value(loop.condition(), state, loop.line());
+                    if (!(decided instanceof Boolean flag)) {
+                        return null;
+                    }
+                    if (!flag) {
+                        return state;
+                    }
+                }
+                final var before = state;
+                state = statements(loop.body(), state);
+                spend();
+                if (loop.testAtEnd()) {
+                    final var decided = value(loop.condition(), state, loop.line());
+                    if (!(decided instanceof Boolean flag)) {
+                        return null;
+                    }
+                    if (!flag) {
+                        return state;
+                    }
+                }
+                if (state.equals(before)) {
+                    // A pass that changed nothing will change nothing next time either, so this
+                    // loop does not end — something the rejections could not see, having forgotten
+                    // what the body writes. Left unreported: this walk is here to find values, and
+                    // a new refusal falling out of it deserves its own decision.
+                    return null;
+                }
+            }
+        } catch (Abandon abandon) {
+            return null;
+        } finally {
+            rejecting = wasRejecting;
+        }
+    }
+
+    private void spend() {
+        if (--budget < 0) {
+            throw new Abandon();
+        }
     }
 
     /**
@@ -139,20 +249,56 @@ public final class DeadCode {
         final var to = integer(value(count.to(), known, count.line()));
         final var step = count.step() == null ? Long.valueOf(1)
                 : integer(value(count.step(), known, count.line()));
-        if (step != null && step == 0) {
-            throw error(count.line(), "a FOR loop with a step of zero would never finish");
+        if (rejecting) {
+            if (step != null && step == 0) {
+                throw error(count.line(), "a FOR loop with a step of zero would never finish");
+            }
+            if (from != null && to != null && step != null && (step > 0 ? from > to : from < to)) {
+                throw error(count.line(), "this counts from " + from + " to " + to + " by " + step
+                        + ", so the body cannot run");
+            }
+            empty(count.body(), count.line(), "this loop has an empty body, so it counts and does "
+                    + "nothing else; delete the loop, or write what it is for");
         }
-        if (from != null && to != null && step != null && (step > 0 ? from > to : from < to)) {
-            throw error(count.line(), "this counts from " + from + " to " + to + " by " + step
-                    + ", so the body cannot run");
-        }
-        empty(count.body(), count.line(), "this loop has an empty body, so it counts and does "
-                + "nothing else; delete the loop, or write what it is for");
         final var written = writes(count.body());
         written.add(count.slot());
         final var inside = forget(known, written);
         statements(count.body(), inside);
-        return inside;
+        final var walked = walk(count, known, from, to, step);
+        return walked == null ? inside : walked;
+    }
+
+    /**
+     * The counting version, and the easier one: the counter is the language's to move and the body
+     * may not assign it, so how many passes there are is settled before the first.
+     */
+    private Map<Integer, Object> walk(CoreStatement.Count count, Map<Integer, Object> known,
+                                      Long from, Long to, Long step) {
+        if (from == null || to == null || step == null || step == 0
+                || leaves(count.body(), Set.of())) {
+            return null;
+        }
+        final var wasRejecting = rejecting;
+        rejecting = false;
+        try {
+            var state = known;
+            long counter = from;
+            while (step > 0 ? counter <= to : counter >= to) {
+                final var entering = new HashMap<>(state);
+                entering.put(count.slot(), counter);
+                state = statements(count.body(), entering);
+                spend();
+                counter = Math.addExact(counter, step);
+            }
+            // What the language promises afterwards: the first value that failed the test.
+            final var ended = new HashMap<>(state);
+            ended.put(count.slot(), counter);
+            return ended;
+        } catch (Abandon | ArithmeticException abandon) {
+            return null;
+        } finally {
+            rejecting = wasRejecting;
+        }
     }
 
     private Map<Integer, Object> invoke(CoreStatement.Invoke invoke, Map<Integer, Object> known) {
@@ -297,6 +443,11 @@ public final class DeadCode {
         try {
             return Constants.of(expression, known, mathContext);
         } catch (CoreArithmetic.Trap | MemoizedCall.Refusal trap) {
+            if (!rejecting) {
+                // Following a loop, not judging it: a trap is a reason to stop looking, not to
+                // refuse the program. Reporting it would mean trusting this walk to be right.
+                throw new Abandon();
+            }
             throw new BubasException(trap.getMessage(), line.line(), line.source(), trap);
         }
     }

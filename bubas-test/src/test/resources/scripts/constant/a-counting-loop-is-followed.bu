@@ -1,0 +1,16 @@
+'NO-COMPILE
+' A counting loop is followed too, and its bounds settle how many passes there are before the
+' first one: four passes leave ten in the total.
+' ERROR: always TRUE
+' LINE: 13
+PROGRAM P
+    DECLARE i INTEGER
+    DECLARE total INTEGER
+    total = 0
+    FOR i = 1 TO 4
+        total = total + i
+    END FOR
+    IF total = 10 THEN
+        ASSERT "unreachable", TRUE
+    END IF
+END.

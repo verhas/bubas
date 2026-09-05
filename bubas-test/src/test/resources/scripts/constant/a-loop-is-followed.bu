@@ -1,0 +1,17 @@
+'NO-COMPILE
+' A loop whose every value the compiler already holds is one it can run. This one leaves 7 in n,
+' so the test under it is answered before the program starts and one of its two ways is dead.
+' ERROR: always TRUE
+' LINE: 14
+PROGRAM P
+    DECLARE n INTEGER
+    DECLARE limit INTEGER
+    n = 5
+    limit = 7
+    DO WHILE n < limit
+        n = n + 1
+    END DO
+    IF n = 7 THEN
+        ASSERT "unreachable", TRUE
+    END IF
+END.

@@ -372,4 +372,134 @@ class DeadCodeTest {
             assertThat(seal(BackToFront.class)).contains("only a variable can be assigned");
         }
     }
+
+    @Nested
+    @DisplayName("following a loop to find where it ends")
+    class Following {
+
+        @Test
+        void a_loop_whose_values_are_all_held_is_run() {
+            assertThat(reject("""
+                    DECLARE n INTEGER
+                    DECLARE limit INTEGER
+                    n = 5
+                    limit = 7
+                    DO WHILE n < limit
+                        n = n + 1
+                    END DO
+                    IF n = 7 THEN
+                        n = 1
+                    END IF
+                    SHOW n"""))
+                    .isEqualTo("this condition is always TRUE, so nothing after this arm can run; "
+                            + "delete the IF and keep its body");
+        }
+
+        @Test
+        void a_post_tested_loop_too() {
+            assertThat(reject("""
+                    DECLARE n INTEGER
+                    n = 0
+                    DO
+                        n = n + 1
+                    END DO UNTIL n = 3
+                    IF n = 3 THEN
+                        n = 1
+                    END IF
+                    SHOW n"""))
+                    .contains("always TRUE");
+        }
+
+        @Test
+        void a_counting_loop_leaves_the_first_value_that_failed_the_test() {
+            assertThat(reject("""
+                    DECLARE i INTEGER
+                    DECLARE total INTEGER
+                    total = 0
+                    FOR i = 1 TO 4
+                        total = total + i
+                    END FOR
+                    IF i = 5 THEN
+                        total = 1
+                    END IF
+                    SHOW total"""))
+                    .as("the counter ends one step past the bound, as the language promises")
+                    .contains("always TRUE");
+        }
+
+        /**
+         * The property the whole design turns on. Inside a loop being followed every condition has
+         * an answer on every pass, but a different one — so it is not the dead code the rejections
+         * are about, and rejecting it would refuse nearly every loop containing an IF.
+         */
+        @Test
+        void a_condition_inside_a_followed_loop_is_not_dead_code() {
+            assertThat(reject("""
+                    DECLARE n INTEGER
+                    DECLARE seen INTEGER
+                    n = 0
+                    seen = 0
+                    DO WHILE n < 3
+                        IF n = 1 THEN
+                            seen = seen + 1
+                        END IF
+                        n = n + 1
+                    END DO
+                    SHOW seen"""))
+                    .isNull();
+        }
+
+        @Test
+        void a_loop_that_can_be_left_early_is_not_followed() {
+            assertThat(reject("""
+                    DECLARE n INTEGER
+                    n = 0
+                    DO WHILE n < 10
+                        n = n + 1
+                        IF n > 2 THEN
+                            EXIT DO
+                        END IF
+                    END DO
+                    IF n = 10 THEN
+                        n = 1
+                    END IF
+                    SHOW n"""))
+                    .as("EXIT is a path the walk does not model, so it gives up and forgets")
+                    .isNull();
+        }
+
+        @Test
+        void a_value_from_a_call_it_may_not_make_stops_it() {
+            assertThat(reject("""
+                    DECLARE n INTEGER
+                    DECLARE limit INTEGER
+                    n = 5
+                    limit = QUIET(7)
+                    DO WHILE n < limit
+                        n = n + 1
+                    END DO
+                    IF n = 7 THEN
+                        n = 1
+                    END IF
+                    SHOW n"""))
+                    .isNull();
+        }
+
+        @Test
+        void a_loop_too_long_to_follow_is_given_up_on_rather_than_followed_forever() {
+            assertThat(reject("""
+                    DECLARE i INTEGER
+                    DECLARE total INTEGER
+                    total = 0
+                    FOR i = 1 TO 500000
+                        total = total + 1
+                    END FOR
+                    IF total = 500000 THEN
+                        total = 1
+                    END IF
+                    SHOW total"""))
+                    .as("the budget runs out, the walk abandons, and compilation still finishes")
+                    .isNull();
+        }
+    }
 }

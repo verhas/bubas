@@ -318,11 +318,13 @@ The analysis walks the program carrying a value for each variable whose value is
 - **A branch** tests every arm in the state it was entered with; a condition cannot change a
   variable, since a function may not reach the store. At the join a value survives only if every
   path arrives with the same one — including the path through a missing `ELSE`.
-- **A loop** forgets everything its body writes, before the condition and for good. The body may run
-  any number of times, so nothing it touches is certain in the condition, inside the body on the
-  second pass, or after the loop.
+- **A loop** forgets everything its body writes, before the condition and for good — unless it can
+  be *followed* ([9.4](#94-following-a-loop)), in which case what it leaves behind is known exactly.
+  Forgetting is the fallback, and the body may run any number of times, so nothing it touches is
+  certain in the condition, inside the body on a second pass, or after the loop.
 - **A `FOR`** forgets its loop variable too, and evaluates its bounds in the state on entry, which
-  is when they are evaluated for real.
+  is when they are evaluated for real. It is followed on the same terms, and then the counter is
+  known afterwards as the first value that failed the test.
 - **`RETURN` and `EXIT`** leave nothing behind that anything reads. A path that ends in one still
   contributes to a join, which loses precision and never gains it.
 
@@ -371,6 +373,60 @@ it is not settled, and the code under it is not dead.
 
 A parameter is the general answer: it is the one thing in a program whose value the compiler cannot
 know. Anything written into the source is known where it is read.
+
+### 9.4. Following a loop
+
+A loop whose every value the analysis already holds is one it can run, and running it is the
+difference between knowing that a loop writes `n` and knowing what it leaves in it:
+
+```basic
+n = 5
+limit = 7
+DO WHILE n < limit
+    n = n + 1
+END DO
+IF n = 7 THEN
+```
+
+Seven, so the `IF` is a question with an answer, and one of its two ways is dead. Nothing about that
+program is written as a constant.
+
+**The walk that follows a loop is not the walk that refuses things**, and the two cannot be one.
+Inside a followed loop *every* condition has an answer on every pass — `IF n = 1` in the body is
+decided each time round — but the answer differs between passes, which is not the dead code
+[6](#6-rejections) is about. Rejecting is therefore done once, conservatively, with everything the
+body writes forgotten; following is done separately and refuses nothing. What following changes is
+only the state the loop leaves behind.
+
+It gives up rather than guesses, and gives up often:
+
+- a condition it cannot decide, or a statement whose effect nothing declared
+- a body that can `EXIT` or `RETURN` — an abrupt exit is a path this does not model
+- arithmetic that traps. That trap would happen on every run and is worth reporting, but reporting
+  it would mean trusting this walk to be right about which pass it reached; it is left alone
+- a budget spent, so a loop the analysis *can* follow but that runs a hundred million times cannot
+  hang a compilation
+
+Giving up costs only precision that was never there before, which is what makes the whole thing
+safe to have.
+
+**Definite assignment does not benefit from any of it.** It runs before lowering, judges a loop by
+its shape — a top-tested one guarantees nothing, because the body may not run — and never learns
+that this particular loop provably runs four times. So a variable first written inside a followed
+loop still needs an initialiser above it, or a loop that tests at the bottom.
+
+> **Rationale (not normative).** This looks like an oversight and is a choice. The rejections can
+> afford to be clever because being clever only ever refuses programs that were wrong anyway. If
+> definite assignment were clever, *acceptance* would depend on it: changing `limit = 7` to a value
+> the compiler cannot read would produce "read before it is assigned" on a line nowhere near the
+> edit, and the four loop shapes would stop being a rule an author can apply by reading. `SPEC.md`
+> §7.5 exists to make that rule readable, and it stays readable by staying dumb.
+
+> **Rationale (not normative).** One case falls out and is deliberately not taken. A pass that
+> changes nothing will change nothing next time, so a loop whose state repeats provably never ends —
+> something [6.2](#62-a-loop-that-cannot-end) cannot see, having forgotten what the body writes.
+> That is a new refusal, and a refusal deserves its own decision rather than arriving as a side
+> effect of an analysis added for a different reason.
 
 ## 10. Testing
 

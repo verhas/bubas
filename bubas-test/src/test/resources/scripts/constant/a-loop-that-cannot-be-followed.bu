@@ -1,0 +1,16 @@
+'OK
+' The compiler follows a loop only when it holds every value the loop turns on. Here the limit
+' arrives through a call it may not make, so the loop is not followed and what it writes is
+' unknown afterwards — which is what makes the test below a real question.
+PROGRAM P
+    DECLARE n INTEGER
+    DECLARE limit INTEGER
+    n = 5
+    limit = MIRROR(7)
+    DO WHILE n < limit
+        n = n + 1
+    END DO
+    IF n = 7 THEN
+        ASSERT "the loop counted up to the limit", TRUE
+    END IF
+END.

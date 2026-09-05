@@ -760,7 +760,8 @@ Reading a variable requires it to be `INITIALIZED` on every path reaching that p
 - unreachable code: after `RETURN`, after `EXIT`, or after a provably non-terminating loop
 - a decided condition on an `IF` or an `ELSEIF`: one arm is dead either way. A condition counts as
   decided when its value follows from the program so far, not only when it is written as a literal —
-  `n = 5` two lines above settles `IF n > 10`
+  `n = 5` two lines above settles `IF n > 10`, and so does a loop the compiler could follow to the
+  end
 - a loop whose decided condition keeps it running and that nothing can leave — an `EXIT` for it or
   for an enclosing loop, or a `RETURN`
 - a loop whose decided condition stops it: a body that never runs, or runs exactly once
