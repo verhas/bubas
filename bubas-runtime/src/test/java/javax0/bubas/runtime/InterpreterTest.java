@@ -1,19 +1,7 @@
 package javax0.bubas.runtime;
 
 import javax0.bubas.analyser.BubasLanguage;
-import javax0.bubas.api.BubasException;
-import javax0.bubas.api.BubasArray;
-import javax0.bubas.api.BubasType;
-import javax0.bubas.api.Context;
-import java.util.Set;
-import java.util.Map;
-import java.util.LinkedHashSet;
-import java.util.LinkedHashMap;
-import javax0.bubas.api.StatementContext;
-import javax0.bubas.api.ExpressionArg;
-import javax0.bubas.api.VariableArg;
-import javax0.bubas.api.BubasCallInterceptor;
-import javax0.bubas.api.Value;
+import javax0.bubas.api.*;
 import javax0.bubas.support.Standard;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,12 +10,9 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.assertj.core.api.Assertions.*;
 
 class InterpreterTest {
 
@@ -80,13 +65,17 @@ class InterpreterTest {
                 .logger((level, message) -> logged.add(level + ": " + message));
     }
 
-    /** Runs a body that returns nothing, and yields whatever it logged. */
+    /**
+     * Runs a body that returns nothing, and yields whatever it logged.
+     */
     private List<String> run(String body) {
         interpreter(body).run();
         return logged;
     }
 
-    /** Runs a body wrapped in a program returning INTEGER. */
+    /**
+     * Runs a body wrapped in a program returning INTEGER.
+     */
     private long value(String body) {
         return Interpreter.of(LANGUAGE.compile("PROGRAM P RETURNS INTEGER\n" + body + "\nEND."))
                 .logger((level, message) -> logged.add(level + ": " + message))
@@ -126,8 +115,10 @@ class InterpreterTest {
 
         @Test
         void integer_overflow_is_an_error_not_a_wraparound() {
-            assertThat(rejection("DECLARE n INTEGER\nn = 9223372036854775807 + 1\n"
-                    + "LOG_EVENT \"INFO\", \"\" + n")).isEqualTo("integer overflow");
+            assertThat(rejection("""
+                    DECLARE n INTEGER
+                    n = 9223372036854775807 + 1
+                    LOG_EVENT "INFO", "" + n""")).isEqualTo("integer overflow");
         }
 
         @Test
@@ -169,7 +160,7 @@ class InterpreterTest {
             final var seen = new ArrayList<String>();
             Interpreter.of(program).logger((level, message) -> seen.add(message)).run();
             assertThat(seen).hasSize(1);
-            return seen.get(0);
+            return seen.getFirst();
         }
 
         @Test
@@ -192,10 +183,10 @@ class InterpreterTest {
         @Test
         void decimals_compare_by_value_not_by_scale() {
             assertThat(valueGiven("a DECIMAL, b DECIMAL", """
-                    IF a = b THEN
-                        RETURN 1
-                    END IF
-                    RETURN 0""",
+                            IF a = b THEN
+                                RETURN 1
+                            END IF
+                            RETURN 0""",
                     "a", new BigDecimal("2.0"), "b", new BigDecimal("2.00"))).isEqualTo(1);
         }
 
@@ -352,7 +343,9 @@ class InterpreterTest {
     @DisplayName("call interception")
     class Interception {
 
-        /** A command that assigns: the reason an interceptor gets the handler's own arguments. */
+        /**
+         * A command that assigns: the reason an interceptor gets the handler's own arguments.
+         */
         public static final class LoadInto {
             public void call(StatementContext ctx, VariableArg target, ExpressionArg id) {
                 target.set(new Order(BigDecimal.TEN));
@@ -379,7 +372,9 @@ class InterpreterTest {
                 .registerService(Orders.class, id -> new Order(new BigDecimal("5")))
                 .seal();
 
-        /** Records every call and answers from a table, which is all a mock ever does. */
+        /**
+         * Records every call and answers from a table, which is all a mock ever does.
+         */
         static class Recorder implements BubasCallInterceptor {
             final List<String> calls = new ArrayList<>();
             final Map<String, Value> functions = new LinkedHashMap<>();
@@ -550,17 +545,19 @@ class InterpreterTest {
          */
         public static final class Describe {
             public String call(Context ctx, Value value) {
-                return value.type() + "=" + String.valueOf(value.as(Object.class));
+                return value.type() + "=" + value.as(Object.class);
             }
         }
 
-        /** Variadic and wildcard together: every element arrives boxed with its own type. */
+        /**
+         * Variadic and wildcard together: every element arrives boxed with its own type.
+         */
         public static final class Render {
             public String call(Context ctx, Value... parts) {
                 final var out = new StringBuilder();
                 for (final var part : parts) {
                     out.append(part.type()).append(':')
-                            .append(String.valueOf(part.as(Object.class))).append(';');
+                            .append(part.as(Object.class)).append(';');
                 }
                 return out.toString();
             }
@@ -572,7 +569,9 @@ class InterpreterTest {
             }
         }
 
-        /** An array reaching a wildcard arrives as its raw Java array, not wrapped. */
+        /**
+         * An array reaching a wildcard arrives as its raw Java array, not wrapped.
+         */
         public static final class SizeOf {
             public long call(Context ctx, Value value) {
                 return value.as(long[].class).length;
@@ -591,7 +590,7 @@ class InterpreterTest {
 
         private static String run(String expression) {
             return Interpreter.of(LANG.compile(
-                    "PROGRAM T RETURNS STRING\n    RETURN " + expression + "\nEND.\n"))
+                            "PROGRAM T RETURNS STRING\n    RETURN " + expression + "\nEND.\n"))
                     .run().asString();
         }
 
@@ -690,7 +689,7 @@ class InterpreterTest {
 
         private static Value run(String returns, String expression) {
             return Interpreter.of(LANG.compile(
-                    "PROGRAM T RETURNS " + returns + "\n    RETURN " + expression + "\nEND.\n"))
+                            "PROGRAM T RETURNS " + returns + "\n    RETURN " + expression + "\nEND.\n"))
                     .run();
         }
 
@@ -709,7 +708,9 @@ class InterpreterTest {
             assertThat(run("STRING", "JOIN()").asString()).isEmpty();
         }
 
-        /** A primitive component type: the packed array must be long[], not Long[]. */
+        /**
+         * A primitive component type: the packed array must be long[], not Long[].
+         */
         @Test
         void a_primitive_element_type_is_unboxed_into_its_own_array() {
             assertThat(run("INTEGER", "SUM_OF(1, 2, 3, 4)").asLong()).isEqualTo(10L);
@@ -722,7 +723,9 @@ class InterpreterTest {
             assertThat(run("STRING", "TAGGED(\"t\")").asString()).isEqualTo("t:0");
         }
 
-        /** An opaque element type: the array's component is the registered Java class. */
+        /**
+         * An opaque element type: the array's component is the registered Java class.
+         */
         @Test
         void opaque_values_pack_into_an_array_of_their_java_type() {
             assertThat(run("INTEGER", "COUNT_ORDERS(LOAD_ORDER(1), LOAD_ORDER(2))").asLong())
@@ -825,8 +828,10 @@ class InterpreterTest {
 
         @Test
         void a_parameter_must_be_supplied_and_of_the_right_type() {
-            final var program = LANGUAGE.compile("PROGRAM P(n INTEGER) RETURNS INTEGER\n"
-                    + "RETURN n\nEND.");
+            final var program = LANGUAGE.compile("""
+                    PROGRAM P(n INTEGER) RETURNS INTEGER
+                    RETURN n
+                    END.""");
             assertThat(catchThrowableOfType(BubasException.class,
                     () -> Interpreter.of(program).run()).getMessage())
                     .contains("needs an argument for 'n'");

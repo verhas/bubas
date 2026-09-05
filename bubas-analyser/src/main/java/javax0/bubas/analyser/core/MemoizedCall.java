@@ -1,7 +1,6 @@
 package javax0.bubas.analyser.core;
 
 import javax0.bubas.analyser.FunctionSignature;
-import javax0.bubas.api.BubasException;
 import javax0.bubas.api.BubasMemoizable;
 import javax0.bubas.api.CoreContext;
 
@@ -67,7 +66,9 @@ final class MemoizedCall {
         }
     }
 
-    /** Carries a message out of a folded call so the caller, which knows the line, can place it. */
+    /**
+     * Carries a message out of a folded call so the caller, which knows the line, can place it.
+     */
     static final class Refusal extends RuntimeException {
 
         Refusal(String message) {
@@ -115,7 +116,9 @@ final class MemoizedCall {
             return Long.MAX_VALUE;
         }
 
-        /** Arrays are never compile-time values, so nothing here can allocate one. */
+        /**
+         * Arrays are never compile-time values, so nothing here can allocate one.
+         */
         @Override
         public int maxArrayLength() {
             return Integer.MAX_VALUE;

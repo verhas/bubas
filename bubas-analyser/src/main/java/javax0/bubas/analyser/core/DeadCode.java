@@ -241,7 +241,7 @@ public final class DeadCode {
     /** A value survives a join only if every path arrives with the same one. */
     private static Map<Integer, Object> merge(List<Map<Integer, Object>> states) {
         final var merged = new HashMap<Integer, Object>();
-        for (final var candidate : states.get(0).entrySet()) {
+        for (final var candidate : states.getFirst().entrySet()) {
             if (states.stream().allMatch(state ->
                     candidate.getValue().equals(state.get(candidate.getKey())))) {
                 merged.put(candidate.getKey(), candidate.getValue());
@@ -296,10 +296,8 @@ public final class DeadCode {
     private Object value(CoreExpression expression, Map<Integer, Object> known, LogicalLine line) {
         try {
             return Constants.of(expression, known, mathContext);
-        } catch (CoreArithmetic.Trap trap) {
+        } catch (CoreArithmetic.Trap | MemoizedCall.Refusal trap) {
             throw new BubasException(trap.getMessage(), line.line(), line.source(), trap);
-        } catch (MemoizedCall.Refusal refusal) {
-            throw new BubasException(refusal.getMessage(), line.line(), line.source(), refusal);
         }
     }
 
