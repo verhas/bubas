@@ -52,7 +52,7 @@
     <properties>
         <!-- The one place a release is numbered. Modules inherit it as ${revision};
              flatten-maven-plugin resolves it away before anything is installed or deployed. -->
-        <revision>1.0.0</revision>
+        <revision>2.0.0</revision>
         <maven.compiler.release>21</maven.compiler.release>
         <flatten.version>1.8.0</flatten.version>
         <source.plugin.version>3.4.0</source.plugin.version>
