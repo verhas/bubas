@@ -404,11 +404,24 @@ It gives up rather than guesses, and gives up often:
 - a body that can `EXIT` or `RETURN` — an abrupt exit is a path this does not model
 - arithmetic that traps. That trap would happen on every run and is worth reporting, but reporting
   it would mean trusting this walk to be right about which pass it reached; it is left alone
-- a budget spent, so a loop the analysis *can* follow but that runs a hundred million times cannot
-  hang a compilation
+- `maxSteps` spent. That is a language setting ([`SPEC.md` §10.3.4](SPEC.md#1034-what-a-compilation-may-spend)),
+  reset for each top-level loop, and it refuses nothing: a loop the analysis cannot follow far
+  enough is a loop it says nothing about
 
 Giving up costs only precision that was never there before, which is what makes the whole thing
 safe to have.
+
+**One thing following a loop *can* refuse.** Where a language sets `maxLoops`, a loop that takes
+more passes than it allows is an error — reported the moment the count passes the limit, because by
+then the compiler has walked that many passes on values it holds and the loop demonstrably takes at
+least that many. Waiting for the loop to end would make the policy unenforceable exactly where it
+matters, since `maxSteps` would stop the walk first.
+
+The two settings are opposites and it is worth keeping them apart: running out of `maxSteps` refuses
+nothing, because not knowing how long a loop takes is an absence of knowledge; exceeding `maxLoops`
+refuses, because it is a proved fact about the program. The second is also very incomplete — it sees
+only loops whose values are all known while compiling, which are the ones somebody could have
+counted by reading, and never the loop whose trip count arrives from a service.
 
 **Definite assignment does not benefit from any of it.** It runs before lowering, judges a loop by
 its shape — a top-tested one guarantees nothing, because the body may not run — and never learns

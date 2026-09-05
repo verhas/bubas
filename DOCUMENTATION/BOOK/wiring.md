@@ -117,6 +117,32 @@ the memory. The runtime cannot do this for you: an array that has arrived in a v
 allocated, so a check there would catch the mistake after paying for it. If chapter 24's vocabulary
 grows a statement that makes an array, it asks first.
 
+## What a compilation is allowed to spend
+
+Two more settings, on the language rather than the interpreter, and they look far more alike than
+they are:
+
+```java
+BubasLanguage.builder()
+        .maxSteps(100_000)      // how hard the compiler tries
+        .maxLoops(1_000_000)    // how long a loop a rule may contain
+```
+
+Chapter 7 mentioned that the compiler works a loop out when it can see every value the loop turns
+on. `maxSteps` is how long it keeps trying before giving up on a loop. **Giving up changes nothing
+about what compiles** — it just means the compiler stops knowing what that loop left behind, exactly
+as if the values had come from outside. Leave it alone unless a compilation is slow.
+
+`maxLoops` is the opposite kind of setting. It is a rule about rules: where the compiler can follow
+a loop, it knows how many passes the loop takes, and refuses the rule when that is more than you
+allow. Unlimited unless you set it.
+
+Be clear-eyed about what it buys. It sees only loops whose every value is written in the rule
+itself — the ones a reviewer could have counted by reading. A loop over a list whose length arrives
+from a service is invisible to it, and `Interpreter.maxSteps` from the previous section is the only
+thing that bounds that one. So it catches the careless loop and misses the dangerous one, which is
+still worth having as long as nobody mistakes it for protection.
+
 ## Rounding, which is not per run
 
 One setting deliberately does not go on the interpreter:

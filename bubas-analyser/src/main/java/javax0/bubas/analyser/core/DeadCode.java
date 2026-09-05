@@ -40,17 +40,19 @@ import java.util.Set;
  */
 public final class DeadCode {
 
-    /**
-     * How much walking a program's loops may cost before the analysis gives up on all of them.
-     * <p>
-     * Not a property of the program and not something an author can raise: it exists so a loop the
-     * analysis can follow but that runs a hundred million times cannot hang a compilation. When a
-     * language gains a budget of its own this is where it will be read from — the accessor is
-     * already on {@code CoreContext}.
-     */
-    private static final long WALKING_BUDGET = 100_000;
-
     private final MathContext mathContext;
+
+    /**
+     * How much following one top-level loop may cost. Running out means giving up on that loop and
+     * saying nothing about it — never refusing the program.
+     */
+    private final long maxSteps;
+
+    /**
+     * How many passes a loop may take. Unlike {@link #maxSteps} this refuses programs, and only
+     * ever ones where the loop was followed to its end and the count is therefore known.
+     */
+    private final long maxLoops;
 
     /**
      * True while this is the walk that refuses things, false while it is following a loop to find
@@ -64,20 +66,30 @@ public final class DeadCode {
      */
     private boolean rejecting = true;
 
-    private long budget = WALKING_BUDGET;
+    /** Work spent following the top-level loop currently being followed. */
+    private long steps;
 
-    private DeadCode(MathContext mathContext) {
+    /** Passes taken by it, including every pass of every loop nested inside it. */
+    private long passes;
+
+    /** Where to report a policy failure: the top-level loop currently being followed. */
+    private LogicalLine walking;
+
+    private DeadCode(MathContext mathContext, long maxSteps, long maxLoops) {
         this.mathContext = mathContext;
+        this.maxSteps = maxSteps;
+        this.maxLoops = maxLoops;
     }
 
     /** Thrown to give up on following a loop. Never leaves a {@code walk}. */
     private static final class Abandon extends RuntimeException {
     }
 
-    public static void check(CoreProgram program, MathContext mathContext) {
+    public static void check(CoreProgram program, MathContext mathContext, long maxSteps,
+                             long maxLoops) {
         // Parameters come from outside and are never known; every other slot starts unassigned,
         // and definite assignment has already refused any program that reads one too early.
-        new DeadCode(mathContext).statements(program.body(), Map.of());
+        new DeadCode(mathContext, maxSteps, maxLoops).statements(program.body(), Map.of());
     }
 
     /** @return what is known once the block has run */
@@ -90,6 +102,9 @@ public final class DeadCode {
     }
 
     private Map<Integer, Object> statement(CoreStatement statement, Map<Integer, Object> known) {
+        if (!rejecting) {
+            spend();
+        }
         return switch (statement) {
             case CoreStatement.Branch branch -> branch(branch, known);
             case CoreStatement.Loop loop -> loop(loop, known);
@@ -184,8 +199,14 @@ public final class DeadCode {
      * <p>
      * It gives up rather than guesses, and says so with {@code null}: a condition it cannot decide,
      * a statement whose effect nothing declared, arithmetic that traps, a body that can
-     * {@code EXIT} or {@code RETURN} — an abrupt exit is a path this does not model — or a budget
-     * spent. Giving up costs only precision that was never there before.
+     * {@code EXIT} or {@code RETURN} — an abrupt exit is a path this does not model — or
+     * {@code maxSteps} spent. Giving up costs only precision that was never there before, and never
+     * refuses a program: not knowing how long a loop takes is an absence of knowledge, and absence
+     * of knowledge is not a fault to report.
+     * <p>
+     * Reaching the end is different. Then the number of passes is known, and {@code maxLoops} is
+     * checked against it — the one refusal here that is about the program rather than about how
+     * hard this tried.
      *
      * @return where the loop ends, or {@code null} when it could not be followed
      */
@@ -194,6 +215,13 @@ public final class DeadCode {
             return null;
         }
         final var wasRejecting = rejecting;
+        if (wasRejecting) {
+            // A fresh allowance for each top-level loop, so one expensive loop cannot spend what
+            // the next one needed and make the analysis depend on the order they were written in.
+            steps = 0;
+            passes = 0;
+            walking = loop.line();
+        }
         rejecting = false;
         try {
             var state = known;
@@ -209,7 +237,7 @@ public final class DeadCode {
                 }
                 final var before = state;
                 state = statements(loop.body(), state);
-                spend();
+                pass();
                 if (loop.testAtEnd()) {
                     final var decided = value(loop.condition(), state, loop.line());
                     if (!(decided instanceof Boolean flag)) {
@@ -235,9 +263,25 @@ public final class DeadCode {
     }
 
     private void spend() {
-        if (--budget < 0) {
+        if (++steps > maxSteps) {
             throw new Abandon();
         }
+    }
+
+    /**
+     * One pass of a loop: a step like any other work, and counted separately against the policy.
+     * <p>
+     * The policy is decided here rather than when the loop ends, and the difference matters. Having
+     * walked this many passes on values it holds, the compiler has proved the loop takes at least
+     * this many — enough to refuse it. Waiting for the end would mean a loop of a billion passes
+     * could never be refused, because {@link #maxSteps} would stop the walk first.
+     */
+    private void pass() {
+        if (++passes > maxLoops) {
+            throw error(walking, "this loop takes more than " + maxLoops
+                    + " passes, over what this language allows");
+        }
+        spend();
     }
 
     /**
@@ -279,6 +323,11 @@ public final class DeadCode {
             return null;
         }
         final var wasRejecting = rejecting;
+        if (wasRejecting) {
+            steps = 0;
+            passes = 0;
+            walking = count.line();
+        }
         rejecting = false;
         try {
             var state = known;
@@ -287,7 +336,7 @@ public final class DeadCode {
                 final var entering = new HashMap<>(state);
                 entering.put(count.slot(), counter);
                 state = statements(count.body(), entering);
-                spend();
+                pass();
                 counter = Math.addExact(counter, step);
             }
             // What the language promises afterwards: the first value that failed the test.

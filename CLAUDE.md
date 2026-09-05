@@ -25,8 +25,12 @@ mistaken for oversights:
   followed loop every condition is decided on every pass but differently between passes, so
   rejecting them would refuse nearly every loop containing an `IF`. Rejecting is done once,
   conservatively, with the body's writes forgotten; following is separate and refuses nothing. It
-  gives up — on `EXIT`, on a trap, on an undecidable value, on a budget — and giving up costs only
-  precision that was never there.
+  gives up — on `EXIT`, on a trap, on an undecidable value, on `maxSteps` — and giving up costs
+  only precision that was never there. Two builder settings look alike and are opposites:
+  `maxSteps` bounds how hard the compiler tries and **never** changes what compiles, while
+  `maxLoops` is a policy about programs and does. Do not let the first grow into the second — a
+  refusal that means "I stopped looking" is the one refusal in this language that cannot name an
+  edit.
 - **A condition the compiler can answer is an error, and "can answer" is flow-sensitive.** `n = 5`
   followed by `IF n > 10` is rejected: the variable is not constant, but it is settled where the
   condition reads it, and almost nobody writes `IF FALSE` — the literal case alone would be a

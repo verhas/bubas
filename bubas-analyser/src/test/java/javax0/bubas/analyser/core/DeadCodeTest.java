@@ -502,4 +502,116 @@ class DeadCodeTest {
                     .isNull();
         }
     }
+
+    @Nested
+    @DisplayName("the two limits, which do opposite things")
+    class Limits {
+
+        private String reject(long maxSteps, long maxLoops, String body) {
+            final var language = BubasLanguage.builder()
+                    .install(Standard::register)
+                    .defineStatement("SHOW {initialized > var:value}", Scramble.class)
+                    .defineFunction("QUIET", Quiet.class)
+                    .maxSteps(maxSteps)
+                    .maxLoops(maxLoops)
+                    .seal();
+            final var thrown = catchThrowableOfType(BubasException.class,
+                    () -> language.compile("PROGRAM P\n" + body + "\nEND."));
+            return thrown == null ? null : thrown.getMessage();
+        }
+
+        private static final String COUNTS_TWENTY = """
+                DECLARE i INTEGER
+                DECLARE n INTEGER
+                n = 0
+                FOR i = 1 TO 20
+                    n = n + 1
+                END FOR
+                IF n = 20 THEN
+                    n = 1
+                END IF
+                SHOW n""";
+
+        @Test
+        void a_loop_inside_both_limits_is_followed_and_its_answer_used() {
+            assertThat(reject(10_000, 100, COUNTS_TWENTY))
+                    .as("the walk reached the end, so the IF below it is decided")
+                    .isEqualTo("this condition is always TRUE, so nothing after this arm can run; "
+                            + "delete the IF and keep its body");
+        }
+
+        @Test
+        void over_maxLoops_is_refused() {
+            assertThat(reject(10_000, 5, COUNTS_TWENTY))
+                    .isEqualTo("this loop takes more than 5 passes, over what this language "
+                            + "allows");
+        }
+
+        @Test
+        void running_out_of_maxSteps_refuses_nothing() {
+            assertThat(reject(5, Long.MAX_VALUE, COUNTS_TWENTY))
+                    .as("not knowing how long a loop takes is not a fault to report")
+                    .isNull();
+        }
+
+        @Test
+        void a_policy_fires_without_waiting_for_the_loop_to_end() {
+            // Six passes are enough to prove the loop is over a limit of five, and the walk stops
+            // there. Waiting for the end would mean a loop of a billion passes could never be
+            // refused, because maxSteps would stop the walk first.
+            assertThat(reject(20, 5, COUNTS_TWENTY))
+                    .isEqualTo("this loop takes more than 5 passes, over what this language "
+                            + "allows");
+        }
+
+        @Test
+        void the_allowance_is_fresh_for_each_top_level_loop() {
+            // Two loops of twenty passes each. A budget shared across the compilation would leave
+            // the second one unfollowed and its IF undecided; a fresh one decides both.
+            assertThat(reject(60, Long.MAX_VALUE, """
+                    DECLARE i INTEGER
+                    DECLARE n INTEGER
+                    DECLARE m INTEGER
+                    n = 0
+                    m = 0
+                    FOR i = 1 TO 20
+                        n = n + 1
+                    END FOR
+                    FOR i = 1 TO 20
+                        m = m + 1
+                    END FOR
+                    IF m = 20 THEN
+                        m = 1
+                    END IF
+                    SHOW n
+                    SHOW m"""))
+                    .isEqualTo("this condition is always TRUE, so nothing after this arm can run; "
+                            + "delete the IF and keep its body");
+        }
+
+        @Test
+        void a_loop_the_compiler_cannot_follow_is_never_measured_against_the_policy() {
+            assertThat(reject(10_000, 2, """
+                    DECLARE n INTEGER
+                    DECLARE limit INTEGER
+                    n = 0
+                    limit = QUIET(1000)
+                    DO WHILE n < limit
+                        n = n + 1
+                    END DO
+                    SHOW n"""))
+                    .as("a thousand passes, and the policy of two says nothing about them")
+                    .isNull();
+        }
+
+        @Test
+        void neither_limit_accepts_nonsense() {
+            assertThat(catchThrowableOfType(BubasDefinitionException.class,
+                    () -> BubasLanguage.builder().maxSteps(0)).getMessage())
+                    .isEqualTo("the compiler needs at least one step, not 0");
+            assertThat(catchThrowableOfType(BubasDefinitionException.class,
+                    () -> BubasLanguage.builder().maxLoops(0)).getMessage())
+                    .isEqualTo("a loop needs at least one pass, not 0");
+        }
+    }
 }

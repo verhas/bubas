@@ -42,12 +42,17 @@ public final class BubasLanguage {
     private final Map<Class<?>, Map<String, Object>> services;
     private final Map<String, Class<?>> documentedBy;
     private final MathContext mathContext;
+    private final long maxSteps;
+    private final long maxLoops;
 
     private BubasLanguage(Vocabulary vocabulary, ConstraintResolver constraints,
                           Map<String, BubasType.Opaque> opaqueTypes,
                           Map<String, FunctionSignature> functions, List<CommandDefinition> commands,
                           Map<Class<?>, Map<String, Object>> services,
-                          Map<String, Class<?>> documentedBy, MathContext mathContext) {
+                          Map<String, Class<?>> documentedBy, MathContext mathContext,
+                          long maxSteps, long maxLoops) {
+        this.maxSteps = maxSteps;
+        this.maxLoops = maxLoops;
         this.documentedBy = Map.copyOf(documentedBy);
         this.mathContext = mathContext;
         this.vocabulary = vocabulary;
@@ -82,6 +87,16 @@ public final class BubasLanguage {
      */
     public MathContext mathContext() {
         return mathContext;
+    }
+
+    /** How hard the compiler may try to follow a loop. Never changes which programs compile. */
+    public long maxSteps() {
+        return maxSteps;
+    }
+
+    /** How many passes a loop may take, when the compiler can prove how many it takes. */
+    public long maxLoops() {
+        return maxLoops;
     }
 
     public static Builder builder() {
@@ -150,7 +165,7 @@ public final class BubasLanguage {
         final var program = StatementParser.parse(Lexer.lex(source), this);
         final var symbols = FlowAnalyser.check(program, this);
         final var core = ConstantFolding.fold(Lowering.lower(program, this, symbols), mathContext);
-        DeadCode.check(core, mathContext);
+        DeadCode.check(core, mathContext, maxSteps, maxLoops);
         return new BubasProgram(this, core);
     }
 
@@ -163,6 +178,8 @@ public final class BubasLanguage {
         /** An opaque type's BUBAS name to the interface holding its documentation. */
         private final Map<String, Class<?>> documentedBy = new LinkedHashMap<>();
         private MathContext mathContext = MathContext.DECIMAL128;
+        private long maxSteps = 100_000;
+        private long maxLoops = Long.MAX_VALUE;
         private boolean skipOverlapAnalysis;
         private Mode mode = Mode.DEFINE;
 
@@ -377,6 +394,60 @@ public final class BubasLanguage {
         }
 
         /**
+         * How much work the compiler may spend following a loop before it gives up on that loop.
+         * <p>
+         * <strong>This never changes which programs compile.</strong> Running out means the
+         * compiler stops trying to work the loop out and falls back to assuming it knows nothing
+         * about what the loop wrote — the same answer it gives for a loop whose values come from
+         * outside. It is a knob on how long a compilation may take, not on what the language
+         * accepts, and an embedder who never touches it loses nothing but precision on loops that
+         * were expensive to follow anyway.
+         * <p>
+         * Counted the way {@code Interpreter.maxSteps} counts, and reset for each top-level loop, so
+         * one expensive loop cannot spend the allowance the next one needed.
+         *
+         * @throws IllegalArgumentException if not positive
+         */
+        public Builder maxSteps(long steps) {
+            if (steps <= 0) {
+                throw new BubasDefinitionException("the compiler needs at least one step, not "
+                        + steps);
+            }
+            this.maxSteps = steps;
+            return this;
+        }
+
+        /**
+         * How many passes a loop may take. Unlimited by default.
+         * <p>
+         * <strong>This does change which programs compile</strong>, and is the opposite kind of
+         * setting from {@link #maxSteps(long)}. It is a policy about programs: where the compiler
+         * can follow a loop to its end it knows exactly how many passes it takes, and refuses the
+         * program when that is over the limit, naming the number.
+         * <p>
+         * It says nothing about a loop the compiler cannot follow — one counting over a list whose
+         * length arrives from a service is never checked, and only {@code Interpreter.maxSteps}
+         * bounds that. So this catches the loop somebody could have counted by reading, and misses
+         * the one that surprises you. It is worth having for the first, not to be relied on for the
+         * second.
+         * <p>
+         * It is reported the moment the count passes the limit rather than when the loop ends: by
+         * then the compiler has walked that many passes with values it holds, which is proof enough,
+         * and waiting for the end would mean a loop of a billion passes could never be refused. A
+         * loop {@link #maxSteps(long)} stopped it from reaching is not measured at all — that is an
+         * absence of knowledge, and it refuses nothing.
+         *
+         * @throws IllegalArgumentException if not positive
+         */
+        public Builder maxLoops(long passes) {
+            if (passes <= 0) {
+                throw new BubasDefinitionException("a loop needs at least one pass, not " + passes);
+            }
+            this.maxLoops = passes;
+            return this;
+        }
+
+        /**
          * Overlap analysis is conservative, so it can reject a pair that would never collide. Skip
          * it for startup cost in production, or for a grammar whose author knows better — not
          * because it complained once.
@@ -423,7 +494,7 @@ public final class BubasLanguage {
                 new OverlapAnalysis(vocabulary).check(patterns);
             }
             return new BubasLanguage(vocabulary, constraints, types, signatures, definitions,
-                    services, documentedBy, mathContext);
+                    services, documentedBy, mathContext, maxSteps, maxLoops);
         }
 
         /**

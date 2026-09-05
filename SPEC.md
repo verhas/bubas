@@ -769,6 +769,9 @@ Reading a variable requires it to be `INITIALIZED` on every path reaching that p
 - a block with no statements in it: a loop body, an `IF` or `ELSEIF` arm, or an `ELSE`
 - a decided expression that cannot be computed: overflow, division or `MOD` by zero — wherever it
   is written, whether or not control could reach it
+- a loop the compiler could follow that takes more passes than `maxLoops` allows, when the
+  language sets one. Reported as soon as the count passes the limit, since by then the compiler has
+  walked that many passes on values it holds; a loop it could not follow that far is not measured
 - a declared variable that is never read
 - a path that reaches the end of a program declaring `RETURNS` without returning a value
 - any type or assignability violation
@@ -1288,6 +1291,8 @@ BubasLanguage lang = BubasLanguage.builder()
                      Validate.class)
 
     .mathContext(new MathContext(16, RoundingMode.HALF_UP))
+    .maxSteps(100_000)                  // how hard the compiler tries
+    .maxLoops(1_000_000)                // how long a loop a program may contain
 
     .extensions()
         .classloader(pluginClassLoader)
@@ -1394,6 +1399,32 @@ A bundle is a method the embedder names explicitly; discovery finds candidates o
 Both end at the same `define` calls, and both are opt-in, but only one of them is a name the
 embedder wrote down. The `extensions()` selector in the example above is planned and
 not implemented; [§10.5](#105-extensions-and-discovery) records why it may stay that way.
+
+#### 10.3.4. What a compilation may spend
+
+Two settings that look alike and are opposites.
+
+**`maxSteps(long)`** is how much work the compiler may spend following one loop before it gives up
+on that loop. **It never changes which programs compile.** Giving up means falling back to assuming
+nothing is known about what the loop wrote — the same answer a loop whose values come from outside
+gets. Counted as `Interpreter.maxSteps` counts, and reset for each top-level loop, so one expensive
+loop cannot spend the allowance the next one needed. Defaults to 100,000.
+
+**`maxLoops(long)`** is how many passes a loop may take, and **it does change which programs
+compile**. It is a policy about programs rather than about compilation: where the compiler follows a
+loop, it knows how many passes that loop takes, and refuses the program when that is over the limit.
+Unlimited by default.
+
+The two are independent, and deliberately. Running out of `maxSteps` refuses nothing, because not
+knowing how long a loop takes is an absence of knowledge rather than a fault. Exceeding `maxLoops`
+refuses, because walking that many passes on values the compiler holds is proof that the loop takes
+at least that many.
+
+> **What this does not do.** The check sees only loops whose every value is known while compiling —
+> the ones a reviewer could have counted by reading. A loop over a list whose length arrives from a
+> service is never measured, and only [`Interpreter.maxSteps`](#1041-what-a-run-may-spend) bounds
+> that. It catches the safe case and misses the dangerous one, which is worth knowing before relying
+> on it.
 
 ### 10.4. Compiling and running
 
