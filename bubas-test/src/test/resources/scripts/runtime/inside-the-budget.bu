@@ -1,0 +1,15 @@
+'OK
+' A run that stays inside its budget cannot tell the budget is there.
+' MAX-STEPS: 200
+' MAX-ARRAY: 100
+PROGRAM P
+    DECLARE i INTEGER
+    DECLARE n INTEGER
+    DECLARE room[10] INTEGER
+    n = 0
+    FOR i = 1 TO 20
+        n = n + 1
+    END FOR
+    ASSERT "the loop ran to the end", n = 20
+    ASSERT "and the array was allowed", LENGTH(room) = 10
+END.

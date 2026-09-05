@@ -1,0 +1,12 @@
+'RUN-TIME-ERROR
+' A single enormous array is refused before the memory is taken, by the command that would
+' have taken it.
+' MAX-ARRAY: 100
+' ERROR: over this run's limit of 100
+' LINE: 10
+PROGRAM P
+    DECLARE wanted INTEGER
+    wanted = MIRROR(5000)
+    DECLARE big[wanted] INTEGER
+    ASSERT "unreachable", LENGTH(big) = 0
+END.

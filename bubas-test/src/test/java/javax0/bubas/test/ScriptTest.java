@@ -53,20 +53,36 @@ class ScriptTest {
             case RUN_TIME_ERROR -> {
                 final var program = compiled(source, expectation);
                 check(expectation, "run", catchThrowableOfType(BubasException.class,
-                        () -> Interpreter.of(program).logger((level, message) -> {
-                        }).run()));
+                        () -> interpreter(program, expectation).run()));
             }
             case OK -> {
                 final var program = compiled(source, expectation);
                 final var thrown = catchThrowableOfType(BubasException.class,
-                        () -> Interpreter.of(program).logger((level, message) -> {
-                        }).run());
+                        () -> interpreter(program, expectation).run());
                 if (thrown != null) {
                     fail(describe(expectation) + " was expected to run cleanly but failed:\n"
                             + thrown.getDiagnostic());
                 }
             }
         }
+    }
+
+    /**
+     * A script runs unbounded unless its header says otherwise, so {@code MAX-STEPS} and
+     * {@code MAX-ARRAY} are how the corpus reaches the two things the interpreter can refuse for
+     * reasons that are nothing to do with the program being wrong.
+     */
+    private static Interpreter interpreter(javax0.bubas.analyser.BubasProgram program,
+                                           Expectation expectation) {
+        final var interpreter = Interpreter.of(program).logger((level, message) -> {
+        });
+        if (expectation.maxSteps() != null) {
+            interpreter.maxSteps(expectation.maxSteps());
+        }
+        if (expectation.maxArray() != null) {
+            interpreter.maxArrayLength(expectation.maxArray());
+        }
+        return interpreter;
     }
 
     private static javax0.bubas.analyser.BubasProgram compiled(String source,

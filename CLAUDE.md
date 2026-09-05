@@ -256,7 +256,13 @@ adding one file and nothing else:
 ' What this script is for, in a sentence.
 ' ERROR: a fragment the diagnostic must contain
 ' LINE: 8
+' MAX-STEPS: 50               ' optional: run it under a step budget
+' MAX-ARRAY: 100              ' optional: run it under an array limit
 ```
+
+`MAX-STEPS` and `MAX-ARRAY` set the interpreter's limits for that script and are the only way the
+corpus can reach a failure that is about the run's budget rather than about the program being wrong.
+Without them a script runs unbounded, which is what nearly every script wants.
 
 `ERROR` and `LINE` are optional but expected for the two failing outcomes — asserting only that
 compilation failed is exactly the insufficiency rule 1 is about. An `'OK` script proves itself with

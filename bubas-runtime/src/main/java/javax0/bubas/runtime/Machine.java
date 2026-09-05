@@ -419,8 +419,10 @@ final class Machine implements StatementContext {
      * whatever the body happens to cost.
      */
     private void step() {
-        if (++steps > limits.steps()) {
-            throw fail("this run has taken more than " + limits.steps()
+        // Through the accessor rather than the field: what the budget is has one answer, and a
+        // handler asking gets the same one the check uses.
+        if (++steps > maxSteps()) {
+            throw fail("this run has taken more than " + maxSteps()
                     + " steps and has been stopped");
         }
     }

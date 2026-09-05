@@ -144,7 +144,7 @@ public final class Interpreter {
      * it can be as large as whatever computed {@code n}, and a wrong figure from a service is an
      * allocation the application never intended.
      * <p>
-     * A command has to ask, through {@link javax0.bubas.api.Context#maxArrayLength()}, because the
+     * A command has to ask, through {@link javax0.bubas.api.CoreContext#maxArrayLength()}, because the
      * only useful moment to refuse is before the memory is taken. The standard {@code DECLARE}
      * asks; a vocabulary with its own array-making statement should too.
      *

@@ -26,8 +26,11 @@ public interface CoreContext {
     MathContext mathContext();
 
     /**
-     * How many statements and loop passes are left to spend, or {@link Long#MAX_VALUE} when nothing
-     * set a limit.
+     * The most this may spend, counted in statements executed and loop passes taken, or
+     * {@link Long#MAX_VALUE} when nothing set a limit.
+     * <p>
+     * The limit, not the remainder: it answers "what was I given", not "what is left". A caller
+     * wanting to know how close it is would need something else, and nothing has asked yet.
      * <p>
      * Here rather than on {@link Context} because a budget belongs to whoever is doing the work, and
      * that is not always the interpreter. The compiler already calls

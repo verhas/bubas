@@ -1,0 +1,14 @@
+'RUN-TIME-ERROR
+' A run that will not finish is stopped at the budget it was given, rather than never.
+' The condition comes through MIRROR so the compiler cannot answer it and refuse the loop.
+' MAX-STEPS: 50
+' ERROR: more than 50 steps
+' LINE: 11
+PROGRAM P
+    DECLARE n INTEGER
+    n = MIRROR(0)
+    DO WHILE n >= 0
+        n = n + 1
+    END DO
+    ASSERT "unreachable", n = 0
+END.
