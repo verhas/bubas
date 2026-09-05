@@ -346,6 +346,11 @@ A loop that cannot run at all is refused: `FOR line = 5 TO 1` counts backwards w
 to, and its body is text nobody will ever execute. So is a step of zero, which would never finish.
 So is a `DO WHILE` whose condition is decided before the first pass.
 
+So is a loop with nothing in it. A body you have emptied out is a shape left behind after the
+contents were deleted, and the only reading under which it means anything is one where the work
+happens inside the condition — which is the kind of cleverness a rule should never contain. The same
+goes for an `IF` arm and an `ELSE`: write what belongs there, or delete the construct.
+
 A loop that cannot stop is refused too — a condition that stays true with no `EXIT` anywhere inside
 it. `DO WHILE TRUE` is perfectly good BUBAS as long as something in the body leaves; what is refused
 is the version where nothing does.

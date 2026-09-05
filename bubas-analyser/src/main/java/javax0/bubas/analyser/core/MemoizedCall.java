@@ -99,6 +99,28 @@ final class MemoizedCall {
             return mathContext;
         }
 
+        /**
+         * Nothing bounds a compile-time call today, because nothing it can do is unbounded: a
+         * memoizable function is called once, on values already in hand, and whatever it does inside
+         * itself is its own affair.
+         * <p>
+         * This becomes a real number the day the compiler works out a loop rather than an
+         * expression. Following a loop whose every value it can see means executing it, and a
+         * compiler that executes must be bounded for the reason a run must: the program may be
+         * wrong. When that arrives the budget arrives here, and callers already ask the right
+         * question.
+         */
+        @Override
+        public long maxSteps() {
+            return Long.MAX_VALUE;
+        }
+
+        /** Arrays are never compile-time values, so nothing here can allocate one. */
+        @Override
+        public int maxArrayLength() {
+            return Integer.MAX_VALUE;
+        }
+
         @Override
         public void log(String level, String message) {
             // Deliberately nowhere. See the note above the record.

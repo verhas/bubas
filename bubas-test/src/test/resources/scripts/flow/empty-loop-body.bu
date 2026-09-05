@@ -1,0 +1,12 @@
+'NO-COMPILE
+' A loop with nothing in it does nothing but test its condition again. Whatever was there was
+' deleted and the shape left behind.
+' ERROR: empty body
+' LINE: 9
+PROGRAM P
+    DECLARE n INTEGER
+    n = MIRROR(0)
+    DO WHILE n < 3
+    END DO
+    ASSERT "unreachable", n = 3
+END.

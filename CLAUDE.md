@@ -36,6 +36,17 @@ mistaken for oversights:
   the `MathContext` is sealed into the `BubasLanguage` — which is also why a folded constant
   belongs to the program and the language together, not to the source. See
   [`CONSTANTS.md`](CONSTANTS.md).
+- **A run's limits are per run, and the array limit is one a command has to ask for.**
+  `maxSteps` counts statements *and* loop passes, because a pass is work in its own right — a
+  `WHILE` evaluates its condition, a `FOR` moves and tests its counter — and pricing that at
+  whatever the body happens to contain would be arbitrary. `maxArrayLength` cannot be enforced by
+  the runtime on a command's behalf: an array that has reached a variable is memory already spent,
+  so the only useful moment to refuse is inside the command, before `Array.newInstance`. That makes
+  it an obligation on any vocabulary that allocates, the same shape as a handler having to be
+  thread-safe. Both default to unlimited, and neither changes what a program means. Both are read
+  from `CoreContext`, not `Context`: a budget belongs to whoever is doing the work, and the compiler
+  will one day be doing some of it — an analysis that follows a loop it can see through is executing
+  it, and needs bounding for the reason a run does.
 - **Purity is declared, never inferred: `@BubasMemoizable` is what lets the compiler call a function.**
   Nothing about a signature says whether it reads a clock or a database, so an unannotated function
   is opaque however pure it looks. One part of the claim is a type and not a promise: a static

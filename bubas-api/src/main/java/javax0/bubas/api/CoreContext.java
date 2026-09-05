@@ -25,6 +25,29 @@ public interface CoreContext {
      */
     MathContext mathContext();
 
+    /**
+     * How many statements and loop passes are left to spend, or {@link Long#MAX_VALUE} when nothing
+     * set a limit.
+     * <p>
+     * Here rather than on {@link Context} because a budget belongs to whoever is doing the work, and
+     * that is not always the interpreter. The compiler already calls
+     * {@linkplain BubasMemoizable memoizable} functions while it compiles, and the day it works out
+     * a loop whose every value it can follow, it is executing something and needs a bound on it for
+     * the same reason a run does. A {@code Context} is not available there; this is.
+     */
+    long maxSteps();
+
+    /**
+     * The largest array that may be brought into existence, or {@link Integer#MAX_VALUE} when
+     * nothing set a limit.
+     * <p>
+     * A command that allocates has to ask. Nothing can enforce this on its behalf: by the time an
+     * array reaches a variable the memory is already spent, so the only useful place to refuse is
+     * before {@code Array.newInstance}, inside the command that calls it. {@code DECLARE a[n] T}
+     * asks, and a vocabulary with its own array-making statement should too.
+     */
+    int maxArrayLength();
+
     void log(String level, String message);
 
     void debug(String message);

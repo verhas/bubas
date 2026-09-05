@@ -179,11 +179,12 @@ the whole idea gets dismissed. An operation you expose can do anything Java can 
 `RUN_SHELL_COMMAND` is a perfectly registrable operation. The vocabulary is only as narrow as the
 operations you chose, and choosing them badly gets you exactly the exposure you were avoiding.
 
-**There are no resource limits yet.** A program can still loop forever. This is a gap rather than a
-decision: the interpreter walks the program one statement at a time, so a step budget or a deadline
-is a small addition rather than a redesign, and it will go in when somebody needs it. Until then,
-untrusted input needs the containment any untrusted workload needs. Chapter 33 is honest about
-this at length.
+**Resource limits are shallower than they look.** A run can be given a step budget and a cap on
+what a single array may allocate, and both are one line each on the interpreter — chapter 28 shows
+them. What is not there is a deadline: an operation you registered that blocks for an hour blocks
+for an hour, because the budget counts what the *program* does and that call is one step. Untrusted
+input still needs the containment any untrusted workload needs. Chapter 33 is honest about where
+the line now falls.
 
 What you get is narrower than "safe" and more useful than it sounds: the set of things a program
 can name is finite, written down, and reviewable by a human before anything is written at all.

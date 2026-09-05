@@ -765,6 +765,7 @@ Reading a variable requires it to be `INITIALIZED` on every path reaching that p
   for an enclosing loop, or a `RETURN`
 - a loop whose decided condition stops it: a body that never runs, or runs exactly once
 - a `FOR` whose decided bounds and step cannot iterate, or whose decided step is zero
+- a block with no statements in it: a loop body, an `IF` or `ELSEIF` arm, or an `ELSE`
 - a decided expression that cannot be computed: overflow, division or `MOD` by zero — wherever it
   is written, whether or not control could reach it
 - a declared variable that is never read
@@ -1403,6 +1404,8 @@ for (long id : orderIds) {
         .argument("orderId", id)
         .argument("region", "EU")
         .registerService(Transaction.class, tx)
+        .maxSteps(1_000_000)
+        .maxArrayLength(100_000)
         .run();
 
     if (result.asBoolean()) { ... }
@@ -1411,7 +1414,30 @@ for (long id : orderIds) {
 
 `run()` may be called once per `Interpreter`; a second call throws.
 
-#### 10.4.1. Interception
+#### 10.4.1. What a run may spend
+
+Both limits are per run and both are unlimited by default. Neither changes what a program means: a
+run inside them cannot tell they are there, and a run outside them is stopped rather than answered
+wrongly. Exceeding either is an ordinary runtime error, naming the line.
+
+- **`maxSteps(long)`** counts statements executed and loop passes taken, together. A pass costs a
+  step of its own because it is work: a `WHILE` evaluates its condition and a `FOR` moves and tests
+  its counter, whatever the body contains. The compiler already refuses the loops it can prove never
+  end ([§8.3](#83-rejected-at-compile-time)); this bounds the ones whose condition depends on what a
+  service answered.
+
+Both are read from `CoreContext` rather than `Context`, because a budget belongs to whoever is doing
+the work and that is not always the interpreter. The compiler already calls
+[`@BubasMemoizable`](#103-building-a-language) functions while it compiles, and an analysis that
+follows a loop whose every value it can see is executing something that needs bounding for the same
+reason a run does. A `Context` is not available there; a `CoreContext` is.
+- **`maxArrayLength(int)`** is the largest array a command may bring into existence, read through
+  `CoreContext.maxArrayLength()`. **A command that allocates has to ask.** The runtime cannot enforce it
+  on the command's behalf: by the time an array reaches a variable the memory is already spent, so
+  the only useful place to refuse is before the allocation, inside the command making it.
+  `DECLARE a[n] T` asks; a vocabulary with its own array-making statement must too.
+
+#### 10.4.2. Interception
 
 An interpreter may be given a `BubasCallInterceptor`, which answers for a function or a command in
 place of its implementation:
@@ -1582,6 +1608,8 @@ why it gets a richer context.
 ```java
 public interface CoreContext {
     MathContext mathContext();
+    long maxSteps();                                // what the work may spend
+    int  maxArrayLength();                          // what it may allocate
     void log(String level, String message);
     void debug(String message);
     void error(String message);                     // throws BubasException

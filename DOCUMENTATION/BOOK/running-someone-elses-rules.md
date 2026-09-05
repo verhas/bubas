@@ -1,7 +1,7 @@
 # Running someone else's rules
 
 <!-- abstract -->
-Everything left: resource limits and the fact that BUBAS does not yet have them, auditing the
+Everything left: resource limits, what they now bound and what they still do not, auditing the
 decisions a rule made and why, observability, and what containment untrusted input still needs.
 Ends with the complete application assembled.
 <!-- /abstract -->
@@ -25,22 +25,33 @@ is more useful than implying otherwise.
 
 ## The gap, stated plainly
 
-**There is no execution limit.** A program can loop forever and nothing will stop it. There is no
-step budget, no deadline, no fuel.
+Some of what this chapter used to call missing is now there, and the part that remains is the harder
+part.
 
-**There is no memory bound.** `DECLARE lines[n] Item` allocates whatever `n` says.
+**A run can be bounded.** `maxSteps` stops a program that loops forever; `maxArrayLength` refuses the
+single enormous `DECLARE lines[n] Item`. Both are per run, both default to off, and a rule that has
+never been given a budget still runs until it finishes. Chapter 28 shows the two lines.
 
-Neither is hard to add — the interpreter walks the program one statement at a time, so a budget is
-a counter and a deadline is a comparison, not a redesign. They are simply not there.
+**There is still no deadline.** The budget counts steps the program takes, and a call into an
+operation you registered is one step however long it blocks. An untrusted rule cannot spin, but it
+can call `LOAD_CLAIM` in a loop and make your database do the spinning.
 
-Until they are, an untrusted rule needs what any untrusted workload needs: its own thread, watched
-from outside, with a hard decision about what to do when it will not stop. That is unpleasant on the
-JVM and there is no version of it that is comfortable. A process boundary is more honest if the
-scale justifies it.
+**The memory bound is per array.** It stops one absurd allocation, not a thousand ordinary ones.
 
-The honest summary: **BUBAS bounds what a rule can name, not what it can consume.** For the first
-two degrees of trust that is enough, because a colleague who writes an infinite loop is a colleague
-you can talk to. For the third it is not, and this is the thing to fix before you get there.
+**And nothing bounds what an operation does.** This is the real remainder, and no limit on the
+interpreter reaches it: the vocabulary is your code, and a rule can only call what you exposed. That
+is a design property rather than a gap, but it means the budget protects you from the *program* and
+not from the *vocabulary*.
+
+So an untrusted rule still needs a thread you watch from outside, with a hard decision about what to
+do when it will not stop — but the decision now arrives for a narrower set of reasons, and a rule
+that merely loops is no longer one of them. A process boundary is still more honest if the scale
+justifies it.
+
+The honest summary has moved by one word: **BUBAS bounds what a rule can name, and now bounds some
+of what it can consume.** For the first two degrees of trust that was already enough. For the third
+it is closer, and the remaining distance is a deadline and a way to bound the operations
+themselves.
 
 ## Auditing decisions
 

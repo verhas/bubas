@@ -1,0 +1,11 @@
+'NO-COMPILE
+' An arm with nothing in it says only that somebody stopped writing.
+' ERROR: this arm is empty
+' LINE: 8
+PROGRAM P
+    DECLARE n INTEGER
+    n = MIRROR(1)
+    IF n > 0 THEN
+    END IF
+    ASSERT "unreachable", n = 1
+END.

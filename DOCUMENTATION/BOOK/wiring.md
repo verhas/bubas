@@ -90,6 +90,33 @@ The cost is that a service forgotten is discovered when a handler asks for it. R
 set in one place — a small factory that turns a claim into a configured interpreter — is worth doing
 on the first day rather than the fortieth.
 
+## What a run is allowed to spend
+
+Two things an application can cap, and both belong on the interpreter because both vary by caller —
+a nightly batch and a request handler do not deserve the same budget:
+
+```java
+Interpreter.of(program)
+        .maxSteps(1_000_000)
+        .maxArrayLength(100_000)
+```
+
+`maxSteps` counts statements executed and loop passes taken. Chapter 8's compiler already refuses
+the loops it can *prove* never end, but a loop that stops when a service says so is not one of those,
+and the service can be wrong. `maxArrayLength` caps what a single `DECLARE items[n] Order` may bring
+into existence, which matters because `n` is an expression and a wrong figure from upstream is an
+allocation nobody intended.
+
+Both are unlimited unless you say otherwise, and a run inside its budget cannot tell they are there.
+Set them anyway. A rule is written by somebody who is not thinking about budgets, which is the
+arrangement this whole book argues for, and it only works if somebody else is.
+
+One obligation comes with the second. **A command that allocates has to ask** — the array limit is
+readable through `CoreContext.maxArrayLength()`, and the standard `DECLARE` consults it before taking
+the memory. The runtime cannot do this for you: an array that has arrived in a variable is already
+allocated, so a check there would catch the mistake after paying for it. If chapter 24's vocabulary
+grows a statement that makes an array, it asks first.
+
 ## Rounding, which is not per run
 
 One setting deliberately does not go on the interpreter:

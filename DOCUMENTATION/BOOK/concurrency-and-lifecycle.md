@@ -73,20 +73,23 @@ run once and is run again on a redelivered message will do its side effects twic
 no notion of a transaction. Idempotency is the application's problem, and the place to solve it is
 in the handlers or around the consumer — not in the rule, which should not know that queues exist.
 
-## What has no answer yet
+## What has an answer, and what has not
 
-Two gaps, stated plainly because a book should not leave them to be discovered.
+**A run can be bounded, and by default is not.** `maxSteps` on the interpreter counts statements
+executed and loop passes taken, so a rule that loops forever stops at a number you chose rather than
+never. `maxArrayLength` caps what a single `DECLARE lines[n] Item` may bring into existence, which
+is the allocation an expression-sized array otherwise makes without anybody agreeing to it. Chapter
+28 shows both. They are unlimited unless you set them, so a program that has never been bounded is
+still a program that can loop forever — the default is the gap, not the mechanism.
 
-**There is no timeout, and no step budget.** A program can loop forever, and nothing will stop it.
-The interpreter walks the program one statement at a time, so a budget or a deadline is a small
-addition rather than a redesign — but it is not there. Until it is, a rule from an untrusted source
-needs the containment any untrusted workload needs: its own thread, watched from outside, with the
-usual unpleasantness about what to do when it will not stop. Chapter 33 is about the wider version
-of this.
+**There is still no deadline.** The budget counts what the program does, and an operation you
+registered that blocks for an hour is one step. A rule that calls a slow service is slow, and no
+number stops that. If you need a wall clock, it is your thread and your timeout, outside all of
+this.
 
-**There is no memory bound.** An array sized from an expression is sized at runtime, and nothing
-checks that the size is sane. `DECLARE lines[n] Item` with a large `n` allocates. For rules your own
-team writes this is a non-issue; for anything else it is the same containment problem.
+**And the memory bound is per array, not per run.** Ten thousand small arrays, each inside the cap,
+are ten thousand arrays. The limit stops the single absurd allocation, which is the mistake that
+actually happens; it is not a heap quota.
 
-Neither is hard to live with when the rules come from colleagues. Both matter as soon as they do
-not, which is precisely the case the last two chapters take up.
+The shape of it: a rule from a colleague who wrote a slow loop is now a rule that stops. A rule
+written to exhaust you is a different problem, and the last two chapters take it up.

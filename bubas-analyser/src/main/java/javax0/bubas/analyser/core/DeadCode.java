@@ -32,6 +32,9 @@ import java.util.Set;
  * was handed, so the analysis assumes the worst rather than trusting a postcondition the runtime
  * does not enforce.
  * <p>
+ * It also refuses a block with nothing in it, which needs none of that machinery and is here
+ * because this is where the refusals live.
+ * <p>
  * Being wrong in that direction is the only safe way to be wrong. A value believed and not held
  * would reject a correct program; a value forgotten only lets a mistake through.
  */
@@ -92,7 +95,13 @@ public final class DeadCode {
                         + "delete the IF and keep its body"
                         : "this condition is always FALSE, so this arm cannot run; delete it");
             }
+            empty(arm.body(), arm.line(), "this arm is empty, so the test above it decides "
+                    + "nothing; delete the arm, or write what belongs in it");
             exits.add(statements(arm.body(), known));
+        }
+        if (branch.otherwise() != null) {
+            empty(branch.otherwise(), branch.line(), "this ELSE is empty, so it says only that "
+                    + "the author stopped; delete it, or write what belongs in it");
         }
         exits.add(branch.otherwise() == null ? known : statements(branch.otherwise(), known));
         return merge(exits);
@@ -115,6 +124,8 @@ public final class DeadCode {
                         : "this condition is always FALSE, so the body cannot run; delete the loop");
             }
         }
+        empty(loop.body(), loop.line(), "this loop has an empty body, so every pass does nothing "
+                + "but test the condition again; delete the loop, or write what it is for");
         statements(loop.body(), inside);
         return inside;
     }
@@ -135,6 +146,8 @@ public final class DeadCode {
             throw error(count.line(), "this counts from " + from + " to " + to + " by " + step
                     + ", so the body cannot run");
         }
+        empty(count.body(), count.line(), "this loop has an empty body, so it counts and does "
+                + "nothing else; delete the loop, or write what it is for");
         final var written = writes(count.body());
         written.add(count.slot());
         final var inside = forget(known, written);
@@ -181,6 +194,20 @@ public final class DeadCode {
             case CoreArgument.Constant constant -> constant.value();
             case null, default -> null;
         };
+    }
+
+    /**
+     * A block with nothing in it is a half-finished edit, not a construct.
+     * <p>
+     * It is never meaningful: the only reading under which an empty loop body does anything is one
+     * where the condition has side effects, and a rule whose behaviour hides in its test is the
+     * cleverness this language exists to keep out. The same goes for an arm and for an {@code ELSE}
+     * — what they say is that somebody deleted the contents and left the shape.
+     */
+    private static void empty(List<CoreStatement> block, LogicalLine line, String message) {
+        if (block.isEmpty()) {
+            throw error(line, message);
+        }
     }
 
     /** Every slot a block might write. Anything handed to a command counts: {@code set} is not guarded. */

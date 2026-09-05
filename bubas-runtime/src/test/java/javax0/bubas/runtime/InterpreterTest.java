@@ -853,4 +853,143 @@ class InterpreterTest {
             assertThat(Interpreter.of(program).run().asLong()).isEqualTo(42);
         }
     }
+
+    @Nested
+    @DisplayName("what one run may spend")
+    class LimitsOnARun {
+
+        /**
+         * Runs a whole program under the given limits, with arguments in declaration order, and
+         * yields what stopped it or null. Whole programs rather than bodies, because a run that has
+         * to keep going needs a condition the compiler cannot answer — which means a parameter.
+         */
+        private BubasException stopped(String source,
+                                       java.util.function.UnaryOperator<Interpreter> limits,
+                                       Object... arguments) {
+            return catchThrowableOfType(BubasException.class, () -> {
+                final var interpreter = Interpreter.of(LANGUAGE.compile(source));
+                for (int i = 0; i < arguments.length; i += 2) {
+                    interpreter.argument((String) arguments[i], arguments[i + 1]);
+                }
+                limits.apply(interpreter.logger((level, message) -> logged.add(message))).run();
+            });
+        }
+
+        @Test
+        void a_run_that_takes_too_many_steps_is_stopped() {
+            final var thrown = stopped("""
+                    PROGRAM P
+                        DECLARE i INTEGER
+                        DECLARE n INTEGER
+                        n = 0
+                        FOR i = 1 TO 1000
+                            n = n + 1
+                        END FOR
+                        LOG_EVENT "INFO", "" + n
+                    END.""", interpreter -> interpreter.maxSteps(50));
+
+            assertThat(thrown).isNotNull();
+            assertThat(thrown.getMessage()).isEqualTo(
+                    "this run has taken more than 50 steps and has been stopped");
+        }
+
+        @Test
+        void a_loop_pass_costs_a_step_of_its_own() {
+            // Three statements, then ten passes of one statement each: 4 + 20 with passes counted,
+            // 14 without. The budget sits between, so this fails only because a pass is a step —
+            // testing the condition and moving the counter is work the program does.
+            final var body = """
+                    PROGRAM P
+                        DECLARE i INTEGER
+                        DECLARE n INTEGER
+                        n = 0
+                        FOR i = 1 TO 10
+                            n = n + 1
+                        END FOR
+                        LOG_EVENT "INFO", "" + n
+                    END.""";
+
+            assertThat(stopped(body, interpreter -> interpreter.maxSteps(18)))
+                    .as("24 steps are taken, so 18 is not enough")
+                    .isNotNull();
+            assertThat(stopped(body, interpreter -> interpreter.maxSteps(25))).isNull();
+        }
+
+        @Test
+        void a_run_inside_its_budget_never_knows_the_limit_is_there() {
+            assertThat(stopped("""
+                    PROGRAM P
+                        DECLARE i INTEGER
+                        DECLARE n INTEGER
+                        n = 0
+                        FOR i = 1 TO 10
+                            n = n + 1
+                        END FOR
+                        LOG_EVENT "INFO", "" + n
+                    END.""", interpreter -> interpreter.maxSteps(1000))).isNull();
+            assertThat(logged).containsExactly("10");
+        }
+
+        @Test
+        void an_array_over_the_limit_is_refused_before_it_is_allocated() {
+            final var thrown = stopped("""
+                    PROGRAM P
+                        DECLARE big[5000] INTEGER
+                        LOG_EVENT "INFO", "" + LENGTH(big)
+                    END.""", interpreter -> interpreter.maxArrayLength(1000));
+
+            assertThat(thrown).isNotNull();
+            assertThat(thrown.getMessage())
+                    .isEqualTo("an array of 5000 elements is over this run's limit of 1000");
+        }
+
+        @Test
+        void an_array_within_the_limit_is_allowed() {
+            assertThat(stopped("""
+                    PROGRAM P
+                        DECLARE small[10] INTEGER
+                        LOG_EVENT "INFO", "" + LENGTH(small)
+                    END.""", interpreter -> interpreter.maxArrayLength(1000))).isNull();
+            assertThat(logged).containsExactly("10");
+        }
+
+        @Test
+        void a_size_computed_during_the_run_is_caught_too() {
+            final var thrown = stopped("""
+                    PROGRAM P(wanted INTEGER)
+                        DECLARE big[wanted] INTEGER
+                        LOG_EVENT "INFO", "" + LENGTH(big)
+                    END.""", interpreter -> interpreter.maxArrayLength(1000), "wanted", 160000L);
+
+            assertThat(thrown).isNotNull();
+            assertThat(thrown.getMessage()).contains("160000 elements is over this run's limit");
+        }
+
+        @Test
+        void neither_limit_applies_unless_it_is_set() {
+            assertThat(stopped("""
+                    PROGRAM P
+                        DECLARE i INTEGER
+                        DECLARE n INTEGER
+                        DECLARE room[100000] INTEGER
+                        n = 0
+                        FOR i = 1 TO 5000
+                            n = n + 1
+                        END FOR
+                        LOG_EVENT "INFO", "" + n + " of " + LENGTH(room)
+                    END.""", interpreter -> interpreter)).isNull();
+            assertThat(logged).containsExactly("5000 of 100000");
+        }
+
+        @Test
+        void a_limit_has_to_make_sense() {
+            final var interpreter = Interpreter.of(LANGUAGE.compile("PROGRAM P\nEND."));
+            assertThat(catchThrowableOfType(IllegalArgumentException.class,
+                    () -> interpreter.maxSteps(0)).getMessage())
+                    .isEqualTo("a run needs at least one step, not 0");
+            assertThat(catchThrowableOfType(IllegalArgumentException.class,
+                    () -> interpreter.maxArrayLength(-1)).getMessage())
+                    .isEqualTo("an array limit cannot be negative: -1");
+        }
+    }
 }

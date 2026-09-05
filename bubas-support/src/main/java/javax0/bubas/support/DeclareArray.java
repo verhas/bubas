@@ -37,6 +37,11 @@ public final class DeclareArray {
         if (length > Integer.MAX_VALUE) {
             ctx.error("an array of " + length + " elements is larger than this runtime can hold");
         }
+        // Asked before the memory is taken, which is the only moment refusing is worth anything.
+        if (length > ctx.maxArrayLength()) {
+            ctx.error("an array of " + length + " elements is over this run's limit of "
+                    + ctx.maxArrayLength());
+        }
         final var array = Array.newInstance(type.javaType(), (int) length);
         if (array instanceof String[] strings) {
             Arrays.fill(strings, "");

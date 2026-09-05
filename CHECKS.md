@@ -232,19 +232,24 @@ public record BlockView(Optional<ExpressionView> condition, List<StatementView> 
 }
 ```
 
-### 5.1. Empty is not absent
+### 5.1. Absent, but never empty
 
-`Branch.otherwise()` is **absent** when the program has no `ELSE`, and **present and empty** when it
-has an `ELSE` containing nothing. A `BlockView`'s `statements()` may likewise be empty.
+`Branch.otherwise()` is **absent** when the program has no `ELSE`, and present when it has one. A
+check may rely on present meaning non-empty: a block with no statements in it does not compile —
+not a loop body, not an arm, not an `ELSE` — so nothing here can be handed one.
 
-The distinction is load-bearing: an arm with an empty body is a thing a check may want to flag, and
-it is unreachable if "no such construct" and "an empty one" render alike.
+`Optional` still earns its place, but for a smaller reason than an earlier draft of this document
+gave. That draft argued the distinction was load-bearing because *"an arm with an empty body is a
+thing a check may want to flag"*, which was true when the language allowed one. It does not: an
+empty block is a half-finished edit, and the compiler says so rather than leaving it for a check
+that may not exist. What remains is the plain question of whether an `ELSE` is there at all, which
+`Optional` answers and an empty list would answer by accident.
 
 ### 5.2. Arms are not flattened
 
 A `Branch` keeps one `BlockView` per `IF`/`ELSEIF` arm, in source order. Flattening the arms
 together would make it impossible to say which statements belong to which condition, how many arms
-there are, or whether an arm is empty.
+there are, or how long the chain a given statement sits at the end of is.
 
 `nested()` exists for walkers that genuinely do not care — a nesting-depth check does not — and
 loses nothing, because the structure remains available on the record.

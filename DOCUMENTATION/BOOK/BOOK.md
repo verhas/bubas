@@ -570,11 +570,11 @@ allow-list argument in full, with its limits stated.
 from: "running-someone-elses-rules.md"
 start: '<!-- abstract'
 end: '<!-- /abstract'
-_content_generated_: 237:md5:ebb95f15c858d07da013b27a6ea6ea11
+_content_generated_: 238:md5:4c16a0d96a6e231a9d11132ca564a68b
 # ⚠️ MANAGED CONTENT: Edits will be lost.
 # danger zone: Delete _content_generated_ to override.
 -->
-Everything left: resource limits and the fact that BUBAS does not yet have them, auditing the
+Everything left: resource limits, what they now bound and what they still do not, auditing the
 decisions a rule made and why, observability, and what containment untrusted input still needs.
 Ends with the complete application assembled.
 <!--/INCLUDE-->

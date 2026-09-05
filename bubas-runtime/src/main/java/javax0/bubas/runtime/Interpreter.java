@@ -30,6 +30,7 @@ public final class Interpreter {
     private final Map<Class<?>, Map<String, Object>> services = new HashMap<>();
     private final Map<String, Integer> parameters = new LinkedHashMap<>();
     private final java.util.Set<String> supplied = new java.util.HashSet<>();
+    private Limits limits = Limits.NONE;
     private BiConsumer<String, String> logger = (level, message) ->
             System.out.println(level + ": " + message);
     private javax0.bubas.api.BubasCallInterceptor interceptor;
@@ -119,6 +120,44 @@ public final class Interpreter {
         return this;
     }
 
+    /**
+     * How many statements and loop passes this run may take, together, before it is stopped.
+     * <p>
+     * Unlimited by default. The compiler refuses the loops it can prove never end, but a loop whose
+     * condition depends on what a service answered is not one of those, and a rule nobody meant to
+     * be expensive can still be. This is the bound an application puts on a run it did not write.
+     *
+     * @throws IllegalArgumentException if not positive
+     */
+    public Interpreter maxSteps(long steps) {
+        if (steps <= 0) {
+            throw new IllegalArgumentException("a run needs at least one step, not " + steps);
+        }
+        this.limits = limits.withSteps(steps);
+        return this;
+    }
+
+    /**
+     * The largest array a command may bring into existence during this run.
+     * <p>
+     * Unlimited by default. An array's size is an expression — {@code DECLARE items[n] Order} — so
+     * it can be as large as whatever computed {@code n}, and a wrong figure from a service is an
+     * allocation the application never intended.
+     * <p>
+     * A command has to ask, through {@link javax0.bubas.api.Context#maxArrayLength()}, because the
+     * only useful moment to refuse is before the memory is taken. The standard {@code DECLARE}
+     * asks; a vocabulary with its own array-making statement should too.
+     *
+     * @throws IllegalArgumentException if negative
+     */
+    public Interpreter maxArrayLength(int length) {
+        if (length < 0) {
+            throw new IllegalArgumentException("an array limit cannot be negative: " + length);
+        }
+        this.limits = limits.withArrayLength(length);
+        return this;
+    }
+
     /** Where {@code ctx.log} goes. Defaults to standard output. */
     public Interpreter logger(BiConsumer<String, String> logger) {
         this.logger = logger;
@@ -144,7 +183,7 @@ public final class Interpreter {
             }
         }
         final var result = new Machine(program.core(), slots, services,
-                program.language().mathContext(), logger, interceptor).run();
+                program.language().mathContext(), limits, logger, interceptor).run();
         return program.returns() == null ? null : new RuntimeValue(program.returns(), result);
     }
 

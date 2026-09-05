@@ -1,0 +1,12 @@
+'NO-COMPILE
+' The same for a counting loop: it counts and does nothing else.
+' ERROR: empty body
+' LINE: 9
+PROGRAM P
+    DECLARE i INTEGER
+    DECLARE n INTEGER
+    n = 0
+    FOR i = 1 TO 4
+    END FOR
+    ASSERT "unreachable", n = 0
+END.

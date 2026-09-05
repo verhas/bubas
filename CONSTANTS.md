@@ -397,6 +397,19 @@ preserves scale and is locale-independent, so it is. This is recorded because it
 constant operation whose output is a `STRING` derived from a `DECIMAL`, and any future change to
 decimal rendering would silently change folded values.
 
+**Whether the analysis should execute a loop rather than forget it.** A loop whose every value it
+can follow is one it could run: with `n = 5`, `limit = 7` and a body of `n = n + 1`, walking the
+iterations settles `n` at 7 and makes the `IF n = 7` below it decided. Everything needed is already
+here — [`Constants.of`](#52-the-evaluator-reads-the-rounding-policy) evaluates in a state,
+[9.2](#92-what-is-learned) updates that state through `@BubasAssigns` — and
+[9.1](#91-what-is-carried) forgets instead only because forgetting is always sound.
+
+Three things gate it. Every statement in the body must be one whose effect is declared, or the state
+is a guess. Every call must be memoizable, or a value is unknown. And the walk must be bounded:
+a loop the analysis can follow but that runs a billion times would hang the compiler, which is why
+`maxSteps` is on `CoreContext` — the budget has to be readable from where the work happens, and that
+is no longer only the interpreter.
+
 **Whether a variadic or wildcard-typed memoizable function should fold.** Both are excluded because
 their arguments cross into Java as arrays and `Value` wrappers, which the interpreter marshals and
 the compiler does not. Lifting that would mean moving the marshalling somewhere both can reach, the

@@ -41,7 +41,10 @@ final class Machine implements StatementContext {
     private final Map<Key, Object> services;
     private final javax0.bubas.api.BubasCallInterceptor interceptor;
     private final MathContext mathContext;
+    private final Limits limits;
     private final BiConsumer<String, String> logger;
+    /** Statements executed and loop passes taken, together. Never reset; a run happens once. */
+    private long steps;
 
     /**
      * The statement being executed, so anything raised below can name a line.
@@ -53,11 +56,12 @@ final class Machine implements StatementContext {
     private Map<String, CoreArgument> arguments = Map.of();
 
     Machine(CoreProgram program, Object[] slots, Map<Class<?>, Map<String, Object>> services,
-            MathContext mathContext, BiConsumer<String, String> logger,
+            MathContext mathContext, Limits limits, BiConsumer<String, String> logger,
             javax0.bubas.api.BubasCallInterceptor interceptor) {
         this.program = program;
         this.slots = slots;
         this.mathContext = mathContext;
+        this.limits = limits;
         this.logger = logger;
         this.interceptor = interceptor;
         this.services = new HashMap<>();
@@ -82,6 +86,7 @@ final class Machine implements StatementContext {
 
     private void execute(CoreStatement statement) {
         current = statement.line();
+        step();
         switch (statement) {
             case CoreStatement.Branch branch -> branch(branch);
             case CoreStatement.Loop loop -> loop(loop);
@@ -108,13 +113,18 @@ final class Machine implements StatementContext {
 
     private void loop(CoreStatement.Loop loop) {
         try {
+            // A pass costs a step of its own: testing the condition is work the program does,
+            // and on a FOR so is moving the counter.
             if (loop.testAtEnd()) {
                 do {
                     execute(loop.body());
+                    step();
                 } while (truth(loop.condition()));
             } else {
+                step();
                 while (truth(loop.condition())) {
                     execute(loop.body());
+                    step();
                 }
             }
         } catch (Signal.Broke leave) {
@@ -138,6 +148,7 @@ final class Machine implements StatementContext {
         slots[loop.slot()] = from;
         try {
             while (step > 0 ? (Long) slots[loop.slot()] <= to : (Long) slots[loop.slot()] >= to) {
+                step();
                 execute(loop.body());
                 slots[loop.slot()] = trapping(() -> CoreArithmetic.integer(
                         CoreExpression.Operator.ADD, (Long) slots[loop.slot()], step));
@@ -397,6 +408,31 @@ final class Machine implements StatementContext {
 
     private BubasException fail(String message) {
         return new BubasException(message, current.line(), current.source());
+    }
+
+    /**
+     * One statement executed, or one pass of a loop.
+     * <p>
+     * A pass is not free and is not a statement: a {@code WHILE} evaluates its condition and a
+     * {@code FOR} moves and tests its counter, and a program doing that a billion times is spending
+     * a billion steps whatever its body contains. Counting only statements would price that at
+     * whatever the body happens to cost.
+     */
+    private void step() {
+        if (++steps > limits.steps()) {
+            throw fail("this run has taken more than " + limits.steps()
+                    + " steps and has been stopped");
+        }
+    }
+
+    @Override
+    public long maxSteps() {
+        return limits.steps();
+    }
+
+    @Override
+    public int maxArrayLength() {
+        return limits.arrayLength();
     }
 
     // ------------------------------------------------------------------ context
